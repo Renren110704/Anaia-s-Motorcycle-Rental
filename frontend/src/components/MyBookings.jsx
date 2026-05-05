@@ -328,7 +328,6 @@ const normalizeBooking = (booking) => {
     safeAccess(() => motorcycleObj.image) ||
     safeAccess(() => booking.motorcycleImage) ||
     "";
-  const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
   const resolveImageUrl = (image) => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];

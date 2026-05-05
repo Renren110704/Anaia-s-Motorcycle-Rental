@@ -276,24 +276,6 @@ const LeftPanel = ({ step }) => {
 };
 
 // ── Card — defined OUTSIDE SignUp so React doesn't remount it on every render ──
-const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
-const buildImageSrc = (image) => {
-  if (!image) return "";
-  if (Array.isArray(image)) image = image[0];
-  if (typeof image !== "string") return "";
-  const t = image.trim();
-  if (!t) return "";
-  if (/^data:image\//i.test(t)) return t;
-  if (/^https?:\/\//i.test(t)) {
-    // If it's a Cloudinary URL or any external URL, use as is
-    return t;
-  }
-  if (t.includes("cloudinary")) return t;
-  // Optionally, if you want to force all uploads to Cloudinary, build the URL here
-  // return `${CLOUDINARY_BASE}/your-cloud-name/image/upload/${t}`;
-  if (t.startsWith("/")) return `${API_BASE_URL}${t}`;
-  return `${API_BASE_URL}/uploads/${t}`;
-};
 const Card = ({ children, bgImage }) => (
   <div
     className="min-h-screen w-full flex items-center justify-center p-4"

@@ -242,12 +242,6 @@ const parseLocalDateTime = (dateStr, timeStr) => {
 
 const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
 const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-const normalizeLocalUploadPath = (pathValue) => {
-  const cleaned = String(pathValue || "").trim().replace(/^\/+/, "");
-  if (!cleaned) return "";
-  if (cleaned.startsWith("uploads/")) return `${API_BASE}/${cleaned}`;
-  return `${API_BASE}/uploads/${cleaned}`;
-};
 const buildImageSrc = (image) => {
   if (!image) return `${API_BASE}/uploads/default-motorcycle.png`;
   if (Array.isArray(image)) image = image[0];

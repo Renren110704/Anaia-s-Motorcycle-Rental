@@ -15,7 +15,6 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles";
-import API_BASE_URL from "../apiBase";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const ITEMS_PER_PAGE = 12;
@@ -428,12 +427,6 @@ const Motorcycles = () => {
 
   const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
   const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-  const normalizeLocalUploadPath = (pathValue) => {
-    const cleaned = String(pathValue || "").trim().replace(/^\/+/, "");
-    if (!cleaned) return "";
-    if (cleaned.startsWith("uploads/")) return `${base}/${cleaned}`;
-    return `${base}/uploads/${cleaned}`;
-  };
 
   const buildImageSrc = (image) => {
     if (!image) return "";

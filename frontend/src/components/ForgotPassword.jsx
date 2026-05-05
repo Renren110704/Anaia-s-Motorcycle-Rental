@@ -17,6 +17,7 @@ import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import axios from "axios";
 import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
+import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 const inputCls =
@@ -167,6 +168,12 @@ const ForgotPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const resendCooldown = useResendCooldown({
+    storageKey: email ? `otpCooldown:forgotPassword:${email}` : null,
+    cooldownSeconds: 60,
+  });
 
   const getPasswordStrength = (pass) => {
     let s = 0;
@@ -187,6 +194,7 @@ const ForgotPassword = () => {
       );
       if (res.status >= 200 && res.status < 300) {
         toast.success("Password reset OTP sent to your email!");
+        resendCooldown.startCooldown();
         setStep(2);
       }
     } catch (err) {
@@ -226,14 +234,16 @@ const ForgotPassword = () => {
   };
 
   const handleResendOTP = async () => {
+    if (!resendCooldown.canResend || resending || loading) return;
+    setResending(true);
     try {
-      await axios.post(
-        `${API_BASE}/api/auth/request-password-reset`,
-        { email },
-      );
+      await axios.post(`${API_BASE}/api/auth/request-password-reset`, { email });
       toast.success("OTP resent successfully!");
+      resendCooldown.startCooldown();
     } catch {
       toast.error("Failed to resend OTP");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -413,9 +423,16 @@ const ForgotPassword = () => {
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  className="text-sm text-[#b50002] font-medium hover:underline text-left"
+                  disabled={!resendCooldown.canResend || resending || loading}
+                  className={`text-sm font-medium text-left transition-colors ${
+                    !resendCooldown.canResend || resending || loading
+                      ? "text-[#171717]/40 cursor-not-allowed"
+                      : "text-[#b50002] hover:underline"
+                  }`}
                 >
-                  Didn't receive it? Resend OTP
+                  {!resendCooldown.canResend
+                    ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
+                    : "Didn't receive it? Resend OTP"}
                 </button>
 
                 <div className="flex items-center justify-between mt-auto pt-2">

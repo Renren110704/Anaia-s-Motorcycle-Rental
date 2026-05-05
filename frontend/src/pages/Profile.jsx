@@ -23,6 +23,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import API_BASE_URL from "../apiBase";
+import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 
 const BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
@@ -276,6 +277,36 @@ const Profile = () => {
   const [showEmailOTP, setShowEmailOTP] = useState(false);
   const [emailOTP, setEmailOTP] = useState("");
   const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [resendingEmailOtp, setResendingEmailOtp] = useState(false);
+
+  const emailChangeOtpCooldown = useResendCooldown({
+    storageKey: pendingEmail ? `otpCooldown:emailChange:${pendingEmail}` : null,
+    cooldownSeconds: 60,
+  });
+
+  const handleResendEmailChangeOTP = async () => {
+    if (!emailChangeOtpCooldown.canResend || resendingEmailOtp || updating)
+      return;
+    if (!pendingEmail) {
+      toast.error("New email is missing");
+      return;
+    }
+    setResendingEmailOtp(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${BASE}/api/auth/request-email-change-otp`,
+        { newEmail: pendingEmail },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success("OTP resent!");
+      emailChangeOtpCooldown.startCooldown();
+    } catch {
+      toast.error("Failed to resend OTP");
+    } finally {
+      setResendingEmailOtp(false);
+    }
+  };
 
   const {
     regions,
@@ -424,6 +455,7 @@ const Profile = () => {
         );
         if (res.data.success) {
           toast.success("OTP sent to your new email address!");
+          emailChangeOtpCooldown.startCooldown();
           setShowEmailOTP(true);
         }
       } catch (err) {
@@ -1055,22 +1087,23 @@ const Profile = () => {
 
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const token = localStorage.getItem("token");
-                        await axios.post(
-                          `${BASE}/api/auth/request-email-change-otp`,
-                          { newEmail: pendingEmail },
-                          { headers: { Authorization: `Bearer ${token}` } },
-                        );
-                        toast.success("OTP resent!");
-                      } catch {
-                        toast.error("Failed to resend OTP");
-                      }
-                    }}
-                    className="text-sm text-[#b50002] font-medium hover:underline"
+                    onClick={handleResendEmailChangeOTP}
+                    disabled={
+                      !emailChangeOtpCooldown.canResend ||
+                      resendingEmailOtp ||
+                      updating
+                    }
+                    className={`text-sm font-medium hover:underline transition-colors ${
+                      !emailChangeOtpCooldown.canResend ||
+                      resendingEmailOtp ||
+                      updating
+                        ? "text-[#171717]/40 cursor-not-allowed"
+                        : "text-[#b50002]"
+                    }`}
                   >
-                    Didn't receive it? Resend OTP
+                    {!emailChangeOtpCooldown.canResend
+                      ? `Resend OTP in ${formatCooldown(emailChangeOtpCooldown.remainingSeconds)}`
+                      : "Didn't receive it? Resend OTP"}
                   </button>
 
                   <div className="flex gap-3 pt-1">

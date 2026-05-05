@@ -20,6 +20,7 @@ import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import axios from "axios";
 import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
+import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 
 const PH_API = "https://psgc.gitlab.io/api";
 
@@ -461,6 +462,12 @@ const SignUp = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const resendCooldown = useResendCooldown({
+    storageKey: formData.email ? `otpCooldown:signupVerify:${formData.email}` : null,
+    cooldownSeconds: 60,
+  });
 
   const {
     regions,
@@ -603,6 +610,7 @@ const SignUp = () => {
         toast.success(
           "Registration successful! Please check your email for OTP.",
         );
+        resendCooldown.startCooldown();
         setStep(3);
       }
     } catch (err) {
@@ -641,14 +649,23 @@ const SignUp = () => {
   };
 
   const handleResendOTP = async () => {
+    if (!resendCooldown.canResend || resending || loading) return;
+    if (!formData.email) {
+      toast.error("Email is missing");
+      return;
+    }
+    setResending(true);
     try {
       await axios.post(
         `${API_BASE}/api/auth/resend-verification-otp`,
         { email: formData.email },
       );
       toast.success("OTP resent successfully!");
+      resendCooldown.startCooldown();
     } catch {
       toast.error("Failed to resend OTP");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -1226,9 +1243,16 @@ const SignUp = () => {
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  className="text-sm text-[#b50002] font-medium hover:underline transition-colors"
+                  disabled={!resendCooldown.canResend || resending || loading}
+                  className={`text-sm font-medium transition-colors ${
+                    !resendCooldown.canResend || resending || loading
+                      ? "text-[#171717]/40 cursor-not-allowed"
+                      : "text-[#b50002] hover:underline"
+                  }`}
                 >
-                  Didn't receive it? Resend OTP
+                  {!resendCooldown.canResend
+                    ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
+                    : "Didn't receive it? Resend OTP"}
                 </button>
               </form>
 

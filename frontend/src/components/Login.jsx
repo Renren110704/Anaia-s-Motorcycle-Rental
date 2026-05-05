@@ -16,6 +16,7 @@ import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
 import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
+import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 const inputCls =
@@ -165,12 +166,31 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resendingLoginOtp, setResendingLoginOtp] = useState(false);
+  const [resendingVerificationOtp, setResendingVerificationOtp] = useState(false);
+
+  const loginOtpCooldown = useResendCooldown({
+    storageKey: credentials.email ? `otpCooldown:loginOtp:${credentials.email}` : null,
+    cooldownSeconds: 60,
+  });
+
+  const verificationOtpCooldown = useResendCooldown({
+    storageKey: unverifiedEmail ? `otpCooldown:verifyEmail:${unverifiedEmail}` : null,
+    cooldownSeconds: 60,
+  });
 
   const handleChange = (e) => {
     setCredentials((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleResendVerification = async () => {
+    if (!verificationOtpCooldown.canResend || resendingVerificationOtp || loading)
+      return;
+    if (!unverifiedEmail) {
+      toast.error("Email is missing");
+      return;
+    }
+    setResendingVerificationOtp(true);
     try {
       await axios.post(
         `${API_BASE}/api/auth/resend-verification-otp`,
@@ -179,10 +199,48 @@ const Login = () => {
         },
       );
       toast.success("Verification OTP sent! Please check your email.");
+      verificationOtpCooldown.startCooldown();
       setStep(3);
       setNeedsVerification(false);
     } catch {
       toast.error("Failed to resend verification OTP");
+    } finally {
+      setResendingVerificationOtp(false);
+    }
+  };
+
+  const handleResendLoginOTP = async () => {
+    if (!loginOtpCooldown.canResend || resendingLoginOtp || loading) return;
+    if (!credentials.email || !credentials.password) {
+      toast.error("Please enter your email and password again");
+      setStep(1);
+      return;
+    }
+    setResendingLoginOtp(true);
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, credentials, {
+        headers: { "Content-Type": "application/json" },
+      });
+      const { requiresOTP, message } = res.data || {};
+      if (requiresOTP) {
+        toast.success(message || "OTP resent to your email.");
+        loginOtpCooldown.startCooldown();
+        setOtp("");
+        setStep(2);
+      } else {
+        toast.error("Unable to resend OTP");
+      }
+    } catch (err) {
+      if (err.response?.data?.needsVerification) {
+        setNeedsVerification(true);
+        setUnverifiedEmail(credentials.email);
+        toast.error("Please verify your email first.", { autoClose: 5000 });
+        setStep(1);
+      } else {
+        toast.error(err.response?.data?.message || "Failed to resend OTP");
+      }
+    } finally {
+      setResendingLoginOtp(false);
     }
   };
 
@@ -202,6 +260,7 @@ const Login = () => {
         const { requiresOTP, message } = res.data || {};
         if (requiresOTP) {
           toast.success(message || "OTP sent to your email.");
+          loginOtpCooldown.startCooldown();
           setStep(2);
         }
       }
@@ -361,9 +420,18 @@ const Login = () => {
                       <button
                         type="button"
                         onClick={handleResendVerification}
-                        className="text-xs text-[#b50002] font-semibold underline hover:text-[#900000]"
+                        disabled={!verificationOtpCooldown.canResend || resendingVerificationOtp || loading}
+                        className={`text-xs font-semibold underline transition-colors ${
+                          !verificationOtpCooldown.canResend ||
+                          resendingVerificationOtp ||
+                          loading
+                            ? "text-[#171717]/40 cursor-not-allowed"
+                            : "text-[#b50002] hover:text-[#900000]"
+                        }`}
                       >
-                        Resend Verification Email
+                        {!verificationOtpCooldown.canResend
+                          ? `Resend in ${formatCooldown(verificationOtpCooldown.remainingSeconds)}`
+                          : "Resend Verification Email"}
                       </button>
                     </div>
                   </div>
@@ -422,6 +490,21 @@ const Login = () => {
                   />
                 </Field>
 
+                <button
+                  type="button"
+                  onClick={handleResendLoginOTP}
+                  disabled={!loginOtpCooldown.canResend || resendingLoginOtp || loading}
+                  className={`text-sm font-medium hover:underline text-left transition-colors ${
+                    !loginOtpCooldown.canResend || resendingLoginOtp || loading
+                      ? "text-[#171717]/40 cursor-not-allowed"
+                      : "text-[#b50002]"
+                  }`}
+                >
+                  {!loginOtpCooldown.canResend
+                    ? `Resend OTP in ${formatCooldown(loginOtpCooldown.remainingSeconds)}`
+                    : "Didn't receive it? Resend OTP"}
+                </button>
+
                 <div className="flex items-center justify-between mt-auto pt-2">
                   <button
                     type="button"
@@ -478,9 +561,18 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={handleResendVerification}
-                  className="text-sm text-[#b50002] font-medium hover:underline text-left"
+                  disabled={!verificationOtpCooldown.canResend || resendingVerificationOtp || loading}
+                  className={`text-sm font-medium hover:underline text-left transition-colors ${
+                    !verificationOtpCooldown.canResend ||
+                    resendingVerificationOtp ||
+                    loading
+                      ? "text-[#171717]/40 cursor-not-allowed"
+                      : "text-[#b50002]"
+                  }`}
                 >
-                  Didn't receive it? Resend OTP
+                  {!verificationOtpCooldown.canResend
+                    ? `Resend OTP in ${formatCooldown(verificationOtpCooldown.remainingSeconds)}`
+                    : "Didn't receive it? Resend OTP"}
                 </button>
 
                 <div className="flex items-center justify-between mt-auto pt-2">

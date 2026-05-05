@@ -1,0 +1,207 @@
+import mongoose from "mongoose";
+
+const { Schema } = mongoose;
+
+// ── Address sub-document ──────────────────────────────────────────────────────
+const addressSchema = new Schema(
+  {
+    barangay: { type: String, default: "" },
+    street: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    region: { type: String, default: "" },
+    zipCode: { type: String, default: "" },
+  },
+  { _id: false, default: {} },
+);
+
+// ── Motorcycle snapshot sub-document ─────────────────────────────────────────
+const motorcycleSummarySchema = new Schema(
+  {
+    id: { type: Schema.Types.ObjectId, ref: "Motorcycle", required: true },
+    unitId: { type: String, default: "" },
+    make: { type: String, default: "" },
+    model: { type: String, default: "" },
+    year: Number,
+    dailyRate: { type: Number, default: 0 },
+    category: { type: String, default: "Scooter" },
+    engineSize: { type: Number, default: 150 },
+    transmission: { type: String, default: "Manual" },
+    fuelType: { type: String, default: "Unleaded" },
+    mileage: { type: Number, default: 0 },
+    hasABS: { type: Boolean, default: false },
+    hasHelmet: { type: Boolean, default: true },
+    image: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
+// ── Booking details sub-document (fees, extras, pickup location) ──────────────
+// Previously missing — caused helmet fee & distance fee to be silently dropped.
+const bookingDetailsSchema = new Schema(
+  {
+    pickupLocation: { type: String, default: "" },
+    distanceFee: { type: Number, default: 0 },
+    distanceTierLabel: { type: String, default: "" },
+    helmetRequested: { type: Boolean, default: false },
+    helmetFee: { type: Number, default: 0 },
+    destinationCity: { type: String, default: "" },
+    // legacy / extra fields — store anything else sent from the frontend
+    engineSize: { type: Number, default: null },
+    transmission: { type: String, default: "" },
+    fuelType: { type: String, default: "" },
+    fuel: { type: String, default: "" },
+    hasABS: { type: Boolean, default: null },
+    dailyRate: { type: Number, default: null },
+  },
+  {
+    _id: false,
+    // Allow any extra keys the frontend might send in the future
+    strict: false,
+  },
+);
+
+const motorcycleBookingSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    customer: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true },
+    phone: { type: String, default: "" },
+    motorcycle: { type: motorcycleSummarySchema, required: true },
+    motorcycleImage: { type: String, default: "" },
+
+    pickupDate: { type: Date, required: true },
+    pickupTime: {
+      type: String,
+      required: true,
+      match: [/^([01]\d|2[0-3]):[0-5]\d$/, "pickupTime must be HH:mm"],
+      default: "08:00",
+    },
+    returnDate: { type: Date, required: true },
+    returnTime: {
+      type: String,
+      required: true,
+      match: [/^([01]\d|2[0-3]):[0-5]\d$/, "returnTime must be HH:mm"],
+      default: "08:00",
+    },
+
+    destination: { type: String, required: true, trim: true },
+
+    // bookingDate is set explicitly so we always capture exact creation time.
+    // We rely on createdAt from timestamps as a fallback, but keep bookingDate
+    // for backwards-compatibility with existing records.
+    bookingDate: { type: Date, default: Date.now },
+
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "pending_reservation",
+        "pending_full_payment",
+        "active",
+        "completed",
+        "cancelled",
+      ],
+      default: "pending_reservation",
+    },
+
+    amount: { type: Number, default: 0 },
+    reservationFee: { type: Number, default: 200 },
+    reservationFeePaid: { type: Boolean, default: false },
+    paymentStatus: {
+      type: String,
+      enum: [
+        "pending_verification",
+        "reservation_paid",
+        "fully_paid",
+        "rejected",
+      ],
+      default: "pending_verification",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "GCash", "PayMaya", "Bank Transfer"],
+      default: "Cash",
+    },
+    reservationPaymentMethod: { type: String, default: "" },
+
+    paymentProofImage: { type: String, default: "" },
+    paymentReferenceId: { type: String, default: "" },
+    paymentSentAt: { type: Date, default: null },
+    paymentSentAmount: { type: Number, default: 0 },
+    requiresProofReupload: { type: Boolean, default: false },
+    adminReviewComment: { type: String, default: "" },
+    adminReviewedAt: { type: Date, default: null },
+    reservationConfirmedAt: { type: Date, default: null },
+    fullPaymentConfirmedAt: { type: Date, default: null },
+    receiptVerification: {
+      status: {
+        type: String,
+        enum: ["pending", "verified", "suspected_fake", "failed"],
+        default: "pending",
+      },
+      score: { type: Number, default: 0 },
+      provider: { type: String, default: "local-rule-engine" },
+      reasons: { type: [String], default: [] },
+      checkedAt: { type: Date, default: Date.now },
+    },
+
+    // ── The previously-missing details field ──────────────────────────────────
+    details: { type: bookingDetailsSchema, default: () => ({}) },
+
+    address: { type: addressSchema, default: () => ({}) },
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
+// ── Pre-validate: populate motorcycle snapshot from DB if fields are missing ──
+motorcycleBookingSchema.pre("validate", async function (next) {
+  if (!this.motorcycle?.id) return next();
+
+  const { make, model, dailyRate } = this.motorcycle;
+  if (make || model || dailyRate) return next();
+
+  try {
+    const Motorcycle =
+      mongoose.models.Motorcycle || mongoose.model("Motorcycle");
+    const motorcycleDoc = await Motorcycle.findById(this.motorcycle.id).lean();
+    if (motorcycleDoc) {
+      Object.assign(this.motorcycle, {
+        unitId: motorcycleDoc.unitId ?? this.motorcycle.unitId ?? "",
+        make: motorcycleDoc.make ?? this.motorcycle.make,
+        model: motorcycleDoc.model ?? this.motorcycle.model,
+        year: motorcycleDoc.year ?? this.motorcycle.year,
+        dailyRate: motorcycleDoc.dailyRate ?? this.motorcycle.dailyRate,
+        engineSize: motorcycleDoc.engineSize ?? this.motorcycle.engineSize,
+        transmission:
+          motorcycleDoc.transmission ?? this.motorcycle.transmission,
+        fuelType: motorcycleDoc.fuelType ?? this.motorcycle.fuelType,
+        mileage: motorcycleDoc.mileage ?? this.motorcycle.mileage,
+        hasABS: motorcycleDoc.hasABS ?? this.motorcycle.hasABS,
+        hasHelmet: motorcycleDoc.hasHelmet ?? this.motorcycle.hasHelmet,
+        image: motorcycleDoc.image ?? this.motorcycle.image,
+      });
+      if (!this.motorcycleImage)
+        this.motorcycleImage = motorcycleDoc.image || "";
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Speeds up "My Bookings" list fetch by user with newest-first sort.
+motorcycleBookingSchema.index({ userId: 1, bookingDate: -1 });
+// Speeds up overlap checks used during booking creation and walk-in booking.
+motorcycleBookingSchema.index({
+  "motorcycle.id": 1,
+  status: 1,
+  pickupDate: 1,
+  returnDate: 1,
+  isDeleted: 1,
+});
+
+export default mongoose.models.MotorcycleBooking ||
+  mongoose.model("MotorcycleBooking", motorcycleBookingSchema);

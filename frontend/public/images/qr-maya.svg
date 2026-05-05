@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="PayMaya QR">
+  <rect width="320" height="320" fill="#f1fff8"/>
+  <rect x="20" y="20" width="280" height="280" rx="20" fill="#ffffff" stroke="#059669" stroke-width="8"/>
+  <g fill="#111827">
+    <rect x="48" y="48" width="56" height="56"/>
+    <rect x="216" y="48" width="56" height="56"/>
+    <rect x="48" y="216" width="56" height="56"/>
+    <rect x="136" y="56" width="16" height="32"/>
+    <rect x="168" y="56" width="16" height="16"/>
+    <rect x="168" y="88" width="48" height="16"/>
+    <rect x="136" y="120" width="48" height="16"/>
+    <rect x="200" y="120" width="16" height="16"/>
+    <rect x="136" y="152" width="16" height="16"/>
+    <rect x="168" y="152" width="48" height="16"/>
+    <rect x="136" y="184" width="80" height="16"/>
+    <rect x="136" y="216" width="16" height="16"/>
+    <rect x="168" y="216" width="16" height="16"/>
+    <rect x="200" y="216" width="16" height="16"/>
+    <rect x="232" y="216" width="24" height="16"/>
+  </g>
+  <text x="160" y="302" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" fill="#047857" font-weight="700">PayMaya QR</text>
+</svg>

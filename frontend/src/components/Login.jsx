@@ -54,8 +54,8 @@ const buildImageSrc = (image) => {
   if (t.includes("cloudinary")) return t;
   // Optionally, if you want to force all uploads to Cloudinary, build the URL here
   // return `${CLOUDINARY_BASE}/your-cloud-name/image/upload/${t}`;
-  if (t.startsWith("/")) return `${API_BASE}${t}`;
-  return `${API_BASE}/uploads/${t}`;
+  if (t.startsWith("/")) return `${API_BASE_URL}${t}`;
+  return `${API_BASE_URL}/uploads/${t}`;
 };
 const Card = ({ children, bgImage }) => (
   <div

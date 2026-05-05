@@ -24,7 +24,7 @@ const sanitizeAllowedOriginEntry = (value) =>
 const defaultAllowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
-  "https://motorcycle-rental-system-04-11-26-dula.onrender.com",
+  "https://anaias-motorcycle-rental.onrender.com",
   "https://motorcycle-rental-system-04-11-26-d-nu.vercel.app",
   "https://*.vercel.app",
   "https://*.onrender.com",

@@ -233,7 +233,7 @@ const getUploadedUrl = async (file) => {
 
   console.error("[GETURL] Cloudinary upload failed, using local fallback");
   const filename = path.basename(absolutePath);
-  const localPath = `https://motorcycle-rental-system-04-11-26-dula.onrender.com/uploads/${filename}`;
+  const localPath = `https://anaias-motorcycle-rental.onrender.com/uploads/${filename}`;
   console.error("[GETURL] returning local fallback:", localPath);
   return localPath;
 };

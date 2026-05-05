@@ -10,7 +10,7 @@ const getDefaultApiBaseUrl = () => {
 
   // If this frontend is hosted on a static host like Hostinger,
   // use the Render backend service for API requests.
-  return "https://motorcycle-rental-system-04-11-26-dula.onrender.com";
+  return "https://anaias-motorcycle-rental.onrender.com";
 };
 
 const API_BASE_URL =

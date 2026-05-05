@@ -146,7 +146,7 @@ const Motorcycles = () => {
 
   const abortControllerRef = useRef(null);
   const topRef = useRef(null);
-  const base = 'https://motorcycle-rental-system-04-11-26-dula.onrender.com';
+  const base = 'https://anaias-motorcycle-rental.onrender.com';
   const limit = 100;
   const fallbackImage = `${base}/uploads/default-motorcycle.png`;
 
@@ -459,20 +459,20 @@ const Motorcycles = () => {
       return "https://res.cloudinary.com" + trimmed;
     }
     // If already starts with https for local uploads, return as-is
-    if (trimmed.startsWith("https://motorcycle-rental-system-04-11-26-dula.onrender.com/uploads/")) {
+    if (trimmed.startsWith("https://anaias-motorcycle-rental.onrender.com/uploads/")) {
       return trimmed;
     }
     // Handle local uploads path
     if (trimmed.startsWith("local/")) {
       const filename = trimmed.replace("local/", "");
-      return `https://motorcycle-rental-system-04-11-26-dula.onrender.com/uploads/${filename}`;
+      return `https://anaias-motorcycle-rental.onrender.com/uploads/${filename}`;
     }
     // Assume it's a Cloudinary public ID
     if (CLOUDINARY_CLOUD_NAME && trimmed) {
       return `${CLOUDINARY_BASE}${CLOUDINARY_CLOUD_NAME}/image/upload/${trimmed}`;
     }
     // Fallback: treat as filename from backend uploads
-    return 'https://motorcycle-rental-system-04-11-26-dula.onrender.com/uploads/' + trimmed;
+    return 'https://anaias-motorcycle-rental.onrender.com/uploads/' + trimmed;
   };
 
   const handleImageError = (e) => {

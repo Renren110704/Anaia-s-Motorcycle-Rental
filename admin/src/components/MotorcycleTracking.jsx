@@ -129,27 +129,6 @@ const isOutsideGeofence = (lat, lng, destinationStr) => {
   return true;
 };
 
-const buildAddressLabel = (payload = {}) => {
-  const addr = payload?.address || {};
-  const parts = [
-    addr.road,
-    addr.neighbourhood || addr.suburb || addr.village,
-    addr.city || addr.town || addr.municipality,
-    addr.state,
-  ].filter(Boolean);
-
-  if (parts.length > 0) return parts.join(", ");
-  return payload?.display_name || "";
-};
-
-const reverseGeocode = async (lat, lng) => {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("Reverse geocoding failed");
-  const data = await res.json().catch(() => ({}));
-  return buildAddressLabel(data);
-};
-
 // ── Formatters ────────────────────────────────────────────────────────────────
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";

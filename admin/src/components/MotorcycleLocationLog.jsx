@@ -116,50 +116,6 @@ const MotorcycleLocationLog = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const deleteLogEntry = useCallback(async (log) => {
-    const confirmed = await confirmModal(
-      "Would you like to delete this location record?",
-    );
-    if (!confirmed) return;
-
-    try {
-      await api.delete("/api/tracking/location-log", {
-        data: {
-          key: log.key || "",
-          bookingId: log.bookingId || "",
-          motorcycleId: log.motorcycleId || "",
-          unitId: log.unitId || "",
-        },
-      });
-
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const existing = Array.isArray(parsed)
-        ? parsed
-        : Object.values(parsed || {});
-      const targetKey =
-        log.id || log.unitId || log.motorcycleId || log.bookingId;
-
-      const next = existing.filter((entry) => {
-        const entryKey =
-          entry.id || entry.unitId || entry.motorcycleId || entry.bookingId;
-        if (log.bookingId && String(entry.bookingId || "") === String(log.bookingId)) return false;
-        if (targetKey && entryKey && entryKey === targetKey) return false;
-        return !(
-          entry.unitId === log.unitId &&
-          entry.motorcycleId === log.motorcycleId &&
-          entry.bookingId === log.bookingId
-        );
-      });
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      await loadLogs();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to delete location log entry.");
-    }
-  }, []);
-
   const loadLogs = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -182,6 +138,57 @@ const MotorcycleLocationLog = () => {
       setLoading(false);
     }
   }, []);
+
+  const deleteLogEntry = useCallback(
+    async (log) => {
+      const confirmed = await confirmModal(
+        "Would you like to delete this location record?",
+      );
+      if (!confirmed) return;
+
+      try {
+        await api.delete("/api/tracking/location-log", {
+          data: {
+            key: log.key || "",
+            bookingId: log.bookingId || "",
+            motorcycleId: log.motorcycleId || "",
+            unitId: log.unitId || "",
+          },
+        });
+
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const existing = Array.isArray(parsed)
+          ? parsed
+          : Object.values(parsed || {});
+        const targetKey =
+          log.id || log.unitId || log.motorcycleId || log.bookingId;
+
+        const next = existing.filter((entry) => {
+          const entryKey =
+            entry.id || entry.unitId || entry.motorcycleId || entry.bookingId;
+          if (
+            log.bookingId &&
+            String(entry.bookingId || "") === String(log.bookingId)
+          )
+            return false;
+          if (targetKey && entryKey && entryKey === targetKey) return false;
+          return !(
+            entry.unitId === log.unitId &&
+            entry.motorcycleId === log.motorcycleId &&
+            entry.bookingId === log.bookingId
+          );
+        });
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        await loadLogs();
+      } catch (err) {
+        console.error(err);
+        setError("Failed to delete location log entry.");
+      }
+    },
+    [loadLogs],
+  );
 
   useEffect(() => {
     loadLogs();

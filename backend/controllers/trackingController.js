@@ -14,7 +14,14 @@ const parseDate = (value) => {
 };
 
 const getEntryKey = (entry = {}) =>
-  String(entry.key || entry.id || entry.unitId || entry.motorcycleId || entry.bookingId || "").trim();
+  String(
+    entry.key ||
+      entry.id ||
+      entry.unitId ||
+      entry.motorcycleId ||
+      entry.bookingId ||
+      "",
+  ).trim();
 
 const toNumberOrNull = (v) => {
   const n = Number(v);
@@ -67,7 +74,10 @@ const mergeByNewest = (entries = []) => {
     const key = getEntryKey(entry);
     if (!key) return;
     const prev = merged.get(key);
-    if (!prev) { merged.set(key, { ...entry, key }); return; }
+    if (!prev) {
+      merged.set(key, { ...entry, key });
+      return;
+    }
     const prevTime = parseDate(prev.lastUpdatedAt)?.getTime() || 0;
     const currTime = parseDate(entry.lastUpdatedAt)?.getTime() || 0;
     merged.set(key, currTime >= prevTime ? { ...entry, key } : prev);
@@ -79,8 +89,10 @@ const mergeByNewest = (entries = []) => {
   });
 };
 
-// Now accepts deviceUniqueId parameter for per-motorcycle tracking
-const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCAR_DEVICE_UNIQUE_ID } = {}) => {
+const fetchTraccarLiveSnapshot = async ({
+  force = false,
+  deviceUniqueId = TRACCAR_DEVICE_UNIQUE_ID,
+} = {}) => {
   if (!deviceUniqueId || deviceUniqueId.trim() === "") {
     throw new Error("No Traccar device ID configured");
   }
@@ -93,7 +105,9 @@ const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCA
   );
   const deviceJson = await deviceRes.json().catch(() => []);
   if (!deviceRes.ok) {
-    throw new Error(deviceJson?.message || `Unable to load Traccar device ${deviceUniqueId}`);
+    throw new Error(
+      deviceJson?.message || `Unable to load Traccar device ${deviceUniqueId}`,
+    );
   }
 
   const device = Array.isArray(deviceJson)
@@ -112,11 +126,16 @@ const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCA
     );
     const positionJson = await positionRes.json().catch(() => []);
     if (!positionRes.ok) {
-      throw new Error(positionJson?.message || "Unable to load Traccar position");
+      throw new Error(
+        positionJson?.message || "Unable to load Traccar position",
+      );
     }
     position = Array.isArray(positionJson)
       ? positionJson[0]
-      : positionJson?.data?.[0] || positionJson?.positions?.[0] || positionJson || null;
+      : positionJson?.data?.[0] ||
+        positionJson?.positions?.[0] ||
+        positionJson ||
+        null;
   }
 
   if (!position) {
@@ -126,12 +145,17 @@ const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCA
     );
     const positionsJson = await positionsRes.json().catch(() => []);
     if (!positionsRes.ok) {
-      throw new Error(positionsJson?.message || "Unable to load Traccar positions");
+      throw new Error(
+        positionsJson?.message || "Unable to load Traccar positions",
+      );
     }
     const positions = Array.isArray(positionsJson)
       ? positionsJson
       : positionsJson?.data || positionsJson?.positions || [];
-    position = positions.find((entry) => Number(entry?.deviceId) === Number(device.id)) || null;
+    position =
+      positions.find(
+        (entry) => Number(entry?.deviceId) === Number(device.id),
+      ) || null;
   }
 
   if (!position) {
@@ -153,7 +177,10 @@ const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCA
     new Date().toISOString();
 
   const geocodedAddress = await reverseGeocodeCoordinates(lat, lng);
-  const address = geocodedAddress || position.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  const address =
+    geocodedAddress ||
+    position.address ||
+    `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
   return {
     id: device.id || device.uniqueId || deviceUniqueId,
@@ -174,11 +201,11 @@ const fetchTraccarLiveSnapshot = async ({ force = false, deviceUniqueId = TRACCA
   };
 };
 
-// Now accepts ?deviceId= query param for per-motorcycle tracking
 export const getTrackingLive = async (req, res, next) => {
   try {
     const force = req.query.force === "true";
-    const deviceUniqueId = req.query.deviceId?.trim() || TRACCAR_DEVICE_UNIQUE_ID;
+    const deviceUniqueId =
+      req.query.deviceId?.trim() || TRACCAR_DEVICE_UNIQUE_ID;
 
     if (!deviceUniqueId || deviceUniqueId.trim() === "") {
       return res.json({ success: false, message: "No tracker configured" });
@@ -193,10 +220,14 @@ export const getTrackingLive = async (req, res, next) => {
 
 export const syncTrackingSnapshots = async (req, res, next) => {
   try {
-    const snapshots = Array.isArray(req.body?.snapshots) ? req.body.snapshots : [];
+    const snapshots = Array.isArray(req.body?.snapshots)
+      ? req.body.snapshots
+      : [];
 
     if (snapshots.length === 0) {
-      return res.status(400).json({ success: false, message: "snapshots[] is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "snapshots[] is required" });
     }
 
     const docs = snapshots
@@ -225,10 +256,21 @@ export const syncTrackingSnapshots = async (req, res, next) => {
       .filter((doc) => doc.lat !== null && doc.lng !== null);
 
     if (docs.length === 0) {
-      return res.status(400).json({ success: false, message: "No valid snapshots to sync" });
-    }
+      return res
+        .status(400)
+        .json({ success: false, message: "No valid snapshots to sync" });
+    } // Use upsert instead of insertMany to prevent duplicate entries
 
-    await LocationSnapshot.insertMany(docs, { ordered: false });
+    await Promise.all(
+      docs.map((doc) =>
+        LocationSnapshot.updateOne(
+          { key: doc.key },
+          { $set: doc },
+          { upsert: true },
+        ),
+      ),
+    );
+
     res.json({ success: true, synced: docs.length });
   } catch (err) {
     next(err);
@@ -259,9 +301,17 @@ export const getTrackingLocationLog = async (req, res, next) => {
       ...dateFilter,
     })
       .select({
-        _id: 1, customer: 1, status: 1, updatedAt: 1, bookingDate: 1,
-        createdAt: 1, pickupDate: 1, returnDate: 1, destination: 1,
-        motorcycle: 1, details: 1,
+        _id: 1,
+        customer: 1,
+        status: 1,
+        updatedAt: 1,
+        bookingDate: 1,
+        createdAt: 1,
+        pickupDate: 1,
+        returnDate: 1,
+        destination: 1,
+        motorcycle: 1,
+        details: 1,
       })
       .sort({ bookingDate: -1 })
       .limit(limit)
@@ -276,12 +326,18 @@ export const getTrackingLocationLog = async (req, res, next) => {
 
     const bookingLogs = bookings.map((b) => {
       const locationObj =
-        b?.details?.lastKnownLocation || b?.details?.location || b?.location || null;
+        b?.details?.lastKnownLocation ||
+        b?.details?.location ||
+        b?.location ||
+        null;
       const lat = toNumberOrNull(locationObj?.lat ?? locationObj?.latitude);
       const lng = toNumberOrNull(locationObj?.lng ?? locationObj?.longitude);
       const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lng);
       const bUnitId = b?.motorcycle?.unitId || "";
-      const motorcycleName = [b?.motorcycle?.make, b?.motorcycle?.model].filter(Boolean).join(" ").trim();
+      const motorcycleName = [b?.motorcycle?.make, b?.motorcycle?.model]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
 
       return {
         key: `${bUnitId || b?.motorcycle?.id || b?._id || ""}`,
@@ -296,33 +352,54 @@ export const getTrackingLocationLog = async (req, res, next) => {
         lng: hasCoordinates ? lng : null,
         locationText: hasCoordinates
           ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-          : b?.destination || b?.details?.pickupLocation || "No location data available",
-        lastUpdatedAt: locationObj?.updatedAt || b?.updatedAt || b?.bookingDate || b?.createdAt || "",
+          : b?.destination ||
+            b?.details?.pickupLocation ||
+            "No location data available",
+        lastUpdatedAt:
+          locationObj?.updatedAt ||
+          b?.updatedAt ||
+          b?.bookingDate ||
+          b?.createdAt ||
+          "",
         source: hasCoordinates ? "Booking GPS" : "Booking destination",
       };
     });
 
     let snapshotQuery = {};
     if (unitId) snapshotQuery.unitId = unitId;
-    if (Object.keys(dateFilter).length > 0) snapshotQuery = { ...snapshotQuery, ...dateFilter };
+    if (Object.keys(dateFilter).length > 0)
+      snapshotQuery = { ...snapshotQuery, ...dateFilter };
 
     const snapshotsRaw = await LocationSnapshot.find(snapshotQuery)
-      .sort({ lastUpdatedAt: -1 }).limit(limit).lean();
+      .sort({ lastUpdatedAt: -1 })
+      .limit(limit)
+      .lean();
 
     const snapshots = snapshotsRaw
       .map((s) => ({
-        key: s.key, id: s.id, motorcycleId: s.motorcycleId, bookingId: s.bookingId,
-        unitId: s.unitId, motorcycleName: s.motorcycleName, customer: s.customer,
-        status: s.status, lat: toNumberOrNull(s.lat), lng: toNumberOrNull(s.lng),
-        locationText: s.locationText, lastUpdatedAt: s.lastUpdatedAt,
-        source: s.source, resolvedLocation: s.resolvedLocation,
+        key: s.key,
+        id: s.id,
+        motorcycleId: s.motorcycleId,
+        bookingId: s.bookingId,
+        unitId: s.unitId,
+        motorcycleName: s.motorcycleName,
+        customer: s.customer,
+        status: s.status,
+        lat: toNumberOrNull(s.lat),
+        lng: toNumberOrNull(s.lng),
+        locationText: s.locationText,
+        lastUpdatedAt: s.lastUpdatedAt,
+        source: s.source,
+        resolvedLocation: s.resolvedLocation,
       }))
       .filter((s) => {
-        if (deletedLocationBookingIds.has(String(s.bookingId || ""))) return false;
+        if (deletedLocationBookingIds.has(String(s.bookingId || "")))
+          return false; // Filter out old hardcoded tracker snapshots
+        const sUnitId = String(s.unitId || "").trim();
+        if (sUnitId === "9210010703" || sUnitId === "GEAR-BK-01") return false;
         return true;
       });
 
-    // Per-motorcycle live tracker lookup using traccarDeviceId
     const liveSnapshotsByUnitId = new Map();
     for (const booking of bookings) {
       const motorcycleId = booking?.motorcycle?.id || booking?.motorcycle?._id;
@@ -330,78 +407,144 @@ export const getTrackingLocationLog = async (req, res, next) => {
       if (!motorcycleId || !bUnitId) continue;
 
       try {
-        const motorcycle = await Motorcycle.findById(motorcycleId).select("traccarDeviceId").lean();
+        const motorcycle = await Motorcycle.findById(motorcycleId)
+          .select("traccarDeviceId")
+          .lean();
         const traccarDeviceId = motorcycle?.traccarDeviceId?.trim() || "";
         if (!traccarDeviceId) continue;
 
-        console.log(`Fetching live tracker for ${bUnitId} with device ${traccarDeviceId}...`);
-        const liveSnap = await fetchTraccarLiveSnapshot({ force: false, deviceUniqueId: traccarDeviceId });
-        liveSnap.unitId = bUnitId; // tie the snapshot to the motorcycle's unit ID
+        console.log(
+          `Fetching live tracker for ${bUnitId} with device ${traccarDeviceId}...`,
+        );
+        const liveSnap = await fetchTraccarLiveSnapshot({
+          force: false,
+          deviceUniqueId: traccarDeviceId,
+        });
+        liveSnap.unitId = bUnitId;
         liveSnap.motorcycleId = String(motorcycleId);
         liveSnap.bookingId = String(booking._id);
         liveSnapshotsByUnitId.set(bUnitId, liveSnap);
-        console.log(`Live tracker fetched for ${bUnitId}:`, { lat: liveSnap.lat, lng: liveSnap.lng });
+        console.log(`Live tracker fetched for ${bUnitId}:`, {
+          lat: liveSnap.lat,
+          lng: liveSnap.lng,
+        });
       } catch (err) {
-        console.warn(`Failed to fetch live tracker for ${bUnitId}:`, err.message);
+        console.warn(
+          `Failed to fetch live tracker for ${bUnitId}:`,
+          err.message,
+        );
       }
     }
 
     const geocodedBookingLogs = await Promise.all(
       bookingLogs.map(async (booking) => {
-        const liveTrackerForUnit = liveSnapshotsByUnitId.get(String(booking.unitId || "").trim()) || null;
+        const liveTrackerForUnit =
+          liveSnapshotsByUnitId.get(String(booking.unitId || "").trim()) ||
+          null;
 
         const recentSnapshotsForUnit = snapshots
-          .filter((s) => String(s.unitId || "").trim() === String(booking.unitId || "").trim())
-          .sort((a, b) => (parseDate(b.lastUpdatedAt)?.getTime() || 0) - (parseDate(a.lastUpdatedAt)?.getTime() || 0));
+          .filter(
+            (s) =>
+              String(s.unitId || "").trim() ===
+              String(booking.unitId || "").trim(),
+          )
+          .sort(
+            (a, b) =>
+              (parseDate(b.lastUpdatedAt)?.getTime() || 0) -
+              (parseDate(a.lastUpdatedAt)?.getTime() || 0),
+          );
 
         const mostRecentSnapshot = recentSnapshotsForUnit[0];
 
         let locationData = booking;
         if (liveTrackerForUnit) {
-          let locationText = liveTrackerForUnit.resolvedLocation || liveTrackerForUnit.locationText;
-          let resolvedLocation = liveTrackerForUnit.resolvedLocation || liveTrackerForUnit.locationText;
+          let locationText =
+            liveTrackerForUnit.resolvedLocation ||
+            liveTrackerForUnit.locationText;
+          let resolvedLocation =
+            liveTrackerForUnit.resolvedLocation ||
+            liveTrackerForUnit.locationText;
 
-          if (locationText && locationText.includes(',') && !locationText.includes(' ')) {
-            const address = await reverseGeocodeCoordinates(liveTrackerForUnit.lat, liveTrackerForUnit.lng);
-            if (address) { locationText = address; resolvedLocation = address; }
+          if (
+            locationText &&
+            locationText.includes(",") &&
+            !locationText.includes(" ")
+          ) {
+            const address = await reverseGeocodeCoordinates(
+              liveTrackerForUnit.lat,
+              liveTrackerForUnit.lng,
+            );
+            if (address) {
+              locationText = address;
+              resolvedLocation = address;
+            }
           }
 
           locationData = {
             ...booking,
             lat: liveTrackerForUnit.lat,
             lng: liveTrackerForUnit.lng,
-            locationText: locationText || `${liveTrackerForUnit.lat?.toFixed(5)}, ${liveTrackerForUnit.lng?.toFixed(5)}`,
+            locationText:
+              locationText ||
+              `${liveTrackerForUnit.lat?.toFixed(5)}, ${liveTrackerForUnit.lng?.toFixed(5)}`,
             resolvedLocation,
             lastUpdatedAt: liveTrackerForUnit.lastUpdatedAt,
             source: liveTrackerForUnit.source || "Live GPS",
           };
         } else if (mostRecentSnapshot) {
-          let locationText = mostRecentSnapshot.resolvedLocation || mostRecentSnapshot.locationText;
-          let resolvedLocation = mostRecentSnapshot.resolvedLocation || mostRecentSnapshot.locationText;
+          let locationText =
+            mostRecentSnapshot.resolvedLocation ||
+            mostRecentSnapshot.locationText;
+          let resolvedLocation =
+            mostRecentSnapshot.resolvedLocation ||
+            mostRecentSnapshot.locationText;
 
-          if (locationText && locationText.includes(',') && !locationText.includes(' ')) {
-            const address = await reverseGeocodeCoordinates(mostRecentSnapshot.lat, mostRecentSnapshot.lng);
-            if (address) { locationText = address; resolvedLocation = address; }
+          if (
+            locationText &&
+            locationText.includes(",") &&
+            !locationText.includes(" ")
+          ) {
+            const address = await reverseGeocodeCoordinates(
+              mostRecentSnapshot.lat,
+              mostRecentSnapshot.lng,
+            );
+            if (address) {
+              locationText = address;
+              resolvedLocation = address;
+            }
           }
 
           locationData = {
             ...booking,
             lat: mostRecentSnapshot.lat,
             lng: mostRecentSnapshot.lng,
-            locationText: locationText || `${mostRecentSnapshot.lat?.toFixed(5)}, ${mostRecentSnapshot.lng?.toFixed(5)}`,
+            locationText:
+              locationText ||
+              `${mostRecentSnapshot.lat?.toFixed(5)}, ${mostRecentSnapshot.lng?.toFixed(5)}`,
             resolvedLocation,
             lastUpdatedAt: mostRecentSnapshot.lastUpdatedAt,
             source: mostRecentSnapshot.source || "GPS Snapshot",
           };
-        } else if (!Number.isFinite(booking.lat) || !Number.isFinite(booking.lng)) {
-          if (booking.locationText && booking.locationText.includes(',')) {
-            const address = await reverseGeocodeCoordinates(booking.lat, booking.lng);
-            if (address) locationData = { ...booking, locationText: address, resolvedLocation: address };
+        } else if (
+          !Number.isFinite(booking.lat) ||
+          !Number.isFinite(booking.lng)
+        ) {
+          if (booking.locationText && booking.locationText.includes(",")) {
+            const address = await reverseGeocodeCoordinates(
+              booking.lat,
+              booking.lng,
+            );
+            if (address)
+              locationData = {
+                ...booking,
+                locationText: address,
+                resolvedLocation: address,
+              };
           }
         }
 
         return locationData;
-      })
+      }),
     );
 
     const snapshotUnitIds = new Set(
@@ -421,7 +564,6 @@ export const getTrackingLocationLog = async (req, res, next) => {
 
     let allEntries = [...bookingLogsToUse, ...snapshots];
 
-    // Add all per-motorcycle live snapshots to allEntries
     for (const liveSnap of liveSnapshotsByUnitId.values()) {
       allEntries.push({
         key: liveSnap.key || liveSnap.unitId,
@@ -487,7 +629,9 @@ export const deleteTrackingLocationLog = async (req, res, next) => {
     const unitId = String(req.body?.unitId || "").trim();
 
     if (!key && !bookingId && !motorcycleId && !unitId) {
-      return res.status(400).json({ success: false, message: "Missing delete identifiers." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing delete identifiers." });
     }
 
     let bookingUpdated = false;
@@ -518,7 +662,9 @@ export const deleteTrackingLocationLog = async (req, res, next) => {
         : { deletedCount: 0 };
 
     if (!bookingUpdated && Number(deleteResult?.deletedCount || 0) === 0) {
-      return res.status(404).json({ success: false, message: "Location log entry not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Location log entry not found." });
     }
 
     return res.json({

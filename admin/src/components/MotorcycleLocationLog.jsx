@@ -40,6 +40,7 @@ const formatTimestamp = (value) => {
 };
 
 const buildLocationText = (record) => {
+  if (record?.resolvedLocation) return record.resolvedLocation;
   if (record?.locationText) return record.locationText;
 
   const lat = Number(record?.lat);
@@ -51,10 +52,36 @@ const buildLocationText = (record) => {
   return "No location data available";
 };
 
+const getLocationLogPriority = (log) => {
+  const source = String(log?.source || "").trim().toLowerCase();
+  if (source === "traccar live" || source === "live gps") return 1;
+  if (source === "gps snapshot" || source === "booking gps") return 2;
+  if (source === "booking destination") return 3;
+  return 4;
+};
+
+const getEntryLookupKey = (log) => {
+  return String(log?.unitId || log?.id || log?.bookingId || log?.motorcycleId || "").trim();
+};
+
+const getPreferredLog = (current, candidate) => {
+  if (!current) return candidate;
+  if (!candidate) return current;
+
+  const currentPriority = getLocationLogPriority(current);
+  const candidatePriority = getLocationLogPriority(candidate);
+  if (candidatePriority !== currentPriority) {
+    return candidatePriority < currentPriority ? candidate : current;
+  }
+
+  const currentTime = parseDate(current.lastUpdatedAt)?.getTime() || 0;
+  const candidateTime = parseDate(candidate.lastUpdatedAt)?.getTime() || 0;
+  return candidateTime >= currentTime ? candidate : current;
+};
+
 const isProtectedLiveTrackerLog = (log) => {
-  const unitId = String(log?.unitId || "").trim();
   const source = String(log?.source || "").toLowerCase();
-  return unitId === "9210010703" || source === "traccar live";
+  return source === "traccar live";
 };
 
 const ConfirmModal = ({ message, onConfirm, onCancel }) => (
@@ -201,14 +228,27 @@ const MotorcycleLocationLog = () => {
     return () => clearInterval(timer);
   }, [loadLogs]);
 
+  const filteredLogs = useMemo(() => {
+    const bestLogByUnit = new Map();
+
+    logs.forEach((log) => {
+      const key = getEntryLookupKey(log);
+      if (!key) return;
+      const current = bestLogByUnit.get(key);
+      bestLogByUnit.set(key, getPreferredLog(current, log));
+    });
+
+    return Array.from(bestLogByUnit.values());
+  }, [logs]);
+
   const sortedLogs = useMemo(
     () =>
-      [...logs].sort((a, b) => {
+      [...filteredLogs].sort((a, b) => {
         const da = parseDate(a.lastUpdatedAt)?.getTime() || 0;
         const db = parseDate(b.lastUpdatedAt)?.getTime() || 0;
         return db - da;
       }),
-    [logs],
+    [filteredLogs],
   );
 
   return (

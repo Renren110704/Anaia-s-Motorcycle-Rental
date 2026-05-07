@@ -14,6 +14,7 @@ import {
   FaTachometerAlt,
   FaShieldAlt,
   FaHardHat,
+  FaSatelliteDish,
 } from "react-icons/fa";
 
 const baseURL = API_BASE_URL;
@@ -32,6 +33,7 @@ const initialFormData = {
   category: "Scooter",
   hasABS: false,
   hasHelmet: true,
+  traccarDeviceId: "",
   image: null,
   imagePreview: null,
 };
@@ -41,7 +43,6 @@ const inputCls =
 const selectCls =
   "w-full pl-10 pr-8 py-2.5 bg-transparent text-[#171717] text-sm focus:outline-none rounded-xl appearance-none disabled:opacity-50";
 
-/* ── Field wrapper ── */
 const F = ({ icon: Icon, label, children }) => (
   <div className="flex flex-col gap-1">
     {label && (
@@ -100,6 +101,7 @@ const AddMotorcycle = () => {
         category: data.category,
         hasABS: data.hasABS,
         hasHelmet: data.hasHelmet,
+        traccarDeviceId: data.traccarDeviceId || "",
       }).forEach(([k, v]) => formData.append(k, v));
       if (data.image) {
         formData.append("image", data.image, data.image.name || "motorcycle-image");
@@ -116,9 +118,7 @@ const AddMotorcycle = () => {
       resetForm();
     } catch (err) {
       toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to list motorcycle",
+        err.response?.data?.message || err.message || "Failed to list motorcycle",
         {
           position: "top-right",
           autoClose: 4000,
@@ -156,28 +156,47 @@ const AddMotorcycle = () => {
 
       <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] backdrop-blur-md rounded-3xl shadow-2xl shadow-black/20 border border-[#171717]/10">
         <form onSubmit={handleSubmit} className={AddCarPageStyles.form}>
-          {/* ── Row 1: Unit ID — full width, inline compact ── */}
+
+          {/* ── Row 1: Unit ID + Tracker ID side by side ── */}
           <div className="mb-5">
             <p className="text-xs font-black text-[#171717]/55 uppercase tracking-widest mb-2">
               Unit Identifier
             </p>
-            <F icon={FaIdCard} label="Unit ID">
-              <input
-                required
-                name="unitId"
-                value={data.unitId}
-                onChange={handleChange}
-                type="text"
-                className={inputCls}
-                placeholder="e.g. UNIT-01"
-                maxLength={30}
-              />
-            </F>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <F icon={FaIdCard} label="Unit ID">
+                <input
+                  required
+                  name="unitId"
+                  value={data.unitId}
+                  onChange={handleChange}
+                  type="text"
+                  className={inputCls}
+                  placeholder="e.g. UNIT-01"
+                  maxLength={30}
+                />
+              </F>
+              <F icon={FaSatelliteDish} label="GPS Tracker ID (Traccar Device Unique ID)">
+                <input
+                  name="traccarDeviceId"
+                  value={data.traccarDeviceId}
+                  onChange={handleChange}
+                  type="text"
+                  className={inputCls}
+                  placeholder="e.g. 9210010703"
+                  maxLength={50}
+                />
+              </F>
+            </div>
+            {data.traccarDeviceId && (
+              <p className="text-xs text-[#171717]/50 mt-1.5 ml-1">
+                📡 This ID must match the device's unique ID registered in Traccar.
+              </p>
+            )}
           </div>
 
           {/* ── Row 2: Two columns ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ── LEFT — 3-col mini grid for most fields ── */}
+            {/* ── LEFT ── */}
             <div>
               <p className="text-xs font-black text-[#171717]/55 uppercase tracking-widest mb-2">
                 Motorcycle Details
@@ -193,9 +212,7 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Honda", "Yamaha", "Suzuki", "Kawasaki"].map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
+                      <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
                 </F>
@@ -208,9 +225,7 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Scooter", "Naked", "Underbone"].map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </F>
@@ -266,9 +281,7 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Unleaded", "Premium"].map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
+                      <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                 </F>
@@ -280,19 +293,17 @@ const AddMotorcycle = () => {
                   <span className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none font-bold">
                     ₱
                   </span>
-                  <div className="relative w-full">
-                    <input
-                      required
-                      name="dailyPrice"
-                      value={data.dailyPrice}
-                      onChange={handleChange}
-                      type="number"
-                      onKeyDown={noScroll}
-                      className={inputCls}
-                      placeholder="200"
-                      min="1"
-                    />
-                  </div>
+                  <input
+                    required
+                    name="dailyPrice"
+                    value={data.dailyPrice}
+                    onChange={handleChange}
+                    type="number"
+                    onKeyDown={noScroll}
+                    className={inputCls}
+                    placeholder="200"
+                    min="1"
+                  />
                 </F>
                 <F icon={FaCog} label="Transmission">
                   <select
@@ -321,10 +332,7 @@ const AddMotorcycle = () => {
                       value={data.hasABS ? "yes" : "no"}
                       onChange={(e) =>
                         handleChange({
-                          target: {
-                            name: "hasABS",
-                            value: e.target.value === "yes",
-                          },
+                          target: { name: "hasABS", value: e.target.value === "yes" },
                         })
                       }
                       className={selectCls}
@@ -339,10 +347,7 @@ const AddMotorcycle = () => {
                       value={data.hasHelmet ? "yes" : "no"}
                       onChange={(e) =>
                         handleChange({
-                          target: {
-                            name: "hasHelmet",
-                            value: e.target.value === "yes",
-                          },
+                          target: { name: "hasHelmet", value: e.target.value === "yes" },
                         })
                       }
                       className={selectCls}
@@ -361,7 +366,6 @@ const AddMotorcycle = () => {
                 Media &amp; Notes
               </p>
 
-              {/* Image upload */}
               <F label="Motorcycle Image">
                 <div className={AddCarPageStyles.imageUploadContainer}>
                   <label className={AddCarPageStyles.imageUploadLabel}>
@@ -389,9 +393,7 @@ const AddMotorcycle = () => {
                           />
                         </svg>
                         <p className={AddCarPageStyles.imageUploadText}>
-                          <span
-                            className={AddCarPageStyles.imageUploadTextSemibold}
-                          >
+                          <span className={AddCarPageStyles.imageUploadTextSemibold}>
                             Click to upload
                           </span>{" "}
                           or drag and drop
@@ -413,7 +415,6 @@ const AddMotorcycle = () => {
                 </div>
               </F>
 
-              {/* Description — fills remaining height */}
               <F label="Description">
                 <textarea
                   required
@@ -435,9 +436,7 @@ const AddMotorcycle = () => {
               className="px-8 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-sm text-white bg-[#171717] shadow-lg shadow-[#171717]/25 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 focus:outline-none"
             >
               <FaMotorcycle style={{ fontSize: 14 }} />
-              <span className={AddCarPageStyles.buttonText}>
-                Add Motorcycle
-              </span>
+              <span className={AddCarPageStyles.buttonText}>Add Motorcycle</span>
             </button>
           </div>
         </form>

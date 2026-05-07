@@ -31,6 +31,7 @@ const RECEIPT_VERIFY_TIMEOUT_MS = Number(
 
 // ── Cloudinary Configuration ──────────────────────────────────────────
 const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_PAYMENT_PROOF_FOLDER = "paymentproof";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
     process.env.CLOUDINARY_API_KEY &&
@@ -50,7 +51,7 @@ const normalizeUrl = (value = "") => {
   return normalized.replace(/^http:\/\//i, "https://");
 };
 
-const uploadFileToCloudinary = async (filePath) => {
+const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_FOLDER) => {
   if (!filePath || !CLOUDINARY_ENABLED) {
     console.error("[CLOUDINARY] Upload skipped - filePath:", !!filePath, "enabled:", CLOUDINARY_ENABLED);
     return null;
@@ -61,9 +62,9 @@ const uploadFileToCloudinary = async (filePath) => {
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath}`);
+      console.log(`[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath} to folder: ${targetFolder}`);
       const result = await cloudinary.uploader.upload(filePath, {
-        folder: CLOUDINARY_FOLDER,
+        folder: targetFolder,
         resource_type: "image",
         use_filename: true,
         unique_filename: true,
@@ -112,8 +113,8 @@ const getUploadedPaymentProofUrl = async (file) => {
     return null;
   }
 
-  console.log("[PAYMENTPROOF] File exists, uploading to Cloudinary...");
-  const cloudUrl = await uploadFileToCloudinary(absolutePath);
+  console.log("[PAYMENTPROOF] File exists, uploading to Cloudinary folder:", CLOUDINARY_PAYMENT_PROOF_FOLDER);
+  const cloudUrl = await uploadFileToCloudinary(absolutePath, CLOUDINARY_PAYMENT_PROOF_FOLDER);
   
   if (cloudUrl) {
     console.log("[PAYMENTPROOF] Got Cloudinary URL:", cloudUrl);

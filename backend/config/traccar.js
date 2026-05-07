@@ -7,8 +7,8 @@ export const TRACCAR_BASE_URL = stripTrailingSlash(
   getEnv("TRACCAR_BASE_URL") || DEFAULT_TRACCAR_BASE_URL,
 );
 
-export const TRACCAR_DEVICE_UNIQUE_ID = getEnv("TRACCAR_DEVICE_UNIQUE_ID") || "9210010703";
-export const TRACCAR_DEVICE_LABEL = getEnv("TRACCAR_DEVICE_LABEL") || "SinoTrack ST901M";
+export const TRACCAR_DEVICE_UNIQUE_ID = getEnv("TRACCAR_DEVICE_UNIQUE_ID") || "";
+export const TRACCAR_DEVICE_LABEL = getEnv("TRACCAR_DEVICE_LABEL") || "";
 
 const TRACCAR_TOKEN = getEnv("TRACCAR_TOKEN");
 const TRACCAR_USERNAME = getEnv("TRACCAR_USERNAME") || "kiefferklyde.lachica27@gmail.com";

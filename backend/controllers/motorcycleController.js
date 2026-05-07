@@ -318,6 +318,7 @@ export const createMotorcycle = async (req, res, next) => {
       status: status || "available",
       image: imageFilename || "",
       description: description || "",
+      traccarDeviceId: req.body.traccarDeviceId || "",
     });
 
     const saved = await motorcycle.save();
@@ -544,6 +545,8 @@ export const updateMotorcycle = async (req, res, next) => {
       "hasHelmet",
       "status",
       "description",
+      "traccarDeviceId",
+
     ];
 
     fields.forEach((f) => {

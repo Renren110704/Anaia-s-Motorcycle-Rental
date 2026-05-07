@@ -5,6 +5,7 @@ const { Schema } = mongoose;
 const motorcycleBookingSubSchema = new Schema(
   {
     bookingId: { type: Schema.Types.ObjectId, ref: "Booking", required: true },
+    traccarDeviceId: { type: String, default: "" },
     pickupDate: { type: Date, required: true },
     returnDate: { type: Date, required: true },
 
@@ -66,6 +67,7 @@ const motorcycleSchema = new Schema({
   deletedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
 
   bookings: { type: [motorcycleBookingSubSchema], default: [] },
+  traccarDeviceId: { type: String, default: "" },
   checkoutLock: { type: checkoutLockSchema, default: null },
 });
 

@@ -75,6 +75,7 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
     hasHelmet: raw.hasHelmet !== false,
     status: raw.status || "available",
     isDeleted: raw.isDeleted || false,
+    traccarDeviceId: raw.traccarDeviceId || "",
     deletedAt: raw.deletedAt || null,
     _rawImage: raw.image ?? raw._rawImage ?? "",
     image: raw.image
@@ -160,10 +161,9 @@ const StatTab = ({
     className={`
       flex-1 min-w-[140px] flex items-center justify-between px-5 py-4 rounded-2xl
       transition-all duration-200 cursor-pointer shadow-lg shadow-black/20
-      ${
-        isActive
-          ? "bg-[#171717] scale-[1.02] shadow-xl shadow-black/30"
-          : "bg-[#b9b9b9] hover:bg-[#a8a8a8] hover:scale-[1.01]"
+      ${isActive
+        ? "bg-[#171717] scale-[1.02] shadow-xl shadow-black/30"
+        : "bg-[#b9b9b9] hover:bg-[#a8a8a8] hover:scale-[1.01]"
       }
     `}
   >
@@ -660,6 +660,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
     const formData = new FormData();
     const fields = {
       unitId: m.unitId || "",
+      traccarDeviceId: m.traccarDeviceId || "",
       make: m.make,
       model: m.model,
       year: Number(m.year || 0),
@@ -792,6 +793,13 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
                   required: true,
                   placeholder: "e.g. UNIT-01",
                   maxLength: 30,
+                })}
+              </div>
+
+              <div className="md:col-span-2">
+                {inputField("GPS Tracker ID (Traccar Device Unique ID)", "traccarDeviceId", "text", {
+                  placeholder: "e.g. 9210010703",
+                  maxLength: 50,
                 })}
               </div>
               {inputField("Make", "make", "text", { required: true })}
@@ -1504,9 +1512,9 @@ const ManageMotorcycle = () => {
         {filteredMotorcycles.length === 0
           ? 0
           : Math.min(
-              (currentPage - 1) * ITEMS_PER_PAGE + 1,
-              filteredMotorcycles.length,
-            )}
+            (currentPage - 1) * ITEMS_PER_PAGE + 1,
+            filteredMotorcycles.length,
+          )}
         –{Math.min(currentPage * ITEMS_PER_PAGE, filteredMotorcycles.length)} of{" "}
         {filteredMotorcycles.length}{" "}
         <span className="font-semibold capitalize">{selectedStatus}</span>{" "}

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import {
   FaMotorcycle,
   FaMapMarkerAlt,
-  FaClock,
   FaTimes,
   FaSearch,
   FaArrowLeft,
@@ -15,9 +14,6 @@ import {
   FaMoneyBillWave,
   FaChevronDown,
   FaChevronUp,
-  FaSatelliteDish,
-  FaSyncAlt,
-  FaExclamationCircle,
 } from "react-icons/fa";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -128,15 +124,6 @@ const formatTime = (timeStr) => {
 
 const formatPrice = (n) => `₱${(Number(n) || 0).toLocaleString("en-PH")}`;
 
-const buildTrackerLocationText = (tracker) => {
-  if (tracker?.resolvedLocation) return tracker.resolvedLocation;
-  if (tracker?.address) return tracker.address;
-  if (Number.isFinite(Number(tracker?.lat)) && Number.isFinite(Number(tracker?.lng))) {
-    return `${Number(tracker.lat).toFixed(5)}, ${Number(tracker.lng).toFixed(5)}`;
-  }
-  return "No live GPS data";
-};
-
 const persistLocationSnapshots = (units = [], liveTrackersByUnit = {}) => {
   try {
     const raw = localStorage.getItem(LOCATION_LOG_STORAGE_KEY);
@@ -212,65 +199,6 @@ const persistLocationSnapshots = (units = [], liveTrackersByUnit = {}) => {
   } catch (err) {
     console.error("Failed to persist location snapshots", err);
   }
-};
-
-const LiveTrackerCard = ({ tracker, loading, error, onRetry }) => {
-  const hasTracker = Number.isFinite(Number(tracker?.lat)) && Number.isFinite(Number(tracker?.lng));
-  const isOnline = String(tracker?.status || "").toLowerCase() === "online";
-
-  return (
-    <div className="bg-[#b9b9b9] rounded-xl p-3 shadow-lg shadow-black/20 border border-[#171717]/10">
-      <div className="flex items-center justify-between mb-2.5">
-        <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-white/70 text-[11px] font-bold text-[#171717]">
-          <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`} />
-          <FaSatelliteDish className="text-[#b50002]" />
-          Traccar Live
-        </span>
-        <button
-          onClick={onRetry}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-[#b50002] hover:text-[#8f0002]"
-          type="button"
-        >
-          <FaSyncAlt className="text-[11px]" /> Refresh
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="text-xs text-[#171717]/60">Fetching live GPS coordinates...</p>
-      ) : error && !hasTracker ? (
-        <div className="flex items-start gap-2 text-[#9c1c1e]">
-          <FaExclamationCircle className="mt-0.5" />
-          <p className="text-xs font-medium">{error}</p>
-        </div>
-      ) : hasTracker ? (
-        <>
-          <p className="text-sm font-bold text-[#171717] leading-tight">{tracker.motorcycleName}</p>
-          <div className="mt-1">
-            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold ${isOnline ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-600" : "bg-red-600"}`} />
-              {isOnline ? "Online" : "Offline"}
-            </span>
-          </div>
-          <p className="text-xs text-[#171717]/70 mt-1">{buildTrackerLocationText(tracker)}</p>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div className="bg-white/70 rounded-lg px-2 py-1.5">
-              <p className="text-[10px] text-[#171717]/50 uppercase font-bold">Latitude</p>
-              <p className="text-xs font-semibold text-[#171717]">{Number(tracker.lat).toFixed(6)}</p>
-            </div>
-            <div className="bg-white/70 rounded-lg px-2 py-1.5">
-              <p className="text-[10px] text-[#171717]/50 uppercase font-bold">Longitude</p>
-              <p className="text-xs font-semibold text-[#171717]">{Number(tracker.lng).toFixed(6)}</p>
-            </div>
-          </div>
-          <p className="text-[11px] text-[#171717]/55 mt-2">
-            {isOnline ? "Online" : "Offline"} · Updated {new Date(tracker.lastUpdatedAt || Date.now()).toLocaleDateString()} {new Date(tracker.lastUpdatedAt || Date.now()).toLocaleTimeString()}
-          </p>
-        </>
-      ) : (
-        <p className="text-xs text-[#171717]/60">{error || "Live GPS is currently unavailable"}</p>
-      )}
-    </div>
-  );
 };
 
 const BookingDetailPanel = ({ motorcycle, onClose }) => {
@@ -444,10 +372,7 @@ const MotorcycleTracking = () => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [liveTracker, setLiveTracker] = useState(null);
   const [liveTrackersByUnit, setLiveTrackersByUnit] = useState({});
-  const [liveTrackerLoading, setLiveTrackerLoading] = useState(true);
-  const [liveTrackerError, setLiveTrackerError] = useState("");
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const circlesRef = useRef({});
@@ -531,9 +456,6 @@ const MotorcycleTracking = () => {
 
   const fetchLiveTrackers = useCallback(async ({ force = false } = {}) => {
     try {
-      setLiveTrackerLoading(true);
-      setLiveTrackerError("");
-
       const bookingsRes = await api.get("/api/motorcycle-bookings", {
         params: { limit: 200, status: "active" },
       });
@@ -570,18 +492,10 @@ const MotorcycleTracking = () => {
       );
 
       setLiveTrackersByUnit(trackerMap);
-      const first = Object.values(trackerMap)[0] || null;
-      setLiveTracker(first);
     } catch (err) {
-      setLiveTrackerError(err?.message || "Live GPS is currently unavailable");
-    } finally {
-      setLiveTrackerLoading(false);
+      console.warn("Failed to fetch live trackers", err?.message || err);
     }
   }, []);
-
-  const handleLiveTrackerRefresh = useCallback(() => {
-    fetchLiveTrackers({ force: true });
-  }, [fetchLiveTrackers]);
 
   const displayedMotorcycles = useMemo(() => {
     return motorcycles.map((motorcycle) => {

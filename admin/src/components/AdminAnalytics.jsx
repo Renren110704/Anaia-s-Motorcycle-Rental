@@ -9,20 +9,31 @@ import {
   FaExclamationTriangle,
   FaFileExport,
   FaFilter,
-  FaMapMarkerAlt,
   FaMoneyBillWave,
   FaMotorcycle,
   FaPrint,
   FaRedo,
   FaShieldAlt,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
+import {
+  Bike,
+  Wrench,
+  TrendingUp,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  CreditCard,
+  BarChart3,
+} from "lucide-react";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
 const PAGE_LIMIT = 1000;
 
-const formatMoney = (n) => `₱ ${Number(n || 0).toLocaleString()}`;
+const formatMoney = (n) => `₱${Number(n || 0).toLocaleString()}`;
 
 const monthKey = (dateLike) => {
   const d = new Date(dateLike);
@@ -30,73 +41,101 @@ const monthKey = (dateLike) => {
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 };
 
-const AnalyticsCard = ({
+// ── Shared styles (mirrors ManageMotorcycle) ──────────────────────────────────
+const labelCls =
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+
+// ── Stat Card (mirrors ManageMotorcycle StatCard) ─────────────────────────────
+const StatCard = ({
   label,
   value,
+  sub,
+  subColor,
   icon: Icon,
-  subText,
-  accent = "text-[#b50002]",
+  accent,
+  onClick,
+  isActive,
+  loading,
 }) => (
-  <div className={`bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-4 shadow-lg border border-[#171717]/10`}>
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-[#171717]/55">
-          {label}
-        </p>
-        <p className="text-3xl font-bold text-[#171717] mt-1">{value}</p>
-        {subText ? <p className="text-xs text-[#171717]/55 mt-1">{subText}</p> : null}
-      </div>
-      <div className="p-3 rounded-xl bg-[#171717]/10 border border-[#171717]/10">
-        <Icon className={`${accent} text-xl`} />
+  <button
+    onClick={onClick}
+    className={`relative text-left bg-white rounded-2xl border shadow-sm p-5 overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full
+      ${isActive ? "border-[#b50002]/30 ring-2 ring-[#b50002]/20" : "border-slate-100"}`}
+  >
+    <div
+      className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
+    />
+    <div className="flex items-start justify-between mb-3">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+        {label}
+      </p>
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10`}
+      >
+        <Icon className={`w-4 h-4 ${accent.replace("bg-", "text-")}`} />
       </div>
     </div>
+    <p className="text-[2rem] font-black text-[#171717] leading-none mb-2">
+      {loading ? (
+        <span className="inline-block w-16 h-7 bg-slate-100 rounded-lg animate-pulse" />
+      ) : (
+        value
+      )}
+    </p>
+    {sub && <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>}
+  </button>
+);
+
+// ── Section card wrapper ──────────────────────────────────────────────────────
+const SectionCard = ({ title, icon: Icon, children, action }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4 text-[#b50002]" />}
+        <h3 className="font-black text-[#171717] text-[14px] uppercase tracking-[0.08em]">
+          {title}
+        </h3>
+      </div>
+      {action}
+    </div>
+    <div className="p-5">{children}</div>
   </div>
 );
 
-const DistributionCard = ({
-  title,
-  items,
-  icon: Icon,
-  emptyText = "No data",
-  barClass = "bg-[#b50002]",
+// ── Bar distribution row ──────────────────────────────────────────────────────
+const DistributionRow = ({
+  label,
+  count,
+  max,
+  color = "bg-[#b50002]",
+  suffix = "",
 }) => {
-  const max = Math.max(1, ...items.map((x) => x.count));
-
+  const pct = max ? Math.max(4, Math.round((count / max) * 100)) : 0;
   return (
-    <div className="bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-5 shadow-lg shadow-black/20 border border-[#171717]/10">
-      <p className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-[#171717]/10">
-        <Icon className="text-[#b50002]" /> {title}
-      </p>
-      {items.length === 0 ? (
-        <p className="text-sm text-[#171717]/55">{emptyText}</p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((item) => {
-            const widthPct = Math.max(4, Math.round((item.count / max) * 100));
-            return (
-              <div key={item.label}>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="font-semibold text-[#171717]">{item.label}</span>
-                  <span className="text-[#171717]/70">{item.count}</span>
-                </div>
-                <div className="w-full h-2.5 rounded-full bg-[#171717]/10 overflow-hidden">
-                  <div
-                    className={`h-full ${barClass}`}
-                    style={{ width: `${widthPct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[12px] font-semibold text-slate-600 truncate max-w-[60%]">
+          {label}
+        </span>
+        <span className="text-[12px] font-black text-[#171717]">
+          {suffix}
+          {count.toLocaleString()}
+        </span>
+      </div>
+      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${color} transition-all duration-700`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 };
 
+// ── Donut Chart ───────────────────────────────────────────────────────────────
 const CHART_COLORS = [
-  "#171717",
   "#b50002",
+  "#171717",
   "#2563eb",
   "#16a34a",
   "#f59e0b",
@@ -105,140 +144,152 @@ const CHART_COLORS = [
   "#be123c",
 ];
 
-const DonutChartCard = ({ title, items, icon: Icon, emptyText = "No data" }) => {
-  const total = items.reduce((sum, item) => sum + Number(item.count || 0), 0);
-
-  if (!total) {
+const DonutChart = ({ items }) => {
+  const total = items.reduce((s, x) => s + Number(x.count || 0), 0);
+  if (!total)
     return (
-      <div className="bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-5 shadow-lg shadow-black/20 border border-[#171717]/10">
-        <p className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-[#171717]/10">
-          <Icon className="text-[#b50002]" /> {title}
-        </p>
-        <p className="text-sm text-[#171717]/55">{emptyText}</p>
-      </div>
+      <p className="text-sm text-slate-400 py-4 text-center">
+        No data available
+      </p>
     );
-  }
 
-  let runningPct = 0;
-  const gradientStops = items
+  let running = 0;
+  const stops = items
     .map((item, idx) => {
       const pct = (Number(item.count || 0) / total) * 100;
-      const start = runningPct;
-      runningPct += pct;
-      const end = runningPct;
-      const color = CHART_COLORS[idx % CHART_COLORS.length];
-      return `${color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+      const start = running;
+      running += pct;
+      return `${CHART_COLORS[idx % CHART_COLORS.length]} ${start.toFixed(2)}% ${running.toFixed(2)}%`;
     })
     .join(", ");
 
   return (
-    <div className="bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-5 shadow-lg shadow-black/20 border border-[#171717]/10">
-      <p className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-[#171717]/10">
-        <Icon className="text-[#b50002]" /> {title}
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-4 items-center">
-        <div className="flex items-center justify-center">
-          <div
-            className="relative h-36 w-36 rounded-full"
-            style={{ background: `conic-gradient(${gradientStops})` }}
-          >
-            <div className="absolute inset-6 rounded-full bg-[#d0d0d0] border border-[#171717]/10 flex items-center justify-center text-center">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-[#171717]/60 font-bold">Total</p>
-                <p className="text-xl font-black text-[#171717] leading-none">{total}</p>
-              </div>
+    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-5 items-center">
+      <div className="flex items-center justify-center">
+        <div
+          className="relative h-32 w-32 rounded-full"
+          style={{ background: `conic-gradient(${stops})` }}
+        >
+          <div className="absolute inset-5 rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                Total
+              </p>
+              <p className="text-xl font-black text-[#171717] leading-none">
+                {total}
+              </p>
             </div>
           </div>
         </div>
-
-        <div className="space-y-2">
-          {items.map((item, idx) => {
-            const count = Number(item.count || 0);
-            const pct = total ? Math.round((count / total) * 100) : 0;
-            const color = CHART_COLORS[idx % CHART_COLORS.length];
-
-            return (
-              <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="h-3 w-3 rounded-full border border-[#171717]/20"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="font-semibold text-[#171717] truncate">{item.label}</span>
-                </div>
-                <span className="text-[#171717]/75 font-medium whitespace-nowrap">
-                  {count} ({pct}%)
+      </div>
+      <div className="space-y-2">
+        {items.map((item, idx) => {
+          const count = Number(item.count || 0);
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return (
+            <div
+              key={item.label}
+              className="flex items-center justify-between gap-2 text-[12px]"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                  style={{
+                    backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                  }}
+                />
+                <span className="font-semibold text-slate-600 truncate">
+                  {item.label}
                 </span>
               </div>
-            );
-          })}
-        </div>
+              <span className="text-[#171717] font-black whitespace-nowrap">
+                {count}{" "}
+                <span className="text-slate-400 font-semibold">({pct}%)</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
 
-const LineChartCard = ({ title, items, icon: Icon, emptyText = "No data" }) => {
-  if (!items.length) {
+// ── Sparkline chart ───────────────────────────────────────────────────────────
+const Sparkline = ({ items }) => {
+  if (!items.length)
     return (
-      <div className="bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-5 shadow-lg shadow-black/20 border border-[#171717]/10">
-        <p className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-[#171717]/10">
-          <Icon className="text-[#b50002]" /> {title}
-        </p>
-        <p className="text-sm text-[#171717]/55">{emptyText}</p>
-      </div>
+      <p className="text-sm text-slate-400 py-4 text-center">
+        No data available
+      </p>
     );
-  }
 
-  const values = items.map((item) => Number(item.count || 0));
+  const values = items.map((x) => Number(x.count || 0));
   const max = Math.max(1, ...values);
   const min = Math.min(...values);
   const range = Math.max(1, max - min);
 
-  const points = items.map((item, idx) => {
+  const pts = items.map((item, idx) => {
     const x = items.length === 1 ? 50 : (idx / (items.length - 1)) * 100;
-    const y = 40 - ((Number(item.count || 0) - min) / range) * 32;
+    const y = 38 - ((Number(item.count || 0) - min) / range) * 30;
     return `${x},${y}`;
   });
 
-  const areaPoints = [`0,40`, ...points, `100,40`].join(" ");
-  const linePoints = points.join(" ");
+  const area = [`0,40`, ...pts, `100,40`].join(" ");
 
-  const firstLabel = items[0]?.label || "";
-  const middleLabel = items[Math.floor(items.length / 2)]?.label || "";
-  const lastLabel = items[items.length - 1]?.label || "";
+  const labelStep = Math.ceil(items.length / 4);
+  const visibleLabels = items.filter(
+    (_, i) => i % labelStep === 0 || i === items.length - 1,
+  );
 
   return (
-    <div className="bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] rounded-2xl p-5 shadow-lg shadow-black/20 border border-[#171717]/10">
-      <p className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-[#171717]/10">
-        <Icon className="text-[#b50002]" /> {title}
-      </p>
-
-      <div className="rounded-xl border border-[#171717]/10 bg-[#171717]/5 p-3">
-        <svg viewBox="0 0 100 44" className="w-full h-44" role="img" aria-label={title}>
-          <line x1="0" y1="40" x2="100" y2="40" stroke="#171717" strokeOpacity="0.22" strokeWidth="0.8" />
-          <line x1="0" y1="24" x2="100" y2="24" stroke="#171717" strokeOpacity="0.12" strokeWidth="0.8" />
-          <line x1="0" y1="8" x2="100" y2="8" stroke="#171717" strokeOpacity="0.12" strokeWidth="0.8" />
-          <polygon points={areaPoints} fill="#16a34a" fillOpacity="0.18" />
-          <polyline points={linePoints} fill="none" stroke="#15803d" strokeWidth="1.6" />
-          {items.map((item, idx) => {
-            const x = items.length === 1 ? 50 : (idx / (items.length - 1)) * 100;
-            const y = 40 - ((Number(item.count || 0) - min) / range) * 32;
-            return <circle key={item.label} cx={x} cy={y} r="1.3" fill="#14532d" />;
-          })}
-        </svg>
-
-        <div className="mt-2 flex items-center justify-between text-[11px] text-[#171717]/65 font-semibold">
-          <span>{firstLabel}</span>
-          <span>{middleLabel}</span>
-          <span>{lastLabel}</span>
-        </div>
+    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+      <svg viewBox="0 0 100 44" className="w-full h-36">
+        {[8, 24, 40].map((y) => (
+          <line
+            key={y}
+            x1="0"
+            y1={y}
+            x2="100"
+            y2={y}
+            stroke="#e2e8f0"
+            strokeWidth="0.8"
+          />
+        ))}
+        <polygon points={area} fill="#b50002" fillOpacity="0.08" />
+        <polyline
+          points={pts.join(" ")}
+          fill="none"
+          stroke="#b50002"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        {items.map((item, idx) => {
+          const x = items.length === 1 ? 50 : (idx / (items.length - 1)) * 100;
+          const y = 38 - ((Number(item.count || 0) - min) / range) * 30;
+          return (
+            <circle key={item.label} cx={x} cy={y} r="1.2" fill="#b50002" />
+          );
+        })}
+      </svg>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+        {visibleLabels.map((item) => (
+          <span key={item.label}>{item.label}</span>
+        ))}
       </div>
     </div>
   );
 };
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3 animate-pulse">
+    <div className="h-3 bg-slate-100 rounded w-24" />
+    <div className="h-8 bg-slate-100 rounded w-32" />
+    <div className="h-2 bg-slate-100 rounded w-20" />
+  </div>
+);
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const AdminAnalytics = () => {
   const [bookings, setBookings] = useState([]);
   const [motorcycles, setMotorcycles] = useState([]);
@@ -259,15 +310,12 @@ const AdminAnalytics = () => {
           params: { includeDeleted: "true", limit: PAGE_LIMIT },
         }),
       ]);
-
       const rawBookings = Array.isArray(bookingsRes.data)
         ? bookingsRes.data
         : bookingsRes.data?.data || bookingsRes.data?.bookings || [];
-
       const rawMotorcycles = Array.isArray(motorcyclesRes.data)
         ? motorcyclesRes.data
         : motorcyclesRes.data?.data || motorcyclesRes.data?.motorcycles || [];
-
       setBookings(rawBookings);
       setMotorcycles(rawMotorcycles);
     } catch (err) {
@@ -286,58 +334,57 @@ const AdminAnalytics = () => {
     bookings
       .filter((b) => !b?.isDeleted)
       .forEach((b) => {
-        const date = new Date(b?.bookingDate || b?.createdAt || b?.pickupDate);
-        if (!Number.isNaN(date.getTime())) {
-          years.add(String(date.getFullYear()));
-        }
+        const d = new Date(b?.bookingDate || b?.createdAt || b?.pickupDate);
+        if (!Number.isNaN(d.getTime())) years.add(String(d.getFullYear()));
       });
-
     return [...years].sort((a, b) => Number(b) - Number(a));
   }, [bookings]);
 
   const filteredBookings = useMemo(() => {
-    const activeBookings = bookings.filter((b) => !b?.isDeleted);
-    return activeBookings.filter((b) => {
-      const date = new Date(b?.bookingDate || b?.createdAt || b?.pickupDate);
-      if (Number.isNaN(date.getTime())) return false;
-
-      if (selectedYear !== "all" && String(date.getFullYear()) !== selectedYear) {
-        return false;
-      }
-
-      if (selectedMonth !== "all" && String(date.getMonth() + 1) !== selectedMonth) {
-        return false;
-      }
-
-      return true;
-    });
+    return bookings
+      .filter((b) => !b?.isDeleted)
+      .filter((b) => {
+        const d = new Date(b?.bookingDate || b?.createdAt || b?.pickupDate);
+        if (Number.isNaN(d.getTime())) return false;
+        if (selectedYear !== "all" && String(d.getFullYear()) !== selectedYear)
+          return false;
+        if (
+          selectedMonth !== "all" &&
+          String(d.getMonth() + 1) !== selectedMonth
+        )
+          return false;
+        return true;
+      });
   }, [bookings, selectedYear, selectedMonth]);
 
   const selectedPeriodLabel = useMemo(() => {
     if (selectedYear === "all" && selectedMonth === "all") return "All Time";
-
     const monthName =
       selectedMonth === "all"
         ? "All Months"
-        : new Date(2000, Number(selectedMonth) - 1, 1).toLocaleDateString("en-US", {
-            month: "long",
-          });
-
+        : new Date(2000, Number(selectedMonth) - 1, 1).toLocaleDateString(
+            "en-US",
+            { month: "long" },
+          );
     if (selectedYear === "all") return `${monthName} (All Years)`;
-    if (selectedMonth === "all") return `All Months in ${selectedYear}`;
+    if (selectedMonth === "all") return `All of ${selectedYear}`;
     return `${monthName} ${selectedYear}`;
   }, [selectedYear, selectedMonth]);
 
   const metrics = useMemo(() => {
     const totalBookings = filteredBookings.length;
-    const activeRentals = filteredBookings.filter((b) => b.status === "active").length;
+    const activeRentals = filteredBookings.filter(
+      (b) => b.status === "active",
+    ).length;
     const pendingReservations = filteredBookings.filter(
       (b) => b.status === "pending_reservation",
     ).length;
     const pendingFullPayment = filteredBookings.filter(
       (b) => b.status === "pending_full_payment",
     ).length;
-    const completed = filteredBookings.filter((b) => b.status === "completed").length;
+    const completed = filteredBookings.filter(
+      (b) => b.status === "completed",
+    ).length;
     const suspectedFake = filteredBookings.filter(
       (b) => b?.receiptVerification?.status === "suspected_fake",
     ).length;
@@ -346,17 +393,41 @@ const AdminAnalytics = () => {
     ).length;
 
     const totalRevenue = filteredBookings.reduce((sum, b) => {
-      if (b.paymentStatus === "fully_paid") return sum + Number(b.amount || 0);
-      if (b.paymentStatus === "reservation_paid") return sum + Number(b.reservationFee || 200);
-      return sum;
+      const reservationFee = Number(b.reservationFee || 200);
+      const extensionAdditional = Array.isArray(b.extensions)
+        ? b.extensions.reduce(
+            (acc, ext) => acc + Number(ext.additionalAmount || 0),
+            0,
+          )
+        : 0;
+      const penaltyAmount = Number(b.returnInspection?.penaltyAmount || 0);
+      const damageAmount = Number(
+        b.returnInspection?.repairEstimateAmount || 0,
+      );
+      const baseAmount = Math.max(
+        0,
+        Number(b.amount || 0) -
+          extensionAdditional -
+          penaltyAmount -
+          damageAmount,
+      );
+      let add = 0;
+      if (b.paymentStatus === "reservation_paid") add += reservationFee;
+      if (b.paymentStatus === "fully_paid") add += baseAmount;
+      if (b.status === "completed") add += extensionAdditional;
+      if (b.status === "completed") add += penaltyAmount + damageAmount;
+      if (b.returnInspection?.penaltySettled && b.status !== "completed")
+        add += penaltyAmount + damageAmount;
+      return sum + add;
     }, 0);
 
     const totalDueAtPickup = filteredBookings.reduce((sum, b) => {
       if (b.status === "cancelled") return sum;
       if (b.paymentStatus === "fully_paid") return sum;
-      const total = Number(b.amount || 0);
-      const down = Number(b.reservationFee || 200);
-      return sum + Math.max(0, total - down);
+      return (
+        sum +
+        Math.max(0, Number(b.amount || 0) - Number(b.reservationFee || 200))
+      );
     }, 0);
 
     return {
@@ -372,29 +443,91 @@ const AdminAnalytics = () => {
     };
   }, [filteredBookings]);
 
-  const fleetStats = useMemo(() => {
-    const activeFleet = motorcycles.filter((m) => !m?.isDeleted);
-    const statusCount = (status) => activeFleet.filter((m) => m.status === status).length;
+  const earningsAndExpenses = useMemo(() => {
+    const t = {
+      reservationFees: 0,
+      unitRental: 0,
+      extensions: 0,
+      pendingExtensions: 0,
+      helmetFees: 0,
+      distanceFees: 0,
+      penalties: 0,
+      other: 0,
+      expenses: 0,
+    };
+    filteredBookings.forEach((b) => {
+      const reservationFee = Number(b.reservationFee || 0);
+      const extensionAdditional = Array.isArray(b.extensions)
+        ? b.extensions.reduce(
+            (acc, ext) => acc + Number(ext.additionalAmount || 0),
+            0,
+          )
+        : 0;
+      const helmetFee = Number(b.details?.helmetFee || 0);
+      const distanceFee = Number(b.details?.distanceFee || 0);
+      const penaltyAmount = Number(b.returnInspection?.penaltyAmount || 0);
+      const repairEstimate = Number(
+        b.returnInspection?.repairEstimateAmount || 0,
+      );
+      const penaltyAndDamageAmount = penaltyAmount + repairEstimate;
+      const amountTotal = Number(b.amount || 0);
+      const baseRental = Math.max(
+        0,
+        amountTotal -
+          extensionAdditional -
+          helmetFee -
+          distanceFee -
+          penaltyAndDamageAmount,
+      );
+      if (b.paymentStatus === "reservation_paid")
+        t.reservationFees += reservationFee;
+      if (b.paymentStatus === "fully_paid") {
+        t.unitRental += baseRental;
+        t.helmetFees += helmetFee;
+        t.distanceFees += distanceFee;
+        if (extensionAdditional && b.status !== "completed")
+          t.pendingExtensions += extensionAdditional;
+      }
+      if (b.status === "completed") {
+        if (extensionAdditional) t.extensions += extensionAdditional;
+        if (penaltyAndDamageAmount) t.penalties += penaltyAndDamageAmount;
+      }
+      if (b.returnInspection?.penaltySettled && b.status !== "completed")
+        t.penalties += penaltyAndDamageAmount;
+      if (repairEstimate) t.expenses += repairEstimate;
+      const attributed =
+        baseRental +
+        extensionAdditional +
+        helmetFee +
+        distanceFee +
+        reservationFee +
+        penaltyAndDamageAmount;
+      if (amountTotal && attributed === 0) t.other += amountTotal;
+    });
+    Object.keys(t).forEach((k) => (t[k] = Math.round(t[k])));
+    return t;
+  }, [filteredBookings]);
 
+  const fleetStats = useMemo(() => {
+    const active = motorcycles.filter((m) => !m?.isDeleted);
     return {
-      total: activeFleet.length,
-      available: statusCount("available"),
-      pending: statusCount("pending"),
-      rented: statusCount("rented"),
-      maintenance: statusCount("maintenance"),
+      total: active.length,
+      available: active.filter((m) => m.status === "available").length,
+      pending: active.filter((m) => m.status === "pending").length,
+      rented: active.filter((m) => m.status === "rented").length,
+      maintenance: active.filter((m) => m.status === "maintenance").length,
     };
   }, [motorcycles]);
 
   const bookingStatusData = useMemo(() => {
-    const statusMap = {
+    const map = {
       PendingReservation: "pending_reservation",
       PendingFullPayment: "pending_full_payment",
       Active: "active",
       Completed: "completed",
       Cancelled: "cancelled",
     };
-
-    return Object.entries(statusMap)
+    return Object.entries(map)
       .map(([label, key]) => ({
         label,
         count: filteredBookings.filter((b) => b.status === key).length,
@@ -406,8 +539,8 @@ const AdminAnalytics = () => {
   const paymentMethodData = useMemo(() => {
     const map = new Map();
     filteredBookings.forEach((b) => {
-      const key = b.reservationPaymentMethod || "Unspecified";
-      map.set(key, (map.get(key) || 0) + 1);
+      const k = b.reservationPaymentMethod || "Unspecified";
+      map.set(k, (map.get(k) || 0) + 1);
     });
     return [...map.entries()]
       .map(([label, count]) => ({ label, count }))
@@ -418,371 +551,519 @@ const AdminAnalytics = () => {
     const map = new Map();
     filteredBookings.forEach((b) => {
       const key = monthKey(b.bookingDate || b.createdAt || b.pickupDate);
-      const add =
-        b.paymentStatus === "fully_paid"
-          ? Number(b.amount || 0)
-          : b.paymentStatus === "reservation_paid"
-            ? Number(b.reservationFee || 200)
-            : 0;
+      const reservationFee = Number(b.reservationFee || 200);
+      const extAdd = Array.isArray(b.extensions)
+        ? b.extensions.reduce(
+            (acc, ext) => acc + Number(ext.additionalAmount || 0),
+            0,
+          )
+        : 0;
+      const penalty = Number(b.returnInspection?.penaltyAmount || 0);
+      const damage = Number(b.returnInspection?.repairEstimateAmount || 0);
+      const base = Math.max(
+        0,
+        Number(b.amount || 0) - extAdd - penalty - damage,
+      );
+      let add = 0;
+      if (b.paymentStatus === "reservation_paid") add += reservationFee;
+      if (b.paymentStatus === "fully_paid") add += base;
+      if (b.status === "completed") add += extAdd + penalty + damage;
+      if (b.returnInspection?.penaltySettled && b.status !== "completed")
+        add += penalty + damage;
       map.set(key, (map.get(key) || 0) + add);
     });
-
     return [...map.entries()]
       .map(([label, total]) => ({ label, count: Math.round(total) }))
       .sort((a, b) => {
-        const da = new Date(`${a.label} 1`);
-        const db = new Date(`${b.label} 1`);
-        if (Number.isNaN(da.getTime()) && Number.isNaN(db.getTime())) return 0;
-        if (Number.isNaN(da.getTime())) return 1;
-        if (Number.isNaN(db.getTime())) return -1;
-        return da - db;
+        const da = new Date(`${a.label} 1`),
+          db = new Date(`${b.label} 1`);
+        return Number.isNaN(da.getTime())
+          ? 1
+          : Number.isNaN(db.getTime())
+            ? -1
+            : da - db;
       });
   }, [filteredBookings]);
 
   const topMotorcycles = useMemo(() => {
     const map = new Map();
     filteredBookings.forEach((b) => {
-      const mk = b?.motorcycle?.make || "Unknown";
-      const md = b?.motorcycle?.model || "Motorcycle";
-      const key = `${mk} ${md}`.trim();
-      map.set(key, (map.get(key) || 0) + 1);
+      const k =
+        `${b?.motorcycle?.make || "Unknown"} ${b?.motorcycle?.model || "Motorcycle"}`.trim();
+      map.set(k, (map.get(k) || 0) + 1);
     });
-
     return [...map.entries()]
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [filteredBookings]);
 
-  const exportAnalyticsCSV = useCallback(() => {
-    const lines = [];
-    lines.push(["Metric", "Value"].join(","));
-    lines.push(["Period", selectedPeriodLabel].join(","));
-    lines.push(["Total Bookings", metrics.totalBookings].join(","));
-    lines.push(["Total Revenue", metrics.totalRevenue].join(","));
-    lines.push(["Due At Pickup", metrics.totalDueAtPickup].join(","));
-    lines.push(["Active Rentals", metrics.activeRentals].join(","));
-    lines.push(["Pending Reservation", metrics.pendingReservations].join(","));
-    lines.push(["Pending Full Payment", metrics.pendingFullPayment].join(","));
-    lines.push(["Suspected Fake", metrics.suspectedFake].join(","));
-    lines.push(["Re-upload Requested", metrics.reuploadRequested].join(","));
-    lines.push(["", ""].join(","));
+  const earningsBreakdownItems = useMemo(() => {
+    return [
+      { label: "Reservation Fees", value: earningsAndExpenses.reservationFees },
+      { label: "Unit Rental", value: earningsAndExpenses.unitRental },
+      { label: "Helmet Fees", value: earningsAndExpenses.helmetFees },
+      { label: "Distance Fees", value: earningsAndExpenses.distanceFees },
+      {
+        label: "Extensions (Completed)",
+        value: earningsAndExpenses.extensions,
+      },
+      {
+        label: "Pending Extensions",
+        value: earningsAndExpenses.pendingExtensions,
+      },
+      { label: "Penalties", value: earningsAndExpenses.penalties },
+      { label: "Other", value: earningsAndExpenses.other },
+    ]
+      .filter((m) => m.value > 0)
+      .map((m) => ({ label: m.label, count: m.value }));
+  }, [earningsAndExpenses]);
 
-    lines.push([
-      "Booking Date",
-      "Customer",
-      "Motorcycle",
-      "Status",
-      "Payment Status",
-      "Amount",
-      "Reservation Fee",
-      "Method",
-      "Suspected Fake",
-    ].join(","));
-
-    filteredBookings.forEach((b) => {
-      const row = [
-        (b.bookingDate || b.createdAt || "").toString().replace(/,/g, " "),
-        (b.customer || "").toString().replace(/,/g, " "),
-        `${b?.motorcycle?.make || ""} ${b?.motorcycle?.model || ""}`.trim().replace(/,/g, " "),
-        (b.status || "").toString().replace(/,/g, " "),
-        (b.paymentStatus || "").toString().replace(/,/g, " "),
-        Number(b.amount || 0),
-        Number(b.reservationFee || 200),
-        (b.reservationPaymentMethod || "").toString().replace(/,/g, " "),
-        b?.receiptVerification?.status === "suspected_fake" ? "Yes" : "No",
-      ];
-      lines.push(row.join(","));
+  const exportCSV = useCallback(() => {
+    const lines = [
+      ["Metric", "Value"].join(","),
+      ["Period", selectedPeriodLabel].join(","),
+      ["Total Bookings", metrics.totalBookings].join(","),
+      ["Total Revenue", metrics.totalRevenue].join(","),
+    ];
+    const blob = new Blob([lines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
     });
-
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const periodToken = selectedPeriodLabel
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9-]/g, "")
-      .toLowerCase();
-    a.download = `analytics-${periodToken}-${Date.now()}.csv`;
+    a.download = `analytics-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [filteredBookings, metrics, selectedPeriodLabel]);
+  }, [metrics, selectedPeriodLabel]);
 
-  const exportPrintableReport = useCallback(() => {
-    const reportHtml = `
-      <html>
-        <head>
-          <title>Admin Analytics Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #171717; }
-            h1 { margin: 0 0 6px; }
-            .muted { color: #555; font-size: 12px; margin-bottom: 18px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 20px; }
-            .card { border: 1px solid #ddd; border-radius: 10px; padding: 10px 12px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
-            th { background: #f4f4f4; }
-          </style>
-        </head>
-        <body>
-          <h1>Anaia's Motorcycle Rental - Analytics Report</h1>
-          <div class="muted">Generated on ${new Date().toLocaleString()} | Period: ${selectedPeriodLabel}</div>
-          <div class="grid">
-            <div class="card"><strong>Total Bookings:</strong> ${metrics.totalBookings}</div>
-            <div class="card"><strong>Total Revenue:</strong> ${formatMoney(metrics.totalRevenue)}</div>
-            <div class="card"><strong>Due At Pickup:</strong> ${formatMoney(metrics.totalDueAtPickup)}</div>
-            <div class="card"><strong>Active Rentals:</strong> ${metrics.activeRentals}</div>
-            <div class="card"><strong>Pending Reservation:</strong> ${metrics.pendingReservations}</div>
-            <div class="card"><strong>Pending Full Payment:</strong> ${metrics.pendingFullPayment}</div>
-            <div class="card"><strong>Suspected Fake:</strong> ${metrics.suspectedFake}</div>
-            <div class="card"><strong>Re-upload Requests:</strong> ${metrics.reuploadRequested}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Booking Date</th>
-                <th>Customer</th>
-                <th>Motorcycle</th>
-                <th>Status</th>
-                <th>Payment</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredBookings
-                .slice(0, 100)
-                .map((b) => {
-                  const mc = `${b?.motorcycle?.make || ""} ${b?.motorcycle?.model || ""}`.trim();
-                  return `<tr>
-                    <td>${new Date(b.bookingDate || b.createdAt || Date.now()).toLocaleDateString()}</td>
-                    <td>${b.customer || ""}</td>
-                    <td>${mc}</td>
-                    <td>${b.status || ""}</td>
-                    <td>${b.paymentStatus || ""}</td>
-                    <td>${Number(b.amount || 0).toLocaleString()}</td>
-                  </tr>`;
-                })
-                .join("")}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
+  const exportPDF = useCallback(() => {
+    const html = `<html><head><title>Analytics Report</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#171717}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left}th{background:#f4f4f4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}.card{border:1px solid #ddd;border-radius:8px;padding:10px}</style></head><body><h1>Analytics Report — ${selectedPeriodLabel}</h1><div class="grid"><div class="card"><strong>Total Bookings:</strong> ${metrics.totalBookings}</div><div class="card"><strong>Revenue:</strong> ${formatMoney(metrics.totalRevenue)}</div><div class="card"><strong>Due At Pickup:</strong> ${formatMoney(metrics.totalDueAtPickup)}</div><div class="card"><strong>Active Rentals:</strong> ${metrics.activeRentals}</div></div></body></html>`;
+    const w = window.open("", "_blank", "width=1100,height=800");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }, [metrics, selectedPeriodLabel]);
 
-    const win = window.open("", "_blank", "width=1100,height=800");
-    if (!win) return;
-    win.document.write(reportHtml);
-    win.document.close();
-    win.focus();
-    win.print();
-  }, [filteredBookings, metrics, selectedPeriodLabel]);
+  const statCards = [
+    {
+      label: "Total Bookings",
+      value: metrics.totalBookings,
+      sub: selectedPeriodLabel,
+      subColor: "text-slate-400",
+      icon: FaCalendarAlt,
+      accent: "bg-violet-500",
+    },
+    {
+      label: "Revenue",
+      value: formatMoney(metrics.totalRevenue),
+      sub: "Confirmed payments",
+      subColor: "text-emerald-500",
+      icon: FaMoneyBillWave,
+      accent: "bg-emerald-500",
+    },
+    {
+      label: "Due At Pickup",
+      value: formatMoney(metrics.totalDueAtPickup),
+      sub: "Outstanding balance",
+      subColor: "text-amber-500",
+      icon: CreditCard,
+      accent: "bg-amber-500",
+    },
+    {
+      label: "Active Rentals",
+      value: metrics.activeRentals,
+      sub: `${fleetStats.rented} units out`,
+      subColor: "text-blue-500",
+      icon: Bike,
+      accent: "bg-blue-500",
+    },
+    {
+      label: "Pending Reservation",
+      value: metrics.pendingReservations,
+      sub: "Awaiting confirmation",
+      subColor: "text-violet-500",
+      icon: Clock,
+      accent: "bg-violet-500",
+    },
+    {
+      label: "Pending Full Payment",
+      value: metrics.pendingFullPayment,
+      sub: "Balance due",
+      subColor: "text-amber-500",
+      icon: CheckCircle2,
+      accent: "bg-amber-500",
+    },
+    {
+      label: "Suspected Fake",
+      value: metrics.suspectedFake,
+      sub: `${metrics.reuploadRequested} re-upload requests`,
+      subColor: "text-red-500",
+      icon: FaShieldAlt,
+      accent: "bg-[#b50002]",
+    },
+    {
+      label: "Completed",
+      value: metrics.completed,
+      sub: "Finished rentals",
+      subColor: "text-emerald-500",
+      icon: FaCheckCircle,
+      accent: "bg-emerald-500",
+    },
+  ];
+
+  const fleetStatCards = [
+    {
+      label: "Available",
+      value: fleetStats.available,
+      color: "bg-emerald-500",
+      text: "text-emerald-600",
+      bg: "bg-emerald-50 border-emerald-200",
+    },
+    {
+      label: "Rented",
+      value: fleetStats.rented,
+      color: "bg-blue-500",
+      text: "text-blue-600",
+      bg: "bg-blue-50 border-blue-200",
+    },
+    {
+      label: "Pending",
+      value: fleetStats.pending,
+      color: "bg-violet-500",
+      text: "text-violet-600",
+      bg: "bg-violet-50 border-violet-200",
+    },
+    {
+      label: "Maintenance",
+      value: fleetStats.maintenance,
+      color: "bg-amber-500",
+      text: "text-amber-600",
+      bg: "bg-amber-50 border-amber-200",
+    },
+  ];
 
   return (
-    <div className="min-h-screen pt-32 bg-[#e3e3e3] py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-4 rounded-3xl bg-gradient-to-br from-[#171717] via-[#212121] to-[#b50002] p-4 sm:p-5 border border-white/10 mt-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] font-black text-[#b9b9b9]/80 mb-1">
-                Admin Dashboard
-              </p>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
-                Data Analytics
-              </h1>
-              <p className="text-xs sm:text-sm text-[#b9b9b9]/80 mt-1.5 max-w-xl">
-                Monitor booking demand, payment health, and fleet movement in one dashboard.
-              </p>
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
+        {/* ── Header ── */}
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              Data Analytics
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Monitor booking demand, payment health, and fleet movement.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
+            >
+              <FaFileExport className="text-[10px]" /> Export CSV
+            </button>
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
+            >
+              <FaPrint className="text-[10px]" /> Print Report
+            </button>
+            <button
+              onClick={fetchAnalyticsData}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#b50002] text-white font-bold text-xs shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+            >
+              <FaRedo
+                className={`text-[10px] ${loading ? "animate-spin" : ""}`}
+              />{" "}
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* ── Filters toolbar ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <FaFilter className="text-slate-300 text-[10px]" />
+              <span className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase">
+                Filter Period
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                >
+                  <option value="all">All Years</option>
+                  {availableYears.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                >
+                  <option value="all">All Months</option>
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <option key={i + 1} value={String(i + 1)}>
+                      {new Date(2000, i, 1).toLocaleDateString("en-US", {
+                        month: "long",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+              {fleetStatCards.map(({ label, value, text, bg }) => (
+                <span
+                  key={label}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${bg} ${text}`}
+                >
+                  {label}: {value}
+                </span>
+              ))}
             </div>
           </div>
+
+          {/* Active period indicator */}
+          {(selectedYear !== "all" || selectedMonth !== "all") && (
+            <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+              <p className="text-[11px] text-slate-400 font-semibold">
+                Showing data for:{" "}
+                <span className="text-[#171717] font-black">
+                  {selectedPeriodLabel}
+                </span>
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedYear("all");
+                  setSelectedMonth("all");
+                }}
+                className="text-[11px] text-[#b50002] font-bold hover:underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 bg-[#c7c5c5] rounded-xl px-3 py-2 shadow-lg shadow-black/20 border border-[#171717]/10">
-            <FaFilter className="text-[#171717] text-sm" />
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-transparent text-sm text-[#171717] focus:outline-none"
-            >
-              <option value="all">All Years</option>
-              {availableYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
+        {/* ── Error state ── */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-[#b50002] rounded-2xl p-4 mb-6 flex items-center gap-2 text-sm font-semibold">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
+          </div>
+        )}
+
+        {/* ── Main stat cards ── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          {loading
+            ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
+            : statCards.map((s) => (
+                <StatCard key={s.label} {...s} loading={loading} />
               ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[#c7c5c5] rounded-xl px-3 py-2 shadow-lg shadow-black/20 border border-[#171717]/10">
-            <FaCalendarAlt className="text-[#171717] text-sm" />
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-sm text-[#171717] focus:outline-none"
-            >
-              <option value="all">All Months</option>
-              {Array.from({ length: 12 }).map((_, idx) => {
-                const value = String(idx + 1);
-                const label = new Date(2000, idx, 1).toLocaleDateString("en-US", {
-                  month: "long",
-                });
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          <button
-            onClick={fetchAnalyticsData}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#171717] text-white text-sm font-bold shadow-lg hover:brightness-110 transition-all"
-          >
-            <FaRedo className={loading ? "animate-spin" : ""} /> Refresh
-          </button>
-
-          <button
-            onClick={exportAnalyticsCSV}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-lg hover:brightness-110 transition-all"
-          >
-            <FaFileExport /> Export CSV
-          </button>
-
-          <button
-            onClick={exportPrintableReport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-lg hover:brightness-110 transition-all"
-          >
-            <FaPrint /> Export PDF
-          </button>
-
-          <div className="ml-auto flex items-center gap-2 text-xs">
-            <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 font-semibold border border-green-300">
-              Available: {fleetStats.available}
-            </span>
-            <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 font-semibold border border-yellow-300">
-              Pending: {fleetStats.pending}
-            </span>
-            <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-semibold border border-blue-300">
-              Rented: {fleetStats.rented}
-            </span>
-            <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 font-semibold border border-red-300">
-              Maintenance: {fleetStats.maintenance}
-            </span>
-          </div>
         </div>
 
-        {error ? (
-          <div className="bg-red-100 border border-red-300 text-red-800 rounded-xl p-4 mb-5 flex items-center gap-2">
-            <FaExclamationTriangle /> {error}
+        {/* ── Body layout ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+          {/* Left: charts — 3/4 */}
+          <div className="xl:col-span-3 space-y-4">
+            {/* Revenue trend */}
+            <SectionCard title="Revenue Trend" icon={TrendingUp}>
+              <Sparkline items={revenueByMonth} />
+            </SectionCard>
+
+            {/* Donut grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SectionCard title="Booking Status" icon={BarChart3}>
+                <DonutChart items={bookingStatusData} />
+              </SectionCard>
+              <SectionCard title="Payment Methods" icon={CreditCard}>
+                <DonutChart items={paymentMethodData} />
+              </SectionCard>
+            </div>
+
+            {/* Top motorcycles */}
+            <SectionCard title="Top Requested Motorcycles" icon={FaMotorcycle}>
+              {topMotorcycles.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">
+                  No bookings yet
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {topMotorcycles.map((m) => (
+                    <DistributionRow
+                      key={m.label}
+                      label={m.label}
+                      count={m.count}
+                      max={topMotorcycles[0].count}
+                      color="bg-blue-500"
+                    />
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+
           </div>
-        ) : null}
 
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-[124px] rounded-2xl bg-[#b9b9b9] border border-[#171717]/10 animate-pulse"
-              />
-            ))}
+          {/* Right sidebar — 1/4 */}
+          <div className="flex flex-col gap-4">
+            {/* Fleet Summary */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                Fleet Summary
+              </h3>
+              <div className="space-y-3">
+                {fleetStatCards.map(({ label, value, color }) => {
+                  const pct = fleetStats.total
+                    ? Math.round((value / fleetStats.total) * 100)
+                    : 0;
+                  return (
+                    <div key={label}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] font-semibold text-slate-500">
+                          {label}
+                        </span>
+                        <span className="text-[12px] font-black text-[#171717]">
+                          {loading ? "—" : value}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${color} transition-all duration-700`}
+                          style={{ width: loading ? "0%" : `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-2 border-t border-slate-50 flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-slate-500">
+                    Total Fleet
+                  </span>
+                  <span className="text-[12px] font-black text-[#171717]">
+                    {fleetStats.total}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Revenue breakdown summary */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                Revenue Breakdown
+              </h3>
+              <div className="space-y-2.5">
+                {[
+                  {
+                    label: "Unit Rental",
+                    value: earningsAndExpenses.unitRental,
+                    color: "text-emerald-600",
+                  },
+                  {
+                    label: "Reservation Fees",
+                    value: earningsAndExpenses.reservationFees,
+                    color: "text-blue-600",
+                  },
+                  {
+                    label: "Extensions",
+                    value: earningsAndExpenses.extensions,
+                    color: "text-violet-600",
+                  },
+                  {
+                    label: "Penalties",
+                    value: earningsAndExpenses.penalties,
+                    color: "text-amber-600",
+                  },
+                  {
+                    label: "Helmet Fees",
+                    value: earningsAndExpenses.helmetFees,
+                    color: "text-slate-500",
+                  },
+                  {
+                    label: "Distance Fees",
+                    value: earningsAndExpenses.distanceFees,
+                    color: "text-slate-500",
+                  },
+                ]
+                  .filter((x) => x.value > 0)
+                  .map(({ label, value, color }) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {label}
+                      </span>
+                      <span className={`text-[12px] font-black ${color}`}>
+                        {formatMoney(value)}
+                      </span>
+                    </div>
+                  ))}
+                {earningsAndExpenses.expenses > 0 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                    <span className="text-[11px] font-semibold text-[#b50002]">
+                      Expenses (Repairs)
+                    </span>
+                    <span className="text-[12px] font-black text-[#b50002]">
+                      {formatMoney(earningsAndExpenses.expenses)}
+                    </span>
+                  </div>
+                )}
+                {earningsAndExpenses.pendingExtensions > 0 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Pending Extensions
+                    </span>
+                    <span className="text-[12px] font-black text-slate-400">
+                      {formatMoney(earningsAndExpenses.pendingExtensions)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Receipt integrity */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                Receipt Integrity
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-100">
+                  <div>
+                    <p className="text-[11px] font-black text-[#b50002] uppercase tracking-wider">
+                      Suspected Fake
+                    </p>
+                    <p className="text-2xl font-black text-[#b50002]">
+                      {metrics.suspectedFake}
+                    </p>
+                  </div>
+                  <FaShieldAlt className="text-[#b50002] text-xl opacity-40" />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <div>
+                    <p className="text-[11px] font-black text-amber-600 uppercase tracking-wider">
+                      Re-upload Requests
+                    </p>
+                    <p className="text-2xl font-black text-amber-600">
+                      {metrics.reuploadRequested}
+                    </p>
+                  </div>
+                  <FaExclamationTriangle className="text-amber-500 text-xl opacity-40" />
+                </div>
+              </div>
+            </div>
           </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <AnalyticsCard
-            label="Bookings"
-            value={metrics.totalBookings}
-            icon={FaCalendarAlt}
-            subText="Within selected period"
-            accent="text-[#171717]"
-            glow="shadow-black/20"
-          />
-          <AnalyticsCard
-            label="Revenue"
-            value={formatMoney(metrics.totalRevenue)}
-            icon={FaMoneyBillWave}
-            subText="Paid + reservation confirmed"
-            accent="text-[#171717]"
-            glow="shadow-green-900/20"
-          />
-          <AnalyticsCard
-            label="Due At Pickup"
-            value={formatMoney(metrics.totalDueAtPickup)}
-            icon={FaCreditCard}
-            subText="Outstanding balance"
-            accent="text-[#171717]"
-            glow="shadow-orange-900/20"
-          />
-          <AnalyticsCard
-            label="Fleet"
-            value={fleetStats.total}
-            icon={FaMotorcycle}
-            subText={`${fleetStats.available} available · ${fleetStats.rented} rented`}
-            accent="text-[#171717]"
-            glow="shadow-blue-900/20"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <AnalyticsCard
-            label="Active Rentals"
-            value={metrics.activeRentals}
-            icon={FaClock}
-            accent="text-[#171717]"
-            glow="shadow-blue-900/20"
-          />
-          <AnalyticsCard
-            label="Pending Reservation"
-            value={metrics.pendingReservations}
-            icon={FaCreditCard}
-            accent="text-[#171717]"
-            glow="shadow-yellow-900/20"
-          />
-          <AnalyticsCard
-            label="Pending Full Payment"
-            value={metrics.pendingFullPayment}
-            icon={FaCheckCircle}
-            accent="text-[#171717]"
-            glow="shadow-orange-900/20"
-          />
-          <AnalyticsCard
-            label="Suspected Fake"
-            value={metrics.suspectedFake}
-            icon={FaShieldAlt}
-            subText={`Re-upload requests: ${metrics.reuploadRequested}`}
-            accent="text-[#171717]"
-            glow="shadow-[#b50002]/20"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          <DonutChartCard
-            title="Booking Status Distribution"
-            items={bookingStatusData}
-            icon={FaMapMarkerAlt}
-          />
-          <DonutChartCard
-            title="Payment Method Mix"
-            items={paymentMethodData}
-            icon={FaCreditCard}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <LineChartCard
-            title="Revenue Trend by Month"
-            items={revenueByMonth}
-            icon={FaMoneyBillWave}
-            emptyText="No paid bookings in this period"
-          />
-          <DistributionCard
-            title="Top Requested Motorcycles"
-            items={topMotorcycles}
-            icon={FaMotorcycle}
-            emptyText="No bookings yet"
-            barClass="bg-blue-700"
-          />
         </div>
       </div>
     </div>

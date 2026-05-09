@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactDOM from "react-dom/client";
 import {
   FaMotorcycle,
@@ -9,22 +15,35 @@ import {
   FaShieldAlt,
   FaTimes,
   FaTrash,
-  FaTrashRestore,
-  FaMapMarkedAlt,
   FaSearch,
   FaThLarge,
   FaList,
   FaHourglassHalf,
-  FaExclamationTriangle,
   FaChevronLeft,
   FaChevronRight,
   FaChevronUp,
   FaChevronDown,
   FaSort,
-  FaClock,
+  FaIdCard,
+  FaTag,
+  FaLayerGroup,
+  FaCalendarAlt,
+  FaTachometerAlt,
+  FaHardHat,
+  FaSatelliteDish,
 } from "react-icons/fa";
+import {
+  Wrench,
+  Bike,
+  PlusCircle,
+  MapPin,
+  Clock,
+  ArrowRight,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { AddCarPageStyles, styles } from "../assets/dummyStyles";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
@@ -34,26 +53,16 @@ const api = axios.create({
   baseURL: BASE,
   headers: { Accept: "application/json" },
 });
-
 const ITEMS_PER_PAGE = 10;
 
-const nextSortState = (current) => {
-  if (current === null) return "asc";
-  if (current === "asc") return "desc";
-  return null;
-};
+const nextSortState = (c) => (c === null ? "asc" : c === "asc" ? "desc" : null);
 
 const makeImageUrl = (img) => {
   if (!img) return "";
   const s = String(img).trim();
   if (/^data:image\//i.test(s)) return s;
-  // If it's already a full URL (including Cloudinary), ensure it's HTTPS
-  if (/^https?:\/\//i.test(s)) {
-    // Force HTTPS for Cloudinary and external URLs
-    return s.replace(/^http:\/\//i, "https://");
-  }
-  // Otherwise, prepend the API base for relative paths
-  return `${BASE}/uploads/${s.replace(/^\/+/, '').replace(/^uploads\//, '')}`;
+  if (/^https?:\/\//i.test(s)) return s.replace(/^http:\/\//i, "https://");
+  return `${BASE}/uploads/${s.replace(/^\/+/, "").replace(/^uploads\//, "")}`;
 };
 
 const buildSafeMotorcycle = (raw = {}, idx = 0) => {
@@ -86,38 +95,79 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
   };
 };
 
+// ── Shared styles ─────────────────────────────────────────────────────────────
+const labelCls =
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+const fieldCls =
+  "w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30";
+const fieldClsIcon =
+  "w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 appearance-none";
+
+// Icon-wrapped input container
+const IconField = ({ icon: Icon, label, children }) => (
+  <div>
+    {label && <label className={labelCls}>{label}</label>}
+    <div className="relative flex items-center">
+      {Icon && (
+        <Icon className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
+      )}
+      {children}
+    </div>
+  </div>
+);
+
+// ── Status badge ──────────────────────────────────────────────────────────────
+const STATUS_STYLE = {
+  available: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  rented: "bg-blue-50 text-blue-600 border-blue-200",
+  maintenance: "bg-amber-50 text-amber-600 border-amber-200",
+  pending: "bg-violet-50 text-violet-600 border-violet-200",
+  deleted: "bg-red-50 text-[#b50002] border-red-200",
+};
+const StatusBadge = ({ status, isDeleted }) => {
+  const key = isDeleted ? "deleted" : status;
+  const cls =
+    STATUS_STYLE[key] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  const label = isDeleted
+    ? "Deleted"
+    : status.charAt(0).toUpperCase() + status.slice(1);
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cls}`}
+    >
+      {label}
+    </span>
+  );
+};
+
 // ── Confirm Modal ─────────────────────────────────────────────────────────────
 const ConfirmModal = ({ message, onConfirm, onCancel, isPermanent }) => (
   <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
     onClick={onCancel}
   >
     <div
-      className="bg-[#f4f3f3] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#171717]/10"
+      className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="text-center">
-        <div className="mx-auto flex items-center justify-center h-16 w-16">
-          <FaExclamationTriangle
-            className={`h-8 w-8 ${isPermanent ? "text-[#b50002]" : "text-[#b50002]"}`}
-          />
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertTriangle className="w-6 h-6 text-[#b50002]" />
         </div>
-        <h3 className="text-xl font-bold text-[#171717] mb-2">
+        <h3 className="text-lg font-black text-[#171717] mb-2">
           {isPermanent ? "Permanent Delete" : "Confirm Delete"}
         </h3>
-        <p className="text-[#171717] mb-6">{message}</p>
+        <p className="text-slate-500 text-sm mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+            className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
           >
             {isPermanent ? "Delete Forever" : "Yes, Delete"}
           </button>
@@ -126,16 +176,15 @@ const ConfirmModal = ({ message, onConfirm, onCancel, isPermanent }) => (
     </div>
   </div>
 );
-
 const confirmModal = (message, isPermanent = false) =>
   new Promise((resolve) => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = ReactDOM.createRoot(container);
-    const cleanup = (result) => {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const root = ReactDOM.createRoot(el);
+    const cleanup = (r) => {
       root.unmount();
-      document.body.removeChild(container);
-      resolve(result);
+      document.body.removeChild(el);
+      resolve(r);
     };
     root.render(
       <ConfirmModal
@@ -147,109 +196,113 @@ const confirmModal = (message, isPermanent = false) =>
     );
   });
 
-// ── Stat Tab ──────────────────────────────────────────────────────────────────
-const StatTab = ({
-  title,
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+const StatCard = ({
+  label,
   value,
+  sub,
+  subColor,
   icon: Icon,
-  isActive,
+  accent,
   onClick,
-  accentColor,
+  isActive,
+  loading,
 }) => (
   <button
     onClick={onClick}
-    className={`
-      flex-1 min-w-[140px] flex items-center justify-between px-5 py-4 rounded-2xl
-      transition-all duration-200 cursor-pointer shadow-lg shadow-black/20
-      ${isActive
-        ? "bg-[#171717] scale-[1.02] shadow-xl shadow-black/30"
-        : "bg-[#b9b9b9] hover:bg-[#a8a8a8] hover:scale-[1.01]"
-      }
-    `}
+    className={`relative text-left bg-white rounded-2xl border shadow-sm p-5 overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full
+      ${isActive ? "border-[#b50002]/30" : "border-slate-100"}`}
   >
-    <div className="text-left">
-      <p
-        className={`text-xs font-bold uppercase tracking-widest mb-1 ${isActive ? "text-[#b9b9b9]" : "text-[#171717]/60"}`}
-      >
-        {title}
-      </p>
-      <p
-        className={`text-2xl font-bold ${isActive ? "text-white" : "text-[#171717]"}`}
-      >
-        {value}
-      </p>
-    </div>
     <div
-      className={`p-3 rounded-xl ${isActive ? "bg-white/10" : "bg-[#171717]/5"}`}
-    >
-      <Icon
-        className={`text-2xl ${isActive ? accentColor || "text-white" : "text-[#171717]"}`}
-      />
+      className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
+    />
+    <div className="flex items-start justify-between mb-3">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+        {label}
+      </p>
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10`}
+      >
+        <Icon className={`w-4 h-4 ${accent.replace("bg-", "text-")}`} />
+      </div>
     </div>
+    <p className="text-[2.2rem] font-black text-[#171717] leading-none mb-2">
+      {loading ? (
+        <span className="inline-block w-10 h-7 bg-slate-100 rounded-lg animate-pulse" />
+      ) : (
+        value
+      )}
+    </p>
+    <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>
   </button>
 );
 
-// ── Unit ID badge ─────────────────────────────────────────────────────────────
-const UnitBadge = ({ unitId }) => {
-  if (!unitId) return null;
-  return (
-    <span className="inline-flex items-center gap-1 py-0.5 text-xs font-bold text-[#171717]">
-      {unitId}
-    </span>
-  );
-};
-
-// ── Sort icon helper ──────────────────────────────────────────────────────────
+// ── Sort icon ─────────────────────────────────────────────────────────────────
 const SortIcon = ({ state }) => {
   if (state === "asc")
     return (
-      <FaChevronUp className="text-[#b50002] text-xs ml-1 flex-shrink-0" />
+      <FaChevronUp className="text-[#b50002] text-[10px] ml-1 flex-shrink-0" />
     );
   if (state === "desc")
     return (
-      <FaChevronDown className="text-[#b50002] text-xs ml-1 flex-shrink-0" />
+      <FaChevronDown className="text-[#b50002] text-[10px] ml-1 flex-shrink-0" />
     );
-  return <FaSort className="text-[#b9b9b9]/40 text-xs ml-1 flex-shrink-0" />;
+  return <FaSort className="text-slate-300 text-[10px] ml-1 flex-shrink-0" />;
 };
+
+// ── Skeleton row ──────────────────────────────────────────────────────────────
+const SkeletonRow = () => (
+  <tr>
+    {[...Array(7)].map((_, i) => (
+      <td key={i} className="px-5 py-3.5">
+        <div
+          className="h-4 bg-slate-100 rounded-lg animate-pulse"
+          style={{ width: `${50 + i * 8}%` }}
+        />
+      </td>
+    ))}
+  </tr>
+);
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   if (totalPages <= 1) return null;
-
   const pages = [];
-  const delta = 2;
-  const left = currentPage - delta;
-  const right = currentPage + delta;
   for (let i = 1; i <= totalPages; i++) {
-    if (i === 1 || i === totalPages || (i >= left && i <= right)) pages.push(i);
+    if (
+      i === 1 ||
+      i === totalPages ||
+      (i >= currentPage - 2 && i <= currentPage + 2)
+    )
+      pages.push(i);
   }
   const withEllipsis = [];
   let prev = null;
-  for (const page of pages) {
-    if (prev && page - prev > 1) withEllipsis.push("...");
-    withEllipsis.push(page);
-    prev = page;
+  for (const p of pages) {
+    if (prev && p - prev > 1) withEllipsis.push("...");
+    withEllipsis.push(p);
+    prev = p;
   }
-
   return (
-    <div className="flex items-center justify-center gap-2 mt-8">
+    <div className="flex items-center justify-center gap-2 mt-6">
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-lg bg-[#b9b9b9] text-[#171717] disabled:opacity-40 hover:bg-[#a0a0a0] transition-colors shadow-lg shadow-black/20"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
-        <FaChevronLeft />
+        <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`ellipsis-${idx}`} className="px-2 text-[#171717]">
+          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
             …
           </span>
         ) : (
           <button
             key={item}
             onClick={() => onPageChange(item)}
-            className={`w-9 h-9 rounded-lg font-semibold text-sm transition-all shadow-lg shadow-black/20 ${currentPage === item ? "bg-[#b50002] text-white scale-105" : "bg-[#b9b9b9] text-[#171717] hover:bg-[#a0a0a0]"}`}
+            className={`w-9 h-9 rounded-xl font-bold text-sm transition-all shadow-sm
+              ${currentPage === item ? "bg-[#b50002] text-white shadow-[#b50002]/30" : "bg-white border border-slate-100 text-slate-500 hover:border-[#b50002]/20 hover:text-[#b50002]"}`}
           >
             {item}
           </button>
@@ -258,149 +311,142 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-lg bg-[#b9b9b9] text-[#171717] disabled:opacity-40 hover:bg-[#a0a0a0] transition-colors shadow-lg shadow-black/20"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
-        <FaChevronRight />
+        <FaChevronRight className="text-xs" />
       </button>
     </div>
   );
 };
 
-// ── Card View ─────────────────────────────────────────────────────────────────
-const MotorcycleCard = ({ motorcycle, onEdit, onDelete, onRestore }) => {
-  const getStatusStyle = (status) => {
-    const map = {
-      available: "bg-green-900/30 text-green-800 border border-green-800/30",
-      rented: "bg-blue-900/30 text-blue-800 border border-blue-800/30",
-      maintenance:
-        "bg-orange-900/30 text-orange-800 border border-orange-800/30",
-      pending: "bg-yellow-900/30 text-yellow-800 border border-yellow-800/30",
-    };
-    return map[status] || "bg-gray-700 text-gray-200";
-  };
-
-  return (
+// ── Quick Action ──────────────────────────────────────────────────────────────
+const QuickAction = ({ onClick, icon: Icon, title, desc, accent }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center gap-4 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-[#b50002]/20 hover:-translate-y-0.5 transition-all duration-200 group w-full text-left"
+  >
     <div
-      className={`bg-[#e3e3e3] ${styles.rounded2xl} ${styles.carCard} border-t-2 border-transparent hover:scale-95 transition-all duration-200 ease-out ${motorcycle.isDeleted ? "opacity-60" : ""} shadow-[0_-4px_12px_rgba(0,0,0,0.15)]`}
+      className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${accent} transition-transform group-hover:scale-110 duration-200`}
     >
-      <div className="relative w-full aspect-[16/9] overflow-hidden rounded-t-2xl">
-        <img
-          src={motorcycle.image}
-          alt={`${motorcycle.make} ${motorcycle.model}`}
-          className="w-full h-full object-contain"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.src = "/placeholder-bike.png";
-          }}
-        />
-        <div className="absolute top-4 right-4">
-          {motorcycle.isDeleted ? (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-900/30 text-red-800 border border-red-800">
-              Deleted
-            </span>
-          ) : (
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyle(motorcycle.status)}`}
-            >
-              {motorcycle.status.charAt(0).toUpperCase() +
-                motorcycle.status.slice(1)}
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="p-5 bg-[#b9b9b9] rounded-b-2xl">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-xl font-bold text-[#171717]">
-              {motorcycle.make} {motorcycle.model}
-            </h3>
-            <p className="text-[#171717]">{motorcycle.year}</p>
-            <div className="mt-1">
-              <UnitBadge unitId={motorcycle.unitId} />
-            </div>
-            {motorcycle.description ? (
-              <p className="text-sm text-[#171717] mt-2 line-clamp-3">
-                {motorcycle.description}
-              </p>
-            ) : (
-              <p className="text-sm text-[#171717] mt-2 italic">
-                No description
-              </p>
-            )}
-            {motorcycle.isDeleted && motorcycle.deletedAt && (
-              <p className="text-xs text-[#171717] mt-1">
-                Deleted: {new Date(motorcycle.deletedAt).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-          <div className="text-2xl font-bold text-[#171717]">
-            ₱{motorcycle.dailyRate}
-            <span className="text-sm font-normal">/day</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <div className="flex items-center text-base">
-            <FaGasPump className="text-[#b50002] mr-2" />
-            <span className="text-[#171717]">{motorcycle.fuelType}</span>
-          </div>
-          <div className="flex items-center text-base">
-            <FaCog className="text-[#b50002] mr-2" />
-            <span className="text-[#171717]">{motorcycle.engineSize}cc</span>
-          </div>
-          <div className="flex items-center text-base">
-            <FaCog className="text-[#b50002] mr-2" />
-            <span className="text-[#171717]">{motorcycle.transmission}</span>
-          </div>
-          <div className="flex items-center text-base">
-            <FaShieldAlt className="text-[#b50002] mr-2" />
-            <span className="text-[#171717]">
-              {motorcycle.hasABS ? "ABS" : "Standard"}
-            </span>
-          </div>
-        </div>
-        <div className="flex justify-between border-t border-[#171717] pt-4">
-          {motorcycle.isDeleted && (
-            <>
-              <button
-                onClick={() => onRestore(motorcycle._id ?? motorcycle.id)}
-                className="flex items-center text-green-800 hover:text-green-800/60 transition-colors"
-              >
-                <FaTrashRestore className="mr-1 text-3xl" />
-              </button>
-              <button
-                onClick={() => onDelete(motorcycle._id ?? motorcycle.id, true)}
-                className="flex items-center text-red-800 hover:text-red-800/60 transition-colors"
-              >
-                <FaTrash className="mr-1 text-3xl" />
-              </button>
-            </>
-          )}
-          {!motorcycle.isDeleted &&
-            !["rented", "pending"].includes(
-              (motorcycle.status || "").toLowerCase(),
-            ) && (
-              <>
-                <button
-                  onClick={() => onEdit(motorcycle)}
-                  className="flex items-center text-[#171717] hover:text-green-800 transition-colors"
-                >
-                  <FaEdit className="mr-1 text-3xl" />
-                </button>
-                <button
-                  onClick={() =>
-                    onDelete(motorcycle._id ?? motorcycle.id, false)
-                  }
-                  className="flex items-center text-red-800 hover:text-red-800/60 transition-colors"
-                >
-                  <FaTrash className="mr-1 text-3xl" />
-                </button>
-              </>
-            )}
-        </div>
+      <Icon className="w-5 h-5 text-white" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="font-bold text-[#171717] text-sm leading-tight">{title}</p>
+      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{desc}</p>
+    </div>
+    <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-[#b50002] group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
+  </button>
+);
+
+// ── Motorcycle Card ───────────────────────────────────────────────────────────
+const MotorcycleCard = ({ motorcycle: m, onEdit, onDelete, onRestore }) => (
+  <div
+    className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${m.isDeleted ? "opacity-60" : ""}`}
+  >
+    <div className="relative w-full aspect-[16/9] bg-slate-50 overflow-hidden">
+      <img
+        src={m.image}
+        alt={`${m.make} ${m.model}`}
+        className="w-full h-full object-contain"
+        loading="lazy"
+        onError={(e) => {
+          e.currentTarget.src = "/placeholder-bike.png";
+        }}
+      />
+      <div className="absolute top-3 right-3">
+        <StatusBadge status={m.status} isDeleted={m.isDeleted} />
       </div>
     </div>
-  );
-};
+    <div className="p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          {m.unitId && (
+            <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
+              {m.unitId}
+            </p>
+          )}
+          <h3 className="font-black text-[#171717] text-[15px] leading-tight">
+            {m.make} {m.model}
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {m.year} · {m.category}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xl font-black text-[#171717]">₱{m.dailyRate}</p>
+          <p className="text-[10px] text-slate-400">/day</p>
+        </div>
+      </div>
+      {m.description && (
+        <p className="text-xs text-slate-500 mb-3 line-clamp-2">
+          {m.description}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {[
+          { icon: FaGasPump, label: m.fuelType },
+          { icon: FaCog, label: `${m.engineSize}cc` },
+          { icon: FaCog, label: m.transmission },
+          { icon: FaShieldAlt, label: m.hasABS ? "ABS" : "No ABS" },
+        ].map(({ icon: Icon, label }, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <Icon className="text-[#b50002] text-[11px] flex-shrink-0" />
+            <span className="text-[11px] text-slate-500 font-medium">
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+      {m.isDeleted && m.deletedAt && (
+        <p className="text-[10px] text-slate-400 mb-3">
+          Deleted{" "}
+          {new Date(m.deletedAt).toLocaleDateString("en-PH", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </p>
+      )}
+      <div className="flex gap-2 pt-3 border-t border-slate-50">
+        {m.isDeleted ? (
+          <>
+            <button
+              onClick={() => onRestore(m._id ?? m.id)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-600 font-bold text-xs hover:bg-emerald-100 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Restore
+            </button>
+            <button
+              onClick={() => onDelete(m._id ?? m.id, true)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-[#b50002] font-bold text-xs hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete Forever
+            </button>
+          </>
+        ) : !["rented", "pending"].includes((m.status || "").toLowerCase()) ? (
+          <>
+            <button
+              onClick={() => onEdit(m)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors"
+            >
+              <FaEdit className="text-xs" /> Edit
+            </button>
+            <button
+              onClick={() => onDelete(m._id ?? m.id, false)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-[#b50002] font-bold text-xs hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          </>
+        ) : (
+          <p className="text-[11px] text-slate-300 text-center w-full py-1">
+            No actions available
+          </p>
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 // ── Table View ────────────────────────────────────────────────────────────────
 const MotorcycleTable = ({
@@ -411,55 +457,29 @@ const MotorcycleTable = ({
   colSort,
   onColSort,
 }) => {
-  const getStatusStyle = (status) => {
-    const map = {
-      available: "bg-green-900/30 text-green-800 border border-green-800/30",
-      rented: "bg-blue-900/30 text-blue-800 border border-blue-800/30",
-      maintenance:
-        "bg-orange-900/30 text-orange-800 border border-orange-800/30",
-      pending: "bg-yellow-900/30 text-yellow-800 border border-yellow-800/30",
-    };
-    return (
-      map[status] || "bg-gray-700/30 text-gray-700 border border-gray-600/30"
-    );
-  };
-
   const cols = [
-    { label: "Unit", key: "unitId", width: "w-[120px]", sortable: true },
-    { label: "Motorcycle", key: "make", width: "w-[260px]", sortable: true },
-    { label: "Year", key: "year", width: "w-[90px]", sortable: true },
-    { label: "Category", key: "category", width: "w-[140px]", sortable: true },
-    { label: "Engine", key: "engineSize", width: "w-[120px]", sortable: true },
-    {
-      label: "Transmission",
-      key: "transmission",
-      width: "w-[160px]",
-      sortable: true,
-    },
-    { label: "Fuel", key: "fuelType", width: "w-[130px]", sortable: true },
-    { label: "ABS", key: "hasABS", width: "w-[90px]", sortable: true },
-    { label: "Rate/Day", key: "dailyRate", width: "w-[130px]", sortable: true },
-    { label: "Status", key: null, width: "w-[140px]", sortable: false },
-    { label: "Actions", key: null, width: "w-[120px]", sortable: false },
+    { label: "Unit", key: "unitId", sortable: true },
+    { label: "Motorcycle", key: "make", sortable: true },
+    { label: "Year", key: "year", sortable: true },
+    { label: "Engine", key: "engineSize", sortable: true },
+    { label: "Rate/Day", key: "dailyRate", sortable: true },
+    { label: "Status", key: null, sortable: false },
+    { label: "Actions", key: null, sortable: false },
   ];
-
   return (
-    <div className="rounded-2xl overflow-hidden shadow-lg shadow-black/20">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] border-collapse">
+        <table className="w-full">
           <thead>
-            <tr className="bg-[#171717]">
+            <tr className="border-b border-slate-50">
               {cols.map((col) => (
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`
-                    ${col.width} px-4 py-4 text-left text-sm font-bold uppercase tracking-wider
-                    text-[#b9b9b9] whitespace-nowrap first:pl-5 last:pr-5
-                    ${col.sortable ? "cursor-pointer select-none hover:text-white transition-colors" : ""}
-                  `}
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                    ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
-                  <span className="inline-flex items-center gap-0.5">
+                  <span className="inline-flex items-center">
                     {col.label}
                     {col.sortable && (
                       <SortIcon
@@ -471,29 +491,27 @@ const MotorcycleTable = ({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {motorcycles.map((motorcycle, idx) => (
+          <tbody className="divide-y divide-slate-50">
+            {motorcycles.map((m) => (
               <tr
-                key={motorcycle.id}
-                className={`
-                  border-b border-[#171717]/10 transition-all duration-150
-                  ${idx % 2 === 0 ? "bg-[#b9b9b9]" : "bg-[#c4c4c4]"}
-                  ${motorcycle.isDeleted ? "opacity-55" : "hover:bg-[#a8a8a8]"}
-                `}
+                key={m.id}
+                className={`hover:bg-slate-50/60 transition-colors ${m.isDeleted ? "opacity-50" : ""}`}
               >
-                <td className="px-4 py-4 pl-5">
-                  <UnitBadge unitId={motorcycle.unitId} />
-                  {!motorcycle.unitId && (
-                    <span className="text-sm text-[#171717]/40 italic">—</span>
+                <td className="px-5 py-3.5">
+                  {m.unitId ? (
+                    <span className="text-[11px] font-black text-[#b50002] tracking-wider uppercase">
+                      {m.unitId}
+                    </span>
+                  ) : (
+                    <span className="text-slate-300 text-sm">—</span>
                   )}
                 </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-[#171717]/5">
+                <td className="px-5 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-slate-50 border border-slate-100">
                       <img
-                        src={motorcycle.image}
-                        alt={`${motorcycle.make} ${motorcycle.model}`}
+                        src={m.image}
+                        alt={`${m.make} ${m.model}`}
                         className="w-full h-full object-contain"
                         loading="lazy"
                         onError={(e) => {
@@ -501,137 +519,76 @@ const MotorcycleTable = ({
                         }}
                       />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-base font-bold text-[#171717] truncate leading-tight">
-                        {motorcycle.make} {motorcycle.model}
+                    <div>
+                      <p className="font-black text-[13px] text-[#171717] leading-tight">
+                        {m.make} {m.model}
                       </p>
-                      {motorcycle.isDeleted && motorcycle.deletedAt && (
-                        <p className="text-xs text-red-700 mt-0.5">
-                          Deleted{" "}
-                          {new Date(motorcycle.deletedAt).toLocaleDateString()}
+                      <p className="text-[11px] text-slate-400">{m.category}</p>
+                      {m.isDeleted && m.deletedAt && (
+                        <p className="text-[10px] text-[#b50002] mt-0.5">
+                          Deleted {new Date(m.deletedAt).toLocaleDateString()}
                         </p>
                       )}
                     </div>
                   </div>
                 </td>
-
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
-                    {motorcycle.year || "—"}
+                <td className="px-5 py-3.5 text-[13px] text-slate-500">
+                  {m.year || "—"}
+                </td>
+                <td className="px-5 py-3.5">
+                  <span className="text-[13px] text-slate-600 font-medium">
+                    {m.engineSize}cc
                   </span>
                 </td>
-
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
-                    {motorcycle.category}
+                <td className="px-5 py-3.5">
+                  <span className="font-black text-[13px] text-[#171717]">
+                    ₱{m.dailyRate}
                   </span>
                 </td>
-
-                <td className="px-4 py-4">
+                <td className="px-5 py-3.5">
+                  <StatusBadge status={m.status} isDeleted={m.isDeleted} />
+                </td>
+                <td className="px-5 py-3.5">
                   <div className="flex items-center gap-1.5">
-                    <FaCog className="text-[#b50002] text-sm flex-shrink-0" />
-                    <span className="text-base text-[#171717]">
-                      {motorcycle.engineSize}cc
-                    </span>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
-                    {motorcycle.transmission}
-                  </span>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-1.5">
-                    <FaGasPump className="text-[#b50002] text-sm flex-shrink-0" />
-                    <span className="text-base text-[#171717]">
-                      {motorcycle.fuelType}
-                    </span>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-1.5">
-                    <FaShieldAlt
-                      className={`text-sm ${motorcycle.hasABS ? "text-[#b50002]" : "text-[#171717]/30"}`}
-                    />
-                    <span
-                      className={`text-sm font-semibold ${motorcycle.hasABS ? "text-[#171717]" : "text-[#171717]/40"}`}
-                    >
-                      {motorcycle.hasABS ? "Yes" : "No"}
-                    </span>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <span className="text-base font-bold text-[#171717]">
-                    ₱{motorcycle.dailyRate}
-                  </span>
-                </td>
-
-                <td className="px-4 py-4">
-                  {motorcycle.isDeleted ? (
-                    <span className="inline-flex px-3 py-1 rounded-full text-sm font-semibold bg-red-900/30 text-red-800 border border-red-800/40">
-                      Deleted
-                    </span>
-                  ) : (
-                    <span
-                      className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${getStatusStyle(motorcycle.status)}`}
-                    >
-                      {motorcycle.status.charAt(0).toUpperCase() +
-                        motorcycle.status.slice(1)}
-                    </span>
-                  )}
-                </td>
-
-                <td className="px-3 py-4 pr-5">
-                  <div className="flex items-center gap-2">
-                    {motorcycle.isDeleted && (
+                    {m.isDeleted ? (
                       <>
                         <button
-                          onClick={() =>
-                            onRestore(motorcycle._id ?? motorcycle.id)
-                          }
-                          className="p-2 rounded-lg bg-green-800 text-white hover:bg-green-700 transition-colors"
+                          onClick={() => onRestore(m._id ?? m.id)}
                           title="Restore"
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                         >
-                          <FaTrashRestore className="text-xl" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() =>
-                            onDelete(motorcycle._id ?? motorcycle.id, true)
-                          }
-                          className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
+                          onClick={() => onDelete(m._id ?? m.id, true)}
                           title="Delete Forever"
+                          className="p-1.5 rounded-lg bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
                         >
-                          <FaTrash className="text-xl" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
+                    ) : !["rented", "pending"].includes(
+                        (m.status || "").toLowerCase(),
+                      ) ? (
+                      <>
+                        <button
+                          onClick={() => onEdit(m)}
+                          title="Edit"
+                          className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          <FaEdit className="text-sm" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(m._id ?? m.id, false)}
+                          title="Delete"
+                          className="p-1.5 rounded-lg bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-slate-200 text-[11px]">—</span>
                     )}
-                    {!motorcycle.isDeleted &&
-                      !["rented", "pending"].includes(
-                        (motorcycle.status || "").toLowerCase(),
-                      ) && (
-                        <>
-                          <button
-                            onClick={() => onEdit(motorcycle)}
-                            className="p-2 rounded-lg bg-[#171717] text-white hover:bg-green-800 transition-colors"
-                            title="Edit"
-                          >
-                            <FaEdit className="text-xl" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              onDelete(motorcycle._id ?? motorcycle.id, false)
-                            }
-                            className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
-                            title="Delete"
-                          >
-                            <FaTrash className="text-xl" />
-                          </button>
-                        </>
-                      )}
                   </div>
                 </td>
               </tr>
@@ -643,22 +600,427 @@ const MotorcycleTable = ({
   );
 };
 
-// ── Edit Modal ────────────────────────────────────────────────────────────────
+// ── ADD MOTORCYCLE MODAL ──────────────────────────────────────────────────────
+const initialAddForm = {
+  unitId: "",
+  brandName: "Honda",
+  dailyPrice: "",
+  fuelType: "Unleaded",
+  engineSize: "",
+  transmission: "Manual",
+  year: "",
+  model: "",
+  description: "",
+  category: "Scooter",
+  hasABS: false,
+  hasHelmet: true,
+  traccarDeviceId: "",
+  image: null,
+  imagePreview: null,
+};
+
+const AddMotorcycleModal = ({ onClose, onSuccess }) => {
+  const [data, setData] = useState(initialAddForm);
+  const [submitting, setSubmitting] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    setData((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+  }, []);
+
+  const handleImageChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setData((p) => ({ ...p, image: file }));
+    const reader = new FileReader();
+    reader.onload = (evt) =>
+      setData((p) => ({ ...p, imagePreview: evt.target.result }));
+    reader.readAsDataURL(file);
+  }, []);
+
+  const noScroll = (e) => {
+    if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      Object.entries({
+        unitId: data.unitId,
+        make: data.brandName,
+        dailyRate: data.dailyPrice,
+        fuelType: data.fuelType,
+        engineSize: data.engineSize,
+        transmission: data.transmission,
+        year: data.year,
+        model: data.model,
+        description: data.description || "",
+        color: "",
+        category: data.category,
+        hasABS: data.hasABS,
+        hasHelmet: data.hasHelmet,
+        traccarDeviceId: data.traccarDeviceId || "",
+      }).forEach(([k, v]) => formData.append(k, v));
+      if (data.image)
+        formData.append(
+          "image",
+          data.image,
+          data.image.name || "motorcycle-image",
+        );
+      await api.post("/api/motorcycles", formData);
+      toast.success("Motorcycle added successfully!");
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to add motorcycle",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-4xl max-h-[92vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-slate-50 px-6 py-4 flex items-center justify-between z-10 rounded-t-2xl">
+          <div>
+            <h2 className="font-black text-[#171717] text-lg">
+              Add New Motorcycle
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          >
+            <FaTimes className="text-sm" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Unit Identifiers */}
+          <div>
+            <p className={`${labelCls} mb-3`}>Unit Identifiers</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <IconField icon={FaIdCard} label="Unit ID *">
+                <input
+                  required
+                  name="unitId"
+                  value={data.unitId}
+                  onChange={handleChange}
+                  type="text"
+                  className={fieldClsIcon}
+                  placeholder="e.g. UNIT-01"
+                  maxLength={30}
+                />
+              </IconField>
+              <IconField
+                icon={FaSatelliteDish}
+                label="GPS Tracker ID (Traccar)"
+              >
+                <input
+                  name="traccarDeviceId"
+                  value={data.traccarDeviceId}
+                  onChange={handleChange}
+                  type="text"
+                  className={fieldClsIcon}
+                  placeholder="e.g. 9210010703"
+                  maxLength={50}
+                />
+              </IconField>
+            </div>
+            {data.traccarDeviceId && (
+              <p className="text-[11px] text-slate-400 mt-1.5 ml-1">
+                📡 Must match the device's unique ID in Traccar.
+              </p>
+            )}
+          </div>
+
+          {/* Two-column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LEFT — Specs */}
+            <div className="space-y-4">
+              <p className={labelCls}>Motorcycle Details</p>
+
+              {/* Brand / Category / Year */}
+              <div className="grid grid-cols-3 gap-3">
+                <IconField icon={FaTag} label="Brand *">
+                  <select
+                    required
+                    name="brandName"
+                    value={data.brandName}
+                    onChange={handleChange}
+                    className={fieldClsIcon}
+                  >
+                    {["Honda", "Yamaha", "Suzuki", "Kawasaki"].map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </IconField>
+                <IconField icon={FaLayerGroup} label="Category *">
+                  <select
+                    required
+                    name="category"
+                    value={data.category}
+                    onChange={handleChange}
+                    className={fieldClsIcon}
+                  >
+                    {["Scooter", "Naked", "Underbone"].map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </IconField>
+                <IconField icon={FaCalendarAlt} label="Year *">
+                  <input
+                    required
+                    name="year"
+                    value={data.year}
+                    onChange={handleChange}
+                    type="number"
+                    onKeyDown={noScroll}
+                    className={fieldClsIcon}
+                    placeholder="2020"
+                    min="1990"
+                    max={new Date().getFullYear()}
+                  />
+                </IconField>
+              </div>
+
+              {/* Model / Engine / Fuel */}
+              <div className="grid grid-cols-3 gap-3">
+                <IconField icon={FaMotorcycle} label="Model *">
+                  <input
+                    required
+                    name="model"
+                    value={data.model}
+                    onChange={handleChange}
+                    type="text"
+                    className={fieldClsIcon}
+                    placeholder="e.g. Click"
+                    maxLength={18}
+                  />
+                </IconField>
+                <IconField icon={FaTachometerAlt} label="Engine (cc) *">
+                  <input
+                    required
+                    name="engineSize"
+                    value={data.engineSize}
+                    onChange={handleChange}
+                    type="number"
+                    onKeyDown={noScroll}
+                    className={fieldClsIcon}
+                    placeholder="150"
+                    min="50"
+                  />
+                </IconField>
+                <IconField icon={FaGasPump} label="Fuel *">
+                  <select
+                    required
+                    name="fuelType"
+                    value={data.fuelType}
+                    onChange={handleChange}
+                    className={fieldClsIcon}
+                  >
+                    {["Unleaded", "Premium"].map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </IconField>
+              </div>
+
+              {/* Daily Price / Transmission */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Daily Price (₱) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b50002] text-sm font-bold pointer-events-none">
+                      ₱
+                    </span>
+                    <input
+                      required
+                      name="dailyPrice"
+                      value={data.dailyPrice}
+                      onChange={handleChange}
+                      type="number"
+                      onKeyDown={noScroll}
+                      className={fieldClsIcon}
+                      placeholder="200"
+                      min="1"
+                    />
+                  </div>
+                </div>
+                <IconField icon={FaCog} label="Transmission *">
+                  <select
+                    required
+                    name="transmission"
+                    value={data.transmission}
+                    onChange={handleChange}
+                    className={fieldClsIcon}
+                  >
+                    <option value="Manual">Manual</option>
+                    <option value="Automatic">Automatic</option>
+                    <option value="Semi-Automatic">Semi-Auto</option>
+                  </select>
+                </IconField>
+              </div>
+
+              {/* Features */}
+              <div>
+                <p className={`${labelCls} mb-3`}>Features</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <IconField icon={FaShieldAlt} label="ABS">
+                    <select
+                      name="hasABS"
+                      value={data.hasABS ? "yes" : "no"}
+                      onChange={(e) =>
+                        handleChange({
+                          target: {
+                            name: "hasABS",
+                            value: e.target.value === "yes",
+                          },
+                        })
+                      }
+                      className={fieldClsIcon}
+                    >
+                      <option value="no">No ABS</option>
+                      <option value="yes">Has ABS</option>
+                    </select>
+                  </IconField>
+                  <IconField icon={FaHardHat} label="Helmet">
+                    <select
+                      name="hasHelmet"
+                      value={data.hasHelmet ? "yes" : "no"}
+                      onChange={(e) =>
+                        handleChange({
+                          target: {
+                            name: "hasHelmet",
+                            value: e.target.value === "yes",
+                          },
+                        })
+                      }
+                      className={fieldClsIcon}
+                    >
+                      <option value="no">No Helmet</option>
+                      <option value="yes">Includes Helmet</option>
+                    </select>
+                  </IconField>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — Image + Description */}
+            <div className="space-y-4">
+              <p className={labelCls}>Media & Notes</p>
+
+              {/* Image upload */}
+              <div>
+                <label className={labelCls}>Motorcycle Image</label>
+                <label className="block cursor-pointer">
+                  <div
+                    className={`w-full rounded-2xl border-2 border-dashed transition-colors overflow-hidden
+                    ${data.imagePreview ? "border-slate-200" : "border-slate-200 hover:border-[#b50002]/30"}`}
+                  >
+                    {data.imagePreview ? (
+                      <div className="relative h-44 bg-slate-50">
+                        <img
+                          src={data.imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-contain"
+                        />
+                        <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                          <p className="text-white text-xs font-bold bg-black/50 px-3 py-1.5 rounded-lg">
+                            Change Image
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-44 flex flex-col items-center justify-center gap-2 text-slate-300">
+                        <FaMotorcycle className="text-3xl" />
+                        <p className="text-xs font-semibold">
+                          Click to upload image
+                        </p>
+                        <p className="text-[10px]">PNG, JPG up to 5MB</p>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileRef}
+                    name="image"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    accept="image/*"
+                  />
+                </label>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={labelCls}>Description</label>
+                <textarea
+                  name="description"
+                  value={data.description}
+                  onChange={handleChange}
+                  rows={7}
+                  placeholder="Describe features, condition, special details..."
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2 border-t border-slate-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all disabled:opacity-60"
+            >
+              <FaMotorcycle className="text-sm" />
+              {submitting ? "Adding..." : "Add Motorcycle"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ── EDIT MOTORCYCLE MODAL ─────────────────────────────────────────────────────
 const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
   const fileRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
 
   useEffect(() => {
-    const currentImage = motorcycle?.image || motorcycle?._rawImage || "";
+    const cur = motorcycle?.image || motorcycle?._rawImage || "";
     setSelectedImage(null);
-    setImagePreview(makeImageUrl(currentImage));
+    setImagePreview(makeImageUrl(cur));
     if (fileRef.current) fileRef.current.value = "";
   }, [motorcycle]);
 
   const mapToBackend = (m) => {
-    const formData = new FormData();
-    const fields = {
+    const fd = new FormData();
+    Object.entries({
       unitId: m.unitId || "",
       traccarDeviceId: m.traccarDeviceId || "",
       make: m.make,
@@ -673,37 +1035,20 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
       hasABS: m.hasABS || false,
       hasHelmet: m.hasHelmet !== false,
       status: m.status || "available",
-    };
-
-    Object.entries(fields).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-
-    if (selectedImage) {
-      formData.append("image", selectedImage);
-    }
-
-    return formData;
+    }).forEach(([k, v]) => fd.append(k, v));
+    if (selectedImage) fd.append("image", selectedImage);
+    return fd;
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (evt) => {
       setSelectedImage(file);
       setImagePreview(evt.target.result);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!motorcycle?.unitId) return toast.error("Unit ID is required.");
-    if (!motorcycle?.make || !motorcycle?.model)
-      return toast.error("Make and Model are required.");
-    onSubmit(mapToBackend(motorcycle));
   };
 
   const handleInputChange = (e) => {
@@ -721,280 +1066,261 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
     });
   };
 
-  const inputField = (label, name, type = "text", options = {}) => (
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!motorcycle?.unitId) return toast.error("Unit ID is required.");
+    if (!motorcycle?.make || !motorcycle?.model)
+      return toast.error("Make and Model are required.");
+    onSubmit(mapToBackend(motorcycle));
+  };
+
+  const noScroll = (e) => {
+    if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+  };
+
+  const TF = ({ label, name, type = "text", opts = {} }) => (
     <div>
-      <label className="block text-[#171717] font-medium text-sm mb-1">
-        {label}
-      </label>
-      {type === "select" ? (
-        <select
-          name={name}
-          value={motorcycle[name] || ""}
-          onChange={handleInputChange}
-          className={styles.inputField}
-          required={options.required}
-        >
-          {options.items?.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      ) : type === "checkbox" ? (
-        <input
-          type="checkbox"
-          name={name}
-          checked={motorcycle[name] || false}
-          onChange={handleInputChange}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-        />
-      ) : (
-        <input
-          type={type}
-          name={name}
-          value={motorcycle[name] || ""}
-          onChange={handleInputChange}
-          onKeyDown={(e) => {
-            if (type === "number" && ["e", "E", "+", "-"].includes(e.key))
-              e.preventDefault();
-          }}
-          className={styles.inputField}
-          required={options.required}
-          min={options.min}
-          max={options.max}
-          step={options.step}
-          maxLength={options.maxLength}
-          placeholder={options.placeholder}
-        />
-      )}
+      <label className={labelCls}>{label}</label>
+      <input
+        type={type}
+        name={name}
+        value={motorcycle[name] || ""}
+        onChange={handleInputChange}
+        onKeyDown={type === "number" ? noScroll : undefined}
+        required={opts.required}
+        min={opts.min}
+        max={opts.max}
+        step={opts.step}
+        maxLength={opts.maxLength}
+        placeholder={opts.placeholder}
+        className={fieldCls}
+      />
+    </div>
+  );
+
+  const SF = ({
+    label,
+    name,
+    options,
+    value: customVal,
+    onChange: customChange,
+  }) => (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <select
+        name={name}
+        value={customVal ?? motorcycle[name] ?? ""}
+        onChange={customChange ?? handleInputChange}
+        className={fieldCls}
+      >
+        {options.map((o) => (
+          <option key={o.value ?? o} value={o.value ?? o}>
+            {o.label ?? o}
+          </option>
+        ))}
+      </select>
     </div>
   );
 
   return (
-    <div className={styles.modalOverlay}>
-      <div
-        className={`bg-[#b9b9b9] ${styles.rounded2xl} ${styles.modalContainer}`}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center border-b border-[#171717] pb-4">
-            <h2 className="text-2xl font-bold text-[#171717]">
-              {motorcycle._id
-                ? `Edit: ${motorcycle.make} ${motorcycle.model}`
-                : "Add New Motorcycle"}
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-50 px-6 py-4 flex items-center justify-between z-10 rounded-t-2xl">
+          <div>
+            <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
+              Edit Unit
+            </p>
+            <h2 className="font-black text-[#171717] text-lg">
+              {motorcycle.make} {motorcycle.model}
             </h2>
-            <button onClick={onClose} className="text-[#171717]">
-              <FaTimes className="h-6 w-6" />
-            </button>
           </div>
-          <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                {inputField("Unit ID", "unitId", "text", {
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
+          >
+            <FaTimes className="text-sm" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <TF
+                label="Unit ID *"
+                name="unitId"
+                opts={{
                   required: true,
                   placeholder: "e.g. UNIT-01",
                   maxLength: 30,
-                })}
-              </div>
-
-              <div className="md:col-span-2">
-                {inputField("GPS Tracker ID (Traccar Device Unique ID)", "traccarDeviceId", "text", {
-                  placeholder: "e.g. 9210010703",
-                  maxLength: 50,
-                })}
-              </div>
-              {inputField("Make", "make", "text", { required: true })}
-              {inputField("Model", "model", "text", { required: true })}
-              {inputField("Year", "year", "number", {
-                required: true,
-                min: 1900,
-                max: 2099,
-              })}
-              <div className="md:col-span-2">
-                <label className="block text-[#171717] font-medium text-sm mb-1">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={motorcycle.description || ""}
-                  onChange={handleInputChange}
-                  rows={4}
-                  className={styles.inputField}
-                  placeholder="Enter motorcycle description..."
-                />
-              </div>
-              {inputField("Category", "category", "select", {
-                required: true,
-                items: ["Scooter", "Naked", "Underbone"],
-              })}
-              <div>
-                <label className="block text-[#171717] font-medium text-sm mb-1">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  value={motorcycle.status || "available"}
-                  onChange={handleInputChange}
-                  className={styles.inputField}
-                  required
-                >
-                  <option value="available">Available</option>
-                  <option value="maintenance">Maintenance</option>
-                </select>
-              </div>
-              {inputField("Daily Rate (₱)", "dailyRate", "number", {
-                required: true,
-                min: 1,
-                step: 0.01,
-              })}
-              {inputField("Engine Size (cc)", "engineSize", "number", {
-                required: true,
-                min: 50,
-              })}
-              {inputField("Transmission", "transmission", "select", {
-                required: true,
-                items: ["Manual", "Automatic", "Semi-Automatic"],
-              })}
-              {inputField("Fuel Type", "fuelType", "select", {
-                required: true,
-                items: ["Unleaded", "Premium"],
-              })}
+                }}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-1 text-sm font-medium text-[#171717]">
-                  ABS
-                </label>
-                <select
-                  name="hasABS"
-                  value={motorcycle.hasABS ? "yes" : "no"}
-                  onChange={(e) =>
-                    handleInputChange({
-                      target: {
-                        name: "hasABS",
-                        value: e.target.value === "yes",
-                      },
-                    })
-                  }
-                  className="w-full rounded-lg bg-[#c7c5c5] px-3 py-3 text-sm text-[#171717] focus:outline-none shadow-lg shadow-black/20 focus:ring-1 focus:ring-[#171717]"
-                >
-                  <option value="no">No ABS</option>
-                  <option value="yes">Has ABS</option>
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1 text-sm font-medium text-[#171717]">
-                  Helmet
-                </label>
-                <select
-                  name="hasHelmet"
-                  value={motorcycle.hasHelmet ? "yes" : "no"}
-                  onChange={(e) =>
-                    handleInputChange({
-                      target: {
-                        name: "hasHelmet",
-                        value: e.target.value === "yes",
-                      },
-                    })
-                  }
-                  className="w-full rounded-lg bg-[#c7c5c5] px-3 py-3 text-sm text-[#171717] focus:outline-none shadow-lg shadow-black/20 focus:ring-1 focus:ring-[#171717]"
-                >
-                  <option value="no">No Helmet</option>
-                  <option value="yes">Includes Helmet</option>
-                </select>
-              </div>
+            <div className="sm:col-span-2">
+              <TF
+                label="GPS Tracker ID"
+                name="traccarDeviceId"
+                opts={{ placeholder: "e.g. 9210010703", maxLength: 50 }}
+              />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-[#171717] font-medium text-sm mb-1">
-                Motorcycle Image
-              </label>
-              <div className={AddCarPageStyles.imageUploadContainer}>
-                <label className={AddCarPageStyles.imageUploadLabel}>
-                  {imagePreview ? (
-                    <div className="w-full h-full rounded-xl overflow-hidden">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className={AddCarPageStyles.imageUploadPlaceholder}>
-                      <svg
-                        className={AddCarPageStyles.iconUpload}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.5"
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <p className={AddCarPageStyles.imageUploadText}>
-                        <span
-                          className={AddCarPageStyles.imageUploadTextSemibold}
-                        >
-                          Click to upload
-                        </span>{" "}
-                        or drag and drop
-                      </p>
-                      <p className={AddCarPageStyles.imageUploadSubText}>
-                        PNG, JPG up to 5MB
+            <TF label="Make *" name="make" opts={{ required: true }} />
+            <TF label="Model *" name="model" opts={{ required: true }} />
+            <TF
+              label="Year *"
+              name="year"
+              type="number"
+              opts={{ required: true, min: 1900, max: 2099 }}
+            />
+            <TF
+              label="Daily Rate (₱) *"
+              name="dailyRate"
+              type="number"
+              opts={{ required: true, min: 1, step: 0.01 }}
+            />
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Description</label>
+              <textarea
+                name="description"
+                value={motorcycle.description || ""}
+                onChange={handleInputChange}
+                rows={3}
+                placeholder="Enter motorcycle description..."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none"
+              />
+            </div>
+            <SF
+              label="Category *"
+              name="category"
+              options={["Scooter", "Naked", "Underbone"]}
+            />
+            <SF
+              label="Status *"
+              name="status"
+              options={[
+                { value: "available", label: "Available" },
+                { value: "maintenance", label: "Maintenance" },
+              ]}
+            />
+            <TF
+              label="Engine Size (cc) *"
+              name="engineSize"
+              type="number"
+              opts={{ required: true, min: 50 }}
+            />
+            <SF
+              label="Transmission *"
+              name="transmission"
+              options={["Manual", "Automatic", "Semi-Automatic"]}
+            />
+            <SF
+              label="Fuel Type *"
+              name="fuelType"
+              options={["Unleaded", "Premium"]}
+            />
+            <SF
+              label="ABS"
+              name="hasABS"
+              value={motorcycle.hasABS ? "yes" : "no"}
+              options={[
+                { value: "no", label: "No ABS" },
+                { value: "yes", label: "Has ABS" },
+              ]}
+              onChange={(e) =>
+                handleInputChange({
+                  target: { name: "hasABS", value: e.target.value === "yes" },
+                })
+              }
+            />
+            <SF
+              label="Helmet"
+              name="hasHelmet"
+              value={motorcycle.hasHelmet ? "yes" : "no"}
+              options={[
+                { value: "no", label: "No Helmet" },
+                { value: "yes", label: "Includes Helmet" },
+              ]}
+              onChange={(e) =>
+                handleInputChange({
+                  target: {
+                    name: "hasHelmet",
+                    value: e.target.value === "yes",
+                  },
+                })
+              }
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Motorcycle Image</label>
+            <label className="block cursor-pointer">
+              <div
+                className={`w-full rounded-2xl border-2 border-dashed transition-colors overflow-hidden ${imagePreview ? "border-slate-200" : "border-slate-200 hover:border-[#b50002]/30"}`}
+              >
+                {imagePreview ? (
+                  <div className="relative h-36 bg-slate-50">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-contain"
+                    />
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                      <p className="text-white text-xs font-bold bg-black/50 px-3 py-1.5 rounded-lg">
+                        Change Image
                       </p>
                     </div>
-                  )}
-                  <input
-                    type="file"
-                    ref={fileRef}
-                    name="image"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
+                  </div>
+                ) : (
+                  <div className="h-28 flex flex-col items-center justify-center gap-2 text-slate-300">
+                    <FaMotorcycle className="text-3xl" />
+                    <p className="text-xs font-semibold">Click to upload</p>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="justify-normal space-x-4 pt-4 flex items-center">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-              >
-                {motorcycle._id ? "Save Changes" : "Add Motorcycle"}
-              </button>
-            </div>
-          </form>
-        </div>
+              <input
+                type="file"
+                ref={fileRef}
+                name="image"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2 border-t border-slate-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
-const NoMotorcyclesView = ({ onResetFilter }) => (
-  <div className={`bg-[#b9b9b9] ${styles.noCarsContainer}`}>
-    <div className="mx-auto w-24 h-24 flex items-center justify-center mb-6">
-      <FaMotorcycle className="h-24 w-24 text-[#171717]" />
+// ── Empty State ───────────────────────────────────────────────────────────────
+const EmptyState = ({ onReset }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12 text-center">
+    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <FaMotorcycle className="text-slate-200 text-3xl" />
     </div>
-    <h3 className="mt-4 text-xl font-medium text-[#171717]">
+    <h3 className="font-black text-[#171717] text-lg mb-1">
       No motorcycles found
     </h3>
-    <p className="mt-2 text-[#171717]">Try adjusting your filter criteria</p>
+    <p className="text-slate-400 text-sm mb-4">
+      Try adjusting your filters or search term
+    </p>
     <button
-      onClick={onResetFilter}
-      className="w-40 py-2.5 px-4 rounded-xl mt-6 items-center justify-center gap-2 font-semibold text-sm text-white bg-[#b50002]
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+      onClick={onReset}
+      className="px-5 py-2 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
     >
-      Clear All Filters
+      Clear Filters
     </button>
   </div>
 );
@@ -1003,6 +1329,7 @@ const NoMotorcyclesView = ({ onResetFilter }) => (
 const ManageMotorcycle = () => {
   const navigate = useNavigate();
   const [motorcycles, setMotorcycles] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("available");
@@ -1011,16 +1338,15 @@ const ManageMotorcycle = () => {
   const [selectedTransmission, setSelectedTransmission] = useState("all");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [showFilters, setShowFilters] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
-  const [showEditModel, setShowEditModel] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [colSort, setColSort] = useState({ key: null, dir: null });
 
   const fetchMotorcycles = useCallback(async () => {
     try {
       const res = await api.get("/api/motorcycles", {
-        // includeDeleted=true bypasses the status=available filter so the
-        // admin sees all motorcycles with their real-time status
         params: { includeDeleted: "true", limit: 1000 },
       });
       const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
@@ -1036,13 +1362,14 @@ const ManageMotorcycle = () => {
     } catch (err) {
       console.error(err);
       toast.error("Failed to load motorcycles");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchMotorcycles();
   }, [fetchMotorcycles]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -1055,110 +1382,93 @@ const ManageMotorcycle = () => {
     colSort,
   ]);
 
-  const categories = useMemo(
-    () => [
-      "all",
-      ...Array.from(new Set(motorcycles.map((m) => m.category || "Standard"))),
-    ],
+  const counts = useMemo(
+    () => ({
+      available: motorcycles.filter(
+        (m) => !m.isDeleted && m.status === "available",
+      ).length,
+      pending: motorcycles.filter((m) => !m.isDeleted && m.status === "pending")
+        .length,
+      rented: motorcycles.filter((m) => !m.isDeleted && m.status === "rented")
+        .length,
+      maintenance: motorcycles.filter(
+        (m) => !m.isDeleted && m.status === "maintenance",
+      ).length,
+      deleted: motorcycles.filter((m) => m.isDeleted).length,
+    }),
     [motorcycles],
   );
-  const getUniqueValues = (key) => [
-    ...new Set(
-      motorcycles
-        .map((m) => m[key] || "")
-        .filter(Boolean)
-        .map((v) => v.toString().trim()),
-    ),
-  ];
-  const fuelTypes = getUniqueValues("fuelType");
-  const transmissions = getUniqueValues("transmission");
 
-  const activeCount = motorcycles.filter(
-    (m) => !m.isDeleted && m.status === "available",
-  ).length;
-  const pendingCount = motorcycles.filter(
-    (m) => !m.isDeleted && m.status === "pending",
-  ).length;
-  const rentedCount = motorcycles.filter(
-    (m) => !m.isDeleted && m.status === "rented",
-  ).length;
-  const maintenanceCount = motorcycles.filter(
-    (m) => !m.isDeleted && m.status === "maintenance",
-  ).length;
-  const deletedCount = motorcycles.filter((m) => m.isDeleted).length;
+  const activeTotal = useMemo(
+    () => motorcycles.filter((m) => !m.isDeleted).length,
+    [motorcycles],
+  );
+  const fuelTypes = useMemo(
+    () => [...new Set(motorcycles.map((m) => m.fuelType).filter(Boolean))],
+    [motorcycles],
+  );
+  const transmissions = useMemo(
+    () => [...new Set(motorcycles.map((m) => m.transmission).filter(Boolean))],
+    [motorcycles],
+  );
+  const categories = useMemo(
+    () => [...new Set(motorcycles.map((m) => m.category).filter(Boolean))],
+    [motorcycles],
+  );
 
-  const handleColSort = (key) => {
+  const handleColSort = (key) =>
     setColSort((prev) => {
       if (prev.key !== key) return { key, dir: "asc" };
       const next = nextSortState(prev.dir);
       return next === null ? { key: null, dir: null } : { key, dir: next };
     });
-  };
 
   const filteredMotorcycles = useMemo(() => {
-    let filtered = [...motorcycles];
-
-    if (selectedStatus === "deleted") {
-      filtered = filtered.filter((m) => m.isDeleted);
-    } else {
-      filtered = filtered.filter(
-        (m) => !m.isDeleted && m.status === selectedStatus,
-      );
-    }
-
+    let f = [...motorcycles];
+    if (selectedStatus === "deleted") f = f.filter((m) => m.isDeleted);
+    else f = f.filter((m) => !m.isDeleted && m.status === selectedStatus);
     if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((m) => {
-        const name = `${m.make || ""} ${m.model || ""}`.toLowerCase();
-        return (
-          name.includes(term) ||
-          (m.category || "").toLowerCase().includes(term) ||
-          (m.unitId || "").toLowerCase().includes(term)
-        );
-      });
-    }
-
-    if (selectedCategory !== "all")
-      filtered = filtered.filter((m) => m.category === selectedCategory);
-    if (selectedFuelType !== "all")
-      filtered = filtered.filter((m) => m.fuelType === selectedFuelType);
-    if (selectedTransmission !== "all")
-      filtered = filtered.filter(
-        (m) => m.transmission === selectedTransmission,
+      const t = searchTerm.toLowerCase();
+      f = f.filter(
+        (m) =>
+          `${m.make} ${m.model}`.toLowerCase().includes(t) ||
+          (m.category || "").toLowerCase().includes(t) ||
+          (m.unitId || "").toLowerCase().includes(t),
       );
-
-    const minPrice = parseFloat(priceRange.min);
-    const maxPrice = parseFloat(priceRange.max);
-    if (!isNaN(minPrice))
-      filtered = filtered.filter((m) => m.dailyRate >= minPrice);
-    if (!isNaN(maxPrice))
-      filtered = filtered.filter((m) => m.dailyRate <= maxPrice);
-
+    }
+    if (selectedCategory !== "all")
+      f = f.filter((m) => m.category === selectedCategory);
+    if (selectedFuelType !== "all")
+      f = f.filter((m) => m.fuelType === selectedFuelType);
+    if (selectedTransmission !== "all")
+      f = f.filter((m) => m.transmission === selectedTransmission);
+    const mn = parseFloat(priceRange.min),
+      mx = parseFloat(priceRange.max);
+    if (!isNaN(mn)) f = f.filter((m) => m.dailyRate >= mn);
+    if (!isNaN(mx)) f = f.filter((m) => m.dailyRate <= mx);
     if (colSort.key && colSort.dir) {
-      filtered.sort((a, b) => {
-        let aVal = a[colSort.key];
-        let bVal = b[colSort.key];
-        if (typeof aVal === "boolean") {
-          aVal = aVal ? 1 : 0;
-          bVal = bVal ? 1 : 0;
+      f.sort((a, b) => {
+        let av = a[colSort.key],
+          bv = b[colSort.key];
+        if (typeof av === "boolean") {
+          av = av ? 1 : 0;
+          bv = bv ? 1 : 0;
         }
-        if (typeof aVal === "number" || (!isNaN(Number(aVal)) && aVal !== "")) {
+        if (typeof av === "number" || (!isNaN(Number(av)) && av !== ""))
           return colSort.dir === "asc"
-            ? Number(aVal) - Number(bVal)
-            : Number(bVal) - Number(aVal);
-        }
-        const cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""));
-        return colSort.dir === "asc" ? cmp : -cmp;
+            ? Number(av) - Number(bv)
+            : Number(bv) - Number(av);
+        const c = String(av ?? "").localeCompare(String(bv ?? ""));
+        return colSort.dir === "asc" ? c : -c;
       });
     } else {
-      filtered.sort((a, b) =>
+      f.sort((a, b) =>
         `${a.make} ${a.model}`
           .trim()
           .localeCompare(`${b.make} ${b.model}`.trim()),
       );
     }
-
-    return filtered;
+    return f;
   }, [
     motorcycles,
     searchTerm,
@@ -1171,7 +1481,7 @@ const ManageMotorcycle = () => {
   ]);
 
   const totalPages = Math.ceil(filteredMotorcycles.length / ITEMS_PER_PAGE);
-  const paginatedMotorcycles = filteredMotorcycles.slice(
+  const paginated = filteredMotorcycles.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
@@ -1186,85 +1496,6 @@ const ManageMotorcycle = () => {
     setCurrentPage(1);
   };
 
-  const handleDelete = async (identifier, permanent = false) => {
-    const motorcycle = motorcycles.find(
-      (m) => m._id === identifier || m.id === identifier,
-    );
-    if (!motorcycle) return toast.error("Motorcycle not found");
-    const message = permanent
-      ? `Permanently delete ${motorcycle.make} ${motorcycle.model}? This cannot be undone.`
-      : `Delete ${motorcycle.make} ${motorcycle.model}?`;
-    const confirmed = await confirmModal(message, permanent);
-    if (!confirmed) return;
-    try {
-      if (!motorcycle._id) {
-        setMotorcycles((prev) => prev.filter((p) => p.id !== motorcycle.id));
-        toast.success("Motorcycle removed");
-        return;
-      }
-      await api.delete(
-        permanent
-          ? `/api/motorcycles/${motorcycle._id}/permanent`
-          : `/api/motorcycles/${motorcycle._id}`,
-      );
-      toast.success(
-        permanent ? "Motorcycle permanently deleted" : "Motorcycle deleted",
-      );
-      fetchMotorcycles();
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Failed to delete motorcycle");
-    }
-  };
-
-  const handleRestore = async (identifier) => {
-    const motorcycle = motorcycles.find(
-      (m) => m._id === identifier || m.id === identifier,
-    );
-    if (!motorcycle) return toast.error("Motorcycle not found");
-    if (!motorcycle._id) return toast.error("Cannot restore local motorcycle");
-    try {
-      await api.patch(`/api/motorcycles/${motorcycle._id}/restore`);
-      toast.success("Motorcycle restored successfully");
-      fetchMotorcycles();
-    } catch (err) {
-      console.error(err);
-      toast.error(
-        err.response?.data?.message || "Failed to restore motorcycle",
-      );
-    }
-  };
-
-  const openEdit = (motorcycle) => {
-    const rawImage = motorcycle._rawImage ?? motorcycle.image ?? "";
-    setEditingMotorcycle({
-      ...motorcycle,
-      image: /^data:image\//i.test(String(rawImage)) ? "" : rawImage,
-      _id: motorcycle._id ?? null,
-    });
-    setShowEditModel(true);
-  };
-
-  const handleEditSubmit = async (payload) => {
-    try {
-      const config = payload instanceof FormData ? undefined : undefined;
-
-      if (!editingMotorcycle._id) {
-        await api.post("/api/motorcycles", payload, config);
-        toast.success("Motorcycle added");
-      } else {
-        await api.put(`/api/motorcycles/${editingMotorcycle._id}`, payload, config);
-        toast.success("Motorcycle updated");
-      }
-      setShowEditModel(false);
-      setEditingMotorcycle(null);
-      fetchMotorcycles();
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Failed to save motorcycle");
-    }
-  };
-
   const hasActiveFilters =
     searchTerm ||
     selectedCategory !== "all" ||
@@ -1274,294 +1505,459 @@ const ManageMotorcycle = () => {
     priceRange.max ||
     colSort.key;
 
+  const handleDelete = async (id, permanent = false) => {
+    const m = motorcycles.find((x) => x._id === id || x.id === id);
+    if (!m) return toast.error("Motorcycle not found");
+    const confirmed = await confirmModal(
+      permanent
+        ? `Permanently delete ${m.make} ${m.model}? This cannot be undone.`
+        : `Delete ${m.make} ${m.model}?`,
+      permanent,
+    );
+    if (!confirmed) return;
+    try {
+      if (!m._id) {
+        setMotorcycles((prev) => prev.filter((p) => p.id !== m.id));
+        toast.success("Removed");
+        return;
+      }
+      await api.delete(
+        permanent
+          ? `/api/motorcycles/${m._id}/permanent`
+          : `/api/motorcycles/${m._id}`,
+      );
+      toast.success(permanent ? "Permanently deleted" : "Deleted");
+      fetchMotorcycles();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete");
+    }
+  };
+
+  const handleRestore = async (id) => {
+    const m = motorcycles.find((x) => x._id === id || x.id === id);
+    if (!m?._id) return toast.error("Cannot restore");
+    try {
+      await api.patch(`/api/motorcycles/${m._id}/restore`);
+      toast.success("Restored successfully");
+      fetchMotorcycles();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to restore");
+    }
+  };
+
+  const openEdit = (m) => {
+    const rawImage = m._rawImage ?? m.image ?? "";
+    setEditingMotorcycle({
+      ...m,
+      image: /^data:image\//i.test(String(rawImage)) ? "" : rawImage,
+      _id: m._id ?? null,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (payload) => {
+    try {
+      await api.put(`/api/motorcycles/${editingMotorcycle._id}`, payload);
+      toast.success("Motorcycle updated");
+      setShowEditModal(false);
+      setEditingMotorcycle(null);
+      fetchMotorcycles();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update");
+    }
+  };
+
+  const statCards = [
+    {
+      label: "Available",
+      value: counts.available,
+      sub: "Ready to rent",
+      subColor: "text-emerald-500",
+      icon: Bike,
+      accent: "bg-emerald-500",
+      status: "available",
+    },
+    {
+      label: "Pending",
+      value: counts.pending,
+      sub: "Awaiting action",
+      subColor: "text-violet-500",
+      icon: FaHourglassHalf,
+      accent: "bg-violet-500",
+      status: "pending",
+    },
+    {
+      label: "Rented",
+      value: counts.rented,
+      sub: `${activeTotal ? Math.round((counts.rented / activeTotal) * 100) : 0}% fleet out`,
+      subColor: "text-blue-500",
+      icon: FaMotorcycle,
+      accent: "bg-blue-500",
+      status: "rented",
+    },
+    {
+      label: "Maintenance",
+      value: counts.maintenance,
+      sub: counts.maintenance > 0 ? "Needs attention" : "All clear",
+      subColor: counts.maintenance > 0 ? "text-amber-500" : "text-slate-400",
+      icon: Wrench,
+      accent: "bg-amber-500",
+      status: "maintenance",
+    },
+    {
+      label: "Deleted",
+      value: counts.deleted,
+      sub: "Soft deleted units",
+      subColor: "text-slate-400",
+      icon: Trash2,
+      accent: "bg-slate-400",
+      status: "deleted",
+    },
+  ];
+
   return (
-    <div className="min-h-screen pt-32 bg-[#e3e3e3] text-white py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-4 rounded-3xl bg-gradient-to-br from-[#171717] via-[#212121] to-[#b50002] p-4 sm:p-5 border border-white/10 mt-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
+        {/* Header */}
+        <div className="mb-7 flex items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] font-black text-[#b9b9b9]/80 mb-1">
-              Fleet Control
-            </p>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Motorcycle Management
             </h1>
-            <p className="text-xs sm:text-sm text-[#b9b9b9]/80 mt-1.5 max-w-xl">
-              Manage units, monitor availability, and keep fleet details accurate.
+            <p className="text-slate-400 text-sm mt-1">
+              Manage units, monitor availability, and keep fleet details
+              accurate.
             </p>
           </div>
-        </div>
-      </div>
-
-      <div className="mb-6 space-y-4">
-        <div className="relative max-w-2xl mx-auto">
-          <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#171717]" />
-          <input
-            type="text"
-            placeholder="Search by make, model, category, or unit ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-12 py-3 bg-[#c7c5c5] rounded-lg text-[#171717] placeholder-gray-500 focus:outline-none shadow-lg shadow-black/20 focus:ring-1 focus:ring-[#171717]"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[#171717]"
-            >
-              <FaTimes />
-            </button>
-          )}
-        </div>
-
-        <div className="flex justify-center gap-4 flex-wrap">
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="w-40 flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+            onClick={() => setShowAddModal(true)}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
           >
-            <FaFilter />
-            {showFilters ? "Hide Filters" : "Show Filters"}
-          </button>
-          <button
-            onClick={() =>
-              setViewMode(viewMode === "detailed" ? "list" : "detailed")
-            }
-            className="w-40 flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-          >
-            {viewMode === "detailed" ? (
-              <>
-                <FaList /> List View
-              </>
-            ) : (
-              <>
-                <FaThLarge /> Detailed View
-              </>
-            )}
-          </button>
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="w-40 flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-            >
-              <FaTimes /> Clear Filters
-            </button>
-          )}
-          <button
-            onClick={() => navigate("/motorcycle-tracking")}
-            className="w-40 flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-          >
-            <FaMapMarkedAlt /> View Locations
-          </button>
-          <button
-            onClick={() => navigate("/motorcycle-location-log")}
-            className="w-44 flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-          >
-            <FaClock /> Location Log
+            <PlusCircle className="w-4 h-4" /> Add Unit
           </button>
         </div>
 
-        {showFilters && (
-          <div className="bg-[#b9b9b9] backdrop-blur-md rounded-lg p-6 shadow-lg shadow-black/20">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[#171717] text-sm font-semibold mb-2">
-                  Category
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#c7c5c5] rounded-lg text-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] shadow-lg shadow-black/20"
-                >
-                  <option value="all">All Categories</option>
-                  {categories
-                    .filter((c) => c !== "all")
-                    .map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          {statCards.map((s) => (
+            <StatCard
+              key={s.label}
+              {...s}
+              loading={loading}
+              isActive={selectedStatus === s.status}
+              onClick={() => setSelectedStatus(s.status)}
+            />
+          ))}
+        </div>
+
+        {/* Main + sidebar */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+          {/* Left: list/grid — 3/4 */}
+          <div className="xl:col-span-3 space-y-4">
+            {/* Search + toolbar */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
+                  <input
+                    type="text"
+                    placeholder="Search make, model, unit ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                    >
+                      <FaTimes className="text-sm" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border font-bold text-xs transition-all
+                      ${showFilters ? "bg-[#b50002] border-[#b50002] text-white shadow-md shadow-[#b50002]/30" : "border-slate-200 text-slate-500 hover:border-[#b50002]/20 hover:text-[#b50002]"}`}
+                  >
+                    <FaFilter className="text-[10px]" /> Filters
+                    {hasActiveFilters && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setViewMode(viewMode === "list" ? "detailed" : "list")
+                    }
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
+                  >
+                    {viewMode === "list" ? (
+                      <>
+                        <FaThLarge className="text-[10px]" /> Grid
+                      </>
+                    ) : (
+                      <>
+                        <FaList className="text-[10px]" /> List
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {showFilters && (
+                <div className="mt-4 pt-4 border-t border-slate-50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    {
+                      label: "Category",
+                      val: selectedCategory,
+                      set: setSelectedCategory,
+                      opts: ["all", ...categories],
+                    },
+                    {
+                      label: "Fuel Type",
+                      val: selectedFuelType,
+                      set: setSelectedFuelType,
+                      opts: ["all", ...fuelTypes],
+                    },
+                    {
+                      label: "Transmission",
+                      val: selectedTransmission,
+                      set: setSelectedTransmission,
+                      opts: ["all", ...transmissions],
+                    },
+                  ].map(({ label, val, set, opts }) => (
+                    <div key={label}>
+                      <label className={labelCls}>{label}</label>
+                      <select
+                        value={val}
+                        onChange={(e) => set(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                      >
+                        {opts.map((o) => (
+                          <option key={o} value={o}>
+                            {o === "all" ? `All ${label}s` : o}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                  <div>
+                    <label className={labelCls}>Min Price (₱)</label>
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      min="0"
+                      value={priceRange.min}
+                      onChange={(e) =>
+                        setPriceRange({ ...priceRange, min: e.target.value })
+                      }
+                      onKeyDown={(e) => {
+                        if (["e", "E", "+", "-"].includes(e.key))
+                          e.preventDefault();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Max Price (₱)</label>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      min="0"
+                      value={priceRange.max}
+                      onChange={(e) =>
+                        setPriceRange({ ...priceRange, max: e.target.value })
+                      }
+                      onKeyDown={(e) => {
+                        if (["e", "E", "+", "-"].includes(e.key))
+                          e.preventDefault();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+                    />
+                  </div>
+                  {hasActiveFilters && (
+                    <div className="flex items-end">
+                      <button
+                        onClick={clearFilters}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 text-[#b50002] font-bold text-xs hover:bg-red-100 transition-colors"
+                      >
+                        <FaTimes /> Clear All
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Result count */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[11px] text-slate-400 font-semibold">
+                Showing{" "}
+                {filteredMotorcycles.length === 0
+                  ? 0
+                  : Math.min(
+                      (currentPage - 1) * ITEMS_PER_PAGE + 1,
+                      filteredMotorcycles.length,
+                    )}
+                –
+                {Math.min(
+                  currentPage * ITEMS_PER_PAGE,
+                  filteredMotorcycles.length,
+                )}{" "}
+                of{" "}
+                <span className="text-[#171717] font-black">
+                  {filteredMotorcycles.length}
+                </span>{" "}
+                <span className="capitalize">{selectedStatus}</span> units
+              </p>
+            </div>
+
+            {/* Content */}
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <table className="w-full">
+                  <tbody className="divide-y divide-slate-50">
+                    {[...Array(5)].map((_, i) => (
+                      <SkeletonRow key={i} />
                     ))}
-                </select>
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <label className="block text-[#171717] text-sm font-semibold mb-2">
-                  Fuel Type
-                </label>
-                <select
-                  value={selectedFuelType}
-                  onChange={(e) => setSelectedFuelType(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#c7c5c5] rounded-lg text-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] shadow-lg shadow-black/20"
-                >
-                  <option value="all">All Fuel Types</option>
-                  {fuelTypes.map((fuel) => (
-                    <option key={fuel} value={fuel}>
-                      {fuel}
-                    </option>
-                  ))}
-                </select>
+            ) : paginated.length === 0 ? (
+              <EmptyState onReset={clearFilters} />
+            ) : viewMode === "detailed" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paginated.map((m) => (
+                  <MotorcycleCard
+                    key={m.id}
+                    motorcycle={m}
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                    onRestore={handleRestore}
+                  />
+                ))}
               </div>
-              <div>
-                <label className="block text-[#171717] text-sm font-semibold mb-2">
-                  Transmission
-                </label>
-                <select
-                  value={selectedTransmission}
-                  onChange={(e) => setSelectedTransmission(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#c7c5c5] rounded-lg text-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] shadow-lg shadow-black/20"
-                >
-                  <option value="all">All Transmissions</option>
-                  {transmissions.map((trans) => (
-                    <option key={trans} value={trans}>
-                      {trans}
-                    </option>
-                  ))}
-                </select>
+            ) : (
+              <MotorcycleTable
+                motorcycles={paginated}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onRestore={handleRestore}
+                colSort={colSort}
+                onColSort={handleColSort}
+              />
+            )}
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+
+          {/* Right sidebar */}
+          <div className="flex flex-col gap-4">
+            {/* Fleet summary */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                Fleet Summary
+              </h3>
+              <div className="space-y-3">
+                {[
+                  {
+                    label: "Available",
+                    value: counts.available,
+                    color: "bg-emerald-500",
+                  },
+                  {
+                    label: "Rented",
+                    value: counts.rented,
+                    color: "bg-blue-500",
+                  },
+                  {
+                    label: "Pending",
+                    value: counts.pending,
+                    color: "bg-violet-500",
+                  },
+                  {
+                    label: "Maintenance",
+                    value: counts.maintenance,
+                    color: "bg-amber-500",
+                  },
+                ].map(({ label, value, color }) => {
+                  const pct = activeTotal
+                    ? Math.round((value / activeTotal) * 100)
+                    : 0;
+                  return (
+                    <div key={label}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] font-semibold text-slate-500">
+                          {label}
+                        </span>
+                        <span className="text-[12px] font-black text-[#171717]">
+                          {loading ? "—" : value}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${color} transition-all duration-700`}
+                          style={{ width: loading ? "0%" : `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <label className="block text-[#171717] text-sm font-semibold mb-2">
-                  Min Price (₱/day)
-                </label>
-                <input
-                  type="number"
-                  placeholder="Min"
-                  min="0"
-                  value={priceRange.min}
-                  onChange={(e) =>
-                    setPriceRange({ ...priceRange, min: e.target.value })
-                  }
-                  onKeyDown={(e) => {
-                    if (["e", "E", "+", "-"].includes(e.key))
-                      e.preventDefault();
-                  }}
-                  className="w-full px-3 py-2 bg-[#c7c5c5] rounded-lg text-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] placeholder-gray-500 shadow-lg shadow-black/20"
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-3">
+                Quick Actions
+              </h3>
+              <div className="space-y-2">
+                <QuickAction
+                  onClick={() => setShowAddModal(true)}
+                  icon={PlusCircle}
+                  title="Add Motorcycle"
+                  desc="Register a new unit"
+                  accent="bg-violet-500"
                 />
-              </div>
-              <div>
-                <label className="block text-[#171717] text-sm font-semibold mb-2">
-                  Max Price (₱/day)
-                </label>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  min="0"
-                  value={priceRange.max}
-                  onChange={(e) =>
-                    setPriceRange({ ...priceRange, max: e.target.value })
-                  }
-                  onKeyDown={(e) => {
-                    if (["e", "E", "+", "-"].includes(e.key))
-                      e.preventDefault();
-                  }}
-                  className="w-full px-3 py-2 bg-[#c7c5c5] rounded-lg text-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] placeholder-gray-500 shadow-lg shadow-black/20"
+                <QuickAction
+                  onClick={() => navigate("/motorcycle-tracking")}
+                  icon={MapPin}
+                  title="View Locations"
+                  desc="Live GPS tracking map"
+                  accent="bg-blue-500"
+                />
+                <QuickAction
+                  onClick={() => navigate("/motorcycle-location-log")}
+                  icon={Clock}
+                  title="Location Log"
+                  desc="Historical movement data"
+                  accent="bg-amber-500"
                 />
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* ── Status Tabs ── */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <StatTab
-          title="Available"
-          value={activeCount}
-          icon={FaMotorcycle}
-          isActive={selectedStatus === "available"}
-          onClick={() => setSelectedStatus("available")}
-          accentColor="text-white"
+      {/* Add Modal — full AddMotorcycle form */}
+      {showAddModal && (
+        <AddMotorcycleModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={fetchMotorcycles}
         />
-        <StatTab
-          title="Pending"
-          value={pendingCount}
-          icon={FaHourglassHalf}
-          isActive={selectedStatus === "pending"}
-          onClick={() => setSelectedStatus("pending")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Rented"
-          value={rentedCount}
-          icon={FaMotorcycle}
-          isActive={selectedStatus === "rented"}
-          onClick={() => setSelectedStatus("rented")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Maintenance"
-          value={maintenanceCount}
-          icon={FaCog}
-          isActive={selectedStatus === "maintenance"}
-          onClick={() => setSelectedStatus("maintenance")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Deleted"
-          value={deletedCount}
-          icon={FaTrash}
-          isActive={selectedStatus === "deleted"}
-          onClick={() => setSelectedStatus("deleted")}
-          accentColor="text-white"
-        />
-      </div>
-
-      {/* Result count */}
-      <div className="text-center text-[#171717] mb-4 text-sm">
-        Showing{" "}
-        {filteredMotorcycles.length === 0
-          ? 0
-          : Math.min(
-            (currentPage - 1) * ITEMS_PER_PAGE + 1,
-            filteredMotorcycles.length,
-          )}
-        –{Math.min(currentPage * ITEMS_PER_PAGE, filteredMotorcycles.length)} of{" "}
-        {filteredMotorcycles.length}{" "}
-        <span className="font-semibold capitalize">{selectedStatus}</span>{" "}
-        motorcycles
-        {(selectedCategory !== "all" || searchTerm) && " (filtered)"}
-      </div>
-
-      {/* ── List / Grid ── */}
-      {paginatedMotorcycles.length > 0 ? (
-        <>
-          {viewMode === "detailed" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paginatedMotorcycles.map((motorcycle) => (
-                <MotorcycleCard
-                  key={motorcycle.id}
-                  motorcycle={motorcycle}
-                  onEdit={openEdit}
-                  onDelete={handleDelete}
-                  onRestore={handleRestore}
-                />
-              ))}
-            </div>
-          ) : (
-            <MotorcycleTable
-              motorcycles={paginatedMotorcycles}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onRestore={handleRestore}
-              colSort={colSort}
-              onColSort={handleColSort}
-            />
-          )}
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
-        </>
-      ) : (
-        <NoMotorcyclesView onResetFilter={clearFilters} />
       )}
 
-      {showEditModel && editingMotorcycle && (
+      {/* Edit Modal */}
+      {showEditModal && editingMotorcycle && (
         <EditModal
           motorcycle={editingMotorcycle}
           onClose={() => {
-            setShowEditModel(false);
+            setShowEditModal(false);
             setEditingMotorcycle(null);
           }}
           onSubmit={handleEditSubmit}
@@ -1573,15 +1969,11 @@ const ManageMotorcycle = () => {
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
-        newestOnTop={false}
+        newestOnTop
         closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
         pauseOnHover
-        theme="colored"
+        theme="light"
         icon={false}
-        toastClassName="relative flex items-center"
       />
     </div>
   );

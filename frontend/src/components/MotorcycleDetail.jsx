@@ -21,12 +21,15 @@ import {
   FaInfoCircle,
   FaExclamationTriangle,
   FaMotorcycle,
+  FaThumbsUp,
+  FaThumbsDown,
 } from "react-icons/fa";
 import { GiFullMotorcycleHelmet } from "react-icons/gi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
+import { computeDiscountedPrice, useApplicableDiscount } from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
@@ -921,16 +924,58 @@ const PriceSummary = ({
   distanceFee,
   helmetFee,
   totalAmount,
+  discount,
 }) => {
-  const dueAtPickup = totalAmount - DOWNPAYMENT;
+  const discountAmount = discount
+    ? discount.discountType === "percentage"
+      ? (baseRental * discount.discountValue) / 100
+      : Math.min(discount.discountValue, baseRental)
+    : 0;
+  const discountedDailyRate = discount
+    ? Math.round(computeDiscountedPrice(price, discount))
+    : price;
+  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+  const discountedTotal = discountedBaseRental + distanceFee + helmetFee;
+  const dueAtPickup = Math.max(0, discountedTotal - DOWNPAYMENT);
   return (
     <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
       <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-2">
         Price Summary
       </p>
-      <ReviewRow label="Rate / day" value={`₱${price}`} />
+      <ReviewRow
+        label="Rate / day"
+        value={
+          discount ? (
+            <span className="flex items-baseline gap-1.5 justify-end flex-wrap">
+              <span className="line-through opacity-40 text-xs">₱{price}</span>
+              <span className="text-[#b50002]">₱{discountedDailyRate}</span>
+            </span>
+          ) : (
+            `₱${price}`
+          )
+        }
+      />
       <ReviewRow label="Days" value={days} />
-      <ReviewRow label="Rental Subtotal" value={`₱${baseRental}`} />
+      <ReviewRow
+        label="Rental Subtotal"
+        value={
+          discount ? (
+            <span className="flex items-baseline gap-1.5 justify-end flex-wrap">
+              <span className="line-through opacity-40 text-xs">₱{baseRental}</span>
+              <span>₱{Math.round(discountedBaseRental)}</span>
+            </span>
+          ) : (
+            `₱${baseRental}`
+          )
+        }
+      />
+      {discountAmount > 0 && (
+        <ReviewRow
+          label={`Promo${discount?.code ? ` (${discount.code})` : ""}`}
+          value={`−₱${Math.round(discountAmount)}`}
+          deduct
+        />
+      )}
       {distanceFee > 0 && (
         <ReviewRow label="Distance Fee" value={`+₱${distanceFee}`} accent />
       )}
@@ -1015,6 +1060,10 @@ const MotorcycleDetail = () => {
     paymentSentAmount: String(DOWNPAYMENT),
     paymentProofImage: null,
   });
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [votingReviewId, setVotingReviewId] = useState("");
 
   const availablePickupSlots = getAvailablePickupSlots(formData.pickupDate);
   const noSlotsAvailable = availablePickupSlots.length === 0;
@@ -1226,6 +1275,70 @@ const MotorcycleDetail = () => {
     };
   }, [id, motorcycle]);
 
+  useEffect(() => {
+    let mounted = true;
+    const fetchReviews = async () => {
+      if (!motorcycle) return;
+      try {
+        setReviewsLoading(true);
+        setReviewsError("");
+        const motorcycleId = motorcycle._id || motorcycle.id || id;
+        const res = await api.get(`/api/reviews/motorcycle/${motorcycleId}`, {
+          params: { limit: 6 },
+        });
+        const data = res.data || {};
+        const rows = Array.isArray(data.reviews) ? data.reviews : data.reviews || [];
+        if (!mounted) return;
+        setReviews(rows);
+      } catch (err) {
+        if (!mounted) return;
+        setReviewsError(err.response?.data?.message || "Failed to load reviews");
+      } finally {
+        if (mounted) setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+
+    return () => {
+      mounted = false;
+    };
+  }, [motorcycle, id]);
+
+  const voteOnReview = useCallback(
+    async (reviewId, vote) => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please log in to vote on a review.");
+        return;
+      }
+
+      try {
+        setVotingReviewId(reviewId);
+        const res = await api.patch(
+          `/api/reviews/${reviewId}/vote`,
+          { vote },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const updated = res.data?.review || null;
+        if (updated) {
+          setReviews((prev) =>
+            prev.map((review) =>
+              String(review._id || review.id) === String(reviewId)
+                ? { ...review, ...updated }
+                : review,
+            ),
+          );
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to save vote.");
+      } finally {
+        setVotingReviewId("");
+      }
+    },
+    [],
+  );
+
   if (!motorcycle && loadingMotorcycle)
     return (
       <div className="min-h-screen bg-[#e8e8e8] flex items-center justify-center">
@@ -1266,8 +1379,15 @@ const MotorcycleDetail = () => {
   } = getDistanceFee(formData.destinationCity);
   const helmetFee = formData.wantsHelmet ? HELMET_FEE : 0;
   const baseRental = days * price;
-  const totalAmount = baseRental + distanceFee + helmetFee;
-  const dueAtPickup = totalAmount - DOWNPAYMENT;
+  const applicableDiscount = useApplicableDiscount(motorcycle, days);
+  const discountAmount = applicableDiscount
+    ? applicableDiscount.discountType === "percentage"
+      ? (baseRental * applicableDiscount.discountValue) / 100
+      : Math.min(applicableDiscount.discountValue, baseRental)
+    : 0;
+  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+  const totalAmount = discountedBaseRental + distanceFee + helmetFee;
+  const dueAtPickup = Math.max(0, totalAmount - DOWNPAYMENT);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1557,6 +1677,18 @@ const MotorcycleDetail = () => {
           helmetFee,
           destinationCity: formData.destinationCity,
           downpayment: DOWNPAYMENT,
+          appliedDiscount: applicableDiscount
+            ? {
+                id: applicableDiscount._id,
+                name: applicableDiscount.name,
+                code: applicableDiscount.code || "",
+                discountType: applicableDiscount.discountType,
+                discountValue: applicableDiscount.discountValue,
+                discountAmount: Math.round(discountAmount),
+                discountedBaseRental: Math.round(discountedBaseRental),
+                discountedTotalAmount: Math.round(totalAmount),
+              }
+            : null,
         },
         address: {
           barangay: formData.barangay,
@@ -1593,6 +1725,13 @@ const MotorcycleDetail = () => {
         headers,
         signal: controller.signal,
       });
+      if (applicableDiscount?._id) {
+        api.patch(
+          `/api/discounts/${applicableDiscount._id}/increment-usage`,
+          {},
+          { headers },
+        ).catch(() => {});
+      }
       clearLockTimer();
       setCheckoutLock({
         expiresAt: "",
@@ -1801,6 +1940,61 @@ const MotorcycleDetail = () => {
                   {motorcycle.description}
                 </p>
               )}
+              {/* ── Customer Reviews ── */}
+              <div className="mt-6">
+                <h4 className="text-sm font-bold text-[#171717] mb-3">Customer Reviews</h4>
+                {reviewsLoading ? (
+                  <p className="text-xs text-[#171717]/60">Loading reviews...</p>
+                ) : reviewsError ? (
+                  <p className="text-xs text-red-700">{reviewsError}</p>
+                ) : reviews.length === 0 ? (
+                  <p className="text-xs text-[#171717]/60">No reviews yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {reviews.slice(0, 6).map((r) => (
+                      <div key={r._id || r.id} className="bg-white rounded-xl border border-black/10 p-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-[#171717]">{r.renterName || r.name || 'Anonymous'}</div>
+                            <div className="text-xs text-[#171717]/50">{r.rating || 0} / 5</div>
+                          </div>
+                          <div className="text-xs text-[#171717]/50">{new Date(r.createdAt || r.created_at || Date.now()).toLocaleDateString()}</div>
+                        </div>
+                        <p className="text-sm text-[#171717]/80 mt-2">{r.feedbackDescription || r.comment || ''}</p>
+                        {r.adminReplyMessage && (
+                          <div className="mt-2 p-2 bg-[#f4f4f4] rounded-md border border-[#b50002]/10">
+                            <div className="text-xs font-semibold text-[#b50002]">Admin Reply</div>
+                            <div className="text-sm text-[#171717] mt-1">{r.adminReplyMessage}</div>
+                            {r.adminRepliedAt && (
+                              <div className="text-xs text-[#171717]/50 mt-1">Replied: {new Date(r.adminRepliedAt).toLocaleString()}</div>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => voteOnReview(r._id || r.id, "like")}
+                            disabled={votingReviewId === (r._id || r.id)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            <FaThumbsUp className="text-[10px]" />
+                            Helpful ({r.helpfulLikeCount ?? 0})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => voteOnReview(r._id || r.id, "dislike")}
+                            disabled={votingReviewId === (r._id || r.id)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-red-200 bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-60"
+                          >
+                            <FaThumbsDown className="text-[10px]" />
+                            Not Helpful ({r.helpfulDislikeCount ?? 0})
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2003,6 +2197,7 @@ const MotorcycleDetail = () => {
                       distanceFee={distanceFee}
                       helmetFee={helmetFee}
                       totalAmount={totalAmount}
+                      discount={applicableDiscount}
                     />
                   )}
 

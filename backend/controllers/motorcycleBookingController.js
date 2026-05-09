@@ -20,6 +20,7 @@ const BLOCKING_STATUSES = [
   "pending_reservation",
   "pending_full_payment",
   "active",
+  "inspection",
 ];
 const MAX_RETRIES = 3;
 const REQUIRED_DOWNPAYMENT = 200;
@@ -28,10 +29,27 @@ const CHECKOUT_LOCK_MS = CHECKOUT_LOCK_MINUTES * 60 * 1000;
 const RECEIPT_VERIFY_TIMEOUT_MS = Number(
   process.env.RECEIPT_VERIFY_TIMEOUT_MS || 4000,
 );
+const CLEARANCE_STATUSES = [
+  "pending_inspection",
+  "cleared",
+  "damage_found",
+  "penalty_required",
+];
+const INSPECTION_VEHICLE_STATUSES = [
+  "inspection",
+  "under_review",
+  "repair_needed",
+  "available",
+  "maintenance",
+  "pending",
+  "rented",
+];
 
 // ── Cloudinary Configuration ──────────────────────────────────────────
 const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
 const CLOUDINARY_PAYMENT_PROOF_FOLDER = "paymentproof";
+const CLOUDINARY_RETURN_INSPECTION_FOLDER = "returninspection";
+const CLOUDINARY_REPAIR_ESTIMATE_FOLDER = "repair-estimates";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
     process.env.CLOUDINARY_API_KEY &&
@@ -126,6 +144,26 @@ const getUploadedPaymentProofUrl = async (file) => {
   const localPath = `/uploads/${filename}`;
   console.log("[PAYMENTPROOF] Returning local path:", localPath);
   return localPath;
+};
+
+const getUploadedInspectionUrls = async (
+  files = [],
+  targetFolder = CLOUDINARY_RETURN_INSPECTION_FOLDER,
+) => {
+  if (!Array.isArray(files) || files.length === 0) return [];
+
+  const urls = [];
+  for (const file of files) {
+    const absolutePath = path.resolve(file.path);
+    const cloudUrl = await uploadFileToCloudinary(absolutePath, targetFolder);
+    if (cloudUrl) {
+      urls.push(cloudUrl);
+    } else {
+      const filename = path.basename(absolutePath);
+      urls.push(`/uploads/${filename}`);
+    }
+  }
+  return urls;
 };
 
 const tryParseJSON = (v) => {
@@ -248,6 +286,15 @@ const hasMinimumRentalDuration = (
   return returnAt.getTime() - pickupAt.getTime() >= minimumHours * 60 * 60 * 1000;
 };
 
+const computeRentalDays = (pickupDate, pickupTime, returnDate, returnTime) => {
+  const pickupAt = combineDateAndTime(pickupDate, pickupTime);
+  const returnAt = combineDateAndTime(returnDate, returnTime);
+  if (!pickupAt || !returnAt) return 0;
+  const diffMs = returnAt.getTime() - pickupAt.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+};
+
 const buildBookingLabel = (booking) => {
   const make = booking?.motorcycle?.make || "";
   const model = booking?.motorcycle?.model || "";
@@ -311,6 +358,10 @@ const updateMotorcycleStatus = async (motorcycleId) => {
       (b) => (b.status || "").toLowerCase() === "active",
     );
 
+    const hasInspectionBooking = bookings.some(
+      (b) => (b.status || "").toLowerCase() === "inspection",
+    );
+
     const hasPendingBooking = bookings.some((b) => {
       const status = (b.status || "").toLowerCase();
       return ["pending_reservation", "pending_full_payment"].includes(
@@ -322,18 +373,34 @@ const updateMotorcycleStatus = async (motorcycleId) => {
     if (hasActiveBooking && motorcycle.status !== "rented") {
       motorcycle.status = "rented";
       await motorcycle.save();
-    } else if (
+      return;
+    }
+
+    if (hasInspectionBooking) {
+      if (!["under_review", "repair_needed"].includes(motorcycle.status)) {
+        motorcycle.status = "inspection";
+        await motorcycle.save();
+      }
+      return;
+    }
+
+    if (
       !hasActiveBooking &&
       (hasPendingBooking || hasActiveCheckoutLock) &&
       motorcycle.status !== "pending"
     ) {
       motorcycle.status = "pending";
       await motorcycle.save();
-    } else if (
+      return;
+    }
+
+    if (
       !hasActiveBooking &&
       !hasPendingBooking &&
       !hasActiveCheckoutLock &&
-      ["rented", "pending"].includes(motorcycle.status)
+      ["rented", "pending", "inspection", "under_review", "repair_needed"].includes(
+        motorcycle.status,
+      )
     ) {
       motorcycle.status = "available";
       await motorcycle.save();
@@ -586,6 +653,23 @@ export const createMotorcycleBooking = async (req, res) => {
     const motorcycleId = motorcycleSummary.id;
 
     const requesterUserId = getRequesterUserId(req);
+    if (requesterUserId && mongoose.Types.ObjectId.isValid(requesterUserId)) {
+      const hasOpenInspection = await MotorcycleBooking.exists({
+        userId: new mongoose.Types.ObjectId(requesterUserId),
+        status: "inspection",
+        isDeleted: { $ne: true },
+      });
+
+      if (hasOpenInspection) {
+        return res.status(409).json({
+          success: false,
+          code: "INSPECTION_BLOCKED",
+          message:
+            "You cannot rent another motorcycle while you still have an unresolved inspection booking.",
+        });
+      }
+    }
+
     const motorcycleForLockCheck = await Motorcycle.findById(motorcycleId)
       .select("checkoutLock")
       .lean();
@@ -1120,6 +1204,7 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
         adminReviewComment: 1,
         adminReviewedAt: 1,
         receiptVerification: 1,
+        returnInspection: 1,
         details: 1,
         address: 1,
         isDeleted: 1,
@@ -1235,6 +1320,154 @@ export const updateMotorcycleBooking = async (req, res, next) => {
 
     const updated = await booking.save();
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const extendMotorcycleBooking = async (req, res, next) => {
+  try {
+    if (!req.user || (!req.user.id && !req.user._id)) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const booking = await MotorcycleBooking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const userId = String(req.user._id || req.user.id);
+    if (!booking.userId || String(booking.userId) !== userId) {
+      return res.status(403).json({ success: false, message: "You cannot extend this booking." });
+    }
+
+    if (booking.isDeleted) {
+      return res.status(400).json({ success: false, message: "This booking is not active." });
+    }
+
+    if (booking.status !== "active") {
+      return res.status(400).json({ success: false, message: "Only active bookings can be extended." });
+    }
+
+    const returnDate = req.body?.returnDate;
+    const returnTime = String(req.body?.returnTime || "").trim();
+    if (!returnDate || !returnTime) {
+      return res.status(400).json({ success: false, message: "returnDate and returnTime are required." });
+    }
+
+    const currentReturnAt = combineDateAndTime(booking.returnDate, booking.returnTime);
+    const newReturnAt = combineDateAndTime(returnDate, returnTime);
+    if (!currentReturnAt || !newReturnAt) {
+      return res.status(400).json({ success: false, message: "Invalid return date/time." });
+    }
+
+    if (newReturnAt.getTime() <= currentReturnAt.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: "New return time must be later than the current return time.",
+      });
+    }
+
+    const motorcycleId = booking.motorcycle?.id;
+    if (!motorcycleId) {
+      return res.status(400).json({ success: false, message: "Booking has no motorcycle assigned." });
+    }
+
+    const overlappingCount = await MotorcycleBooking.countDocuments({
+      _id: { $ne: booking._id },
+      "motorcycle.id": motorcycleId,
+      status: { $in: BLOCKING_STATUSES },
+      isDeleted: { $ne: true },
+      pickupDate: { $lte: newReturnAt },
+      returnDate: { $gte: booking.returnDate },
+    });
+
+    if (overlappingCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Extension conflicts with another booking for this motorcycle.",
+      });
+    }
+
+    const days = computeRentalDays(
+      booking.pickupDate,
+      booking.pickupTime,
+      returnDate,
+      returnTime,
+    );
+    if (!days) {
+      return res.status(400).json({ success: false, message: "Invalid extension duration." });
+    }
+
+    const dailyRate = Number(booking.motorcycle?.dailyRate || 0);
+    const distanceFee = Number(booking.details?.distanceFee || 0);
+    const helmetFee = Number(booking.details?.helmetFee || 0);
+    const previousAmount = Number(booking.amount || 0);
+    const newAmount = dailyRate > 0
+      ? dailyRate * days + distanceFee + helmetFee
+      : previousAmount;
+    const additionalAmount = Math.max(0, newAmount - previousAmount);
+
+    const previousReturnDate = booking.returnDate;
+    const previousReturnTime = booking.returnTime;
+
+    booking.returnDate = new Date(newReturnAt);
+    booking.returnTime = returnTime;
+    booking.amount = newAmount;
+    booking.extensions = booking.extensions || [];
+    booking.extensions.push({
+      requestedAt: new Date(),
+      requestedBy: new mongoose.Types.ObjectId(userId),
+      previousReturnDate,
+      previousReturnTime,
+      newReturnDate: booking.returnDate,
+      newReturnTime: booking.returnTime,
+      previousAmount,
+      newAmount,
+      additionalAmount,
+    });
+
+    const updated = await booking.save();
+
+    await Motorcycle.findOneAndUpdate(
+      {
+        _id: motorcycleId,
+        "bookings.bookingId": booking._id,
+      },
+      {
+        $set: {
+          "bookings.$.returnDate": booking.returnDate,
+        },
+      },
+    );
+
+    await updateMotorcycleStatus(motorcycleId);
+
+    await createSystemLog({
+      req,
+      actorType: "user",
+      action: "booking_extended",
+      targetType: "booking",
+      targetId: updated._id,
+      summary: `Booking extended: ${buildBookingLabel(updated)}`,
+      metadata: {
+        previousReturnDate,
+        previousReturnTime,
+        newReturnDate: booking.returnDate,
+        newReturnTime: booking.returnTime,
+        previousAmount,
+        newAmount,
+        additionalAmount,
+      },
+    });
+
+    return res.json({
+      success: true,
+      booking: updated,
+      additionalAmount,
+      newAmount,
+      days,
+    });
   } catch (err) {
     next(err);
   }
@@ -1415,6 +1648,53 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
     const motorcycleId = booking.motorcycle?.id;
     const previousStatus = booking.status;
 
+    if (status === "inspection") {
+      if (booking.status !== "active") {
+        return res.status(400).json({
+          message: "Only active bookings can move to inspection.",
+        });
+      }
+      booking.returnInspection = {
+        ...booking.returnInspection,
+        clearanceStatus:
+          booking.returnInspection?.clearanceStatus || "pending_inspection",
+        vehicleStatus: "inspection",
+        startedAt: booking.returnInspection?.startedAt || new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    if (status === "completed") {
+      if (booking.status !== "inspection") {
+        return res.status(400).json({
+          message: "Booking must be in inspection before completing.",
+        });
+      }
+
+      const clearanceStatus = booking.returnInspection?.clearanceStatus;
+      if (clearanceStatus !== "cleared") {
+        return res.status(400).json({
+          message:
+            "Return inspection must be cleared before completing the booking.",
+        });
+      }
+
+      if (
+        booking.returnInspection?.clearanceStatus === "penalty_required" &&
+        !booking.returnInspection?.penaltySettled
+      ) {
+        return res.status(400).json({
+          message: "Penalty settlement required before completion.",
+        });
+      }
+
+      booking.returnInspection = {
+        ...booking.returnInspection,
+        clearedAt: booking.returnInspection?.clearedAt || new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
     booking.status = status;
     const updated = await booking.save();
 
@@ -1448,6 +1728,194 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
     });
 
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateReturnInspection = async (req, res, next) => {
+  try {
+    const booking = await MotorcycleBooking.findById(req.params.id);
+    if (!booking)
+      return res.status(404).json({ message: "Booking not found." });
+
+    if (booking.status !== "inspection") {
+      return res.status(400).json({
+        message: "Booking must be in inspection before updating clearance.",
+      });
+    }
+
+    const motorcycleId = booking.motorcycle?.id;
+
+    const {
+      clearanceStatus,
+      damageNotes,
+      mechanicNotes,
+      repairEstimateAmount,
+      repairEstimateNotes,
+      penaltyAmount,
+      penaltySummary,
+      penaltySettled,
+      vehicleStatus,
+    } = req.body || {};
+    const previousClearance = booking.returnInspection?.clearanceStatus;
+
+    const inspection = {
+      ...(booking.returnInspection || {}),
+    };
+    const wasRepairAdded = Boolean(booking.returnInspection?.repairEstimateAdded);
+    const wasPenaltySettled = Boolean(booking.returnInspection?.penaltySettled);
+
+    if (clearanceStatus) {
+      if (!CLEARANCE_STATUSES.includes(clearanceStatus)) {
+        return res
+          .status(400)
+          .json({ message: "Invalid clearance status." });
+      }
+      inspection.clearanceStatus = clearanceStatus;
+    }
+
+    // Only include fields relevant to clearance status
+    if (inspection.clearanceStatus === "damage_found") {
+      if (typeof damageNotes === "string") inspection.damageNotes = damageNotes;
+      if (typeof mechanicNotes === "string") inspection.mechanicNotes = mechanicNotes;
+      if (typeof repairEstimateNotes === "string")
+        inspection.repairEstimateNotes = repairEstimateNotes;
+      if (repairEstimateAmount !== undefined) {
+        const parsed = Number(repairEstimateAmount);
+        if (!Number.isNaN(parsed)) inspection.repairEstimateAmount = parsed;
+      }
+      inspection.vehicleStatus = "maintenance";
+    } else if (inspection.clearanceStatus === "penalty_required") {
+      if (typeof penaltySummary === "string") inspection.penaltySummary = penaltySummary;
+      if (penaltyAmount !== undefined) {
+        const parsed = Number(penaltyAmount);
+        if (!Number.isNaN(parsed)) inspection.penaltyAmount = parsed;
+      }
+      inspection.vehicleStatus = "maintenance";
+    } else if (inspection.clearanceStatus === "pending_inspection") {
+      inspection.vehicleStatus = "inspection";
+    } else if (inspection.clearanceStatus === "cleared") {
+      inspection.vehicleStatus = "available";
+    }
+
+    // If we are no longer in penalty_required, remove penalty fields
+    if (inspection.clearanceStatus !== "penalty_required") {
+      delete inspection.penaltyAmount;
+      delete inspection.penaltySummary;
+      delete inspection.penaltySettled;
+    }
+
+    if (penaltySettled !== undefined) {
+      inspection.penaltySettled =
+        String(penaltySettled).toLowerCase() === "true" || penaltySettled === true;
+    }
+
+    const damageFiles = req.files?.damagePhotos || [];
+
+    // Only upload damage photos for damage_found status
+    if (inspection.clearanceStatus === "damage_found") {
+      const damageUrls = await getUploadedInspectionUrls(
+        damageFiles,
+        CLOUDINARY_RETURN_INSPECTION_FOLDER,
+      );
+
+      if (damageUrls.length) {
+        inspection.damagePhotos = [
+          ...(inspection.damagePhotos || []),
+          ...damageUrls,
+        ];
+      }
+    }
+
+    inspection.updatedAt = new Date();
+
+    // Add repair estimate amount to booking revenue when inspection is cleared
+    if (
+      inspection.clearanceStatus === "cleared" &&
+      previousClearance === "damage_found" &&
+      Number(inspection.repairEstimateAmount || 0) > 0 &&
+      !wasRepairAdded
+    ) {
+      booking.amount = Number(booking.amount || 0) + Number(inspection.repairEstimateAmount || 0);
+      inspection.repairEstimateAdded = true;
+    }
+
+    if (inspection.clearanceStatus === "cleared") {
+      inspection.clearedAt = inspection.clearedAt || new Date();
+      booking.status = "completed";
+    }
+
+    // If penalty is settled, mark inspection as completed
+    if (
+      inspection.penaltySettled &&
+      (inspection.clearanceStatus === "damage_found" ||
+        inspection.clearanceStatus === "penalty_required")
+    ) {
+      if (!wasPenaltySettled) {
+        const penaltyTotal = Number(inspection.penaltyAmount || 0);
+        if (penaltyTotal > 0) {
+          booking.amount = Number(booking.amount || 0) + penaltyTotal;
+        }
+      }
+
+      // If there is a repair estimate from damage_found, add it to revenue when settling
+      if (
+        inspection.clearanceStatus === "damage_found" &&
+        Number(inspection.repairEstimateAmount || 0) > 0 &&
+        !wasRepairAdded
+      ) {
+        booking.amount = Number(booking.amount || 0) + Number(inspection.repairEstimateAmount || 0);
+        inspection.repairEstimateAdded = true;
+      }
+
+      inspection.clearedAt = inspection.clearedAt || new Date();
+      inspection.vehicleStatus = "available";
+      booking.status = "completed";
+    }
+
+    booking.returnInspection = inspection;
+    const updated = await booking.save();
+
+    if (motorcycleId) {
+      const nextMotorcycleStatus = inspection.vehicleStatus || null;
+
+      if (nextMotorcycleStatus) {
+        await Motorcycle.findByIdAndUpdate(motorcycleId, {
+          $set: { status: nextMotorcycleStatus },
+        });
+      }
+
+      if (booking.status === "completed") {
+        await Motorcycle.findOneAndUpdate(
+          {
+            _id: motorcycleId,
+            "bookings.bookingId": booking._id,
+          },
+          {
+            $set: { "bookings.$.status": "completed" },
+          },
+        );
+      }
+
+      await updateMotorcycleStatus(motorcycleId);
+    }
+
+    await createSystemLog({
+      req,
+      actorType: "admin",
+      action: "return_inspection_updated",
+      targetType: "booking",
+      targetId: updated._id,
+      summary: `Return inspection updated: ${buildBookingLabel(updated)}`,
+      metadata: {
+        clearanceStatus: updated.returnInspection?.clearanceStatus,
+        penaltySettled: updated.returnInspection?.penaltySettled,
+        bookingStatus: updated.status,
+      },
+    });
+
+    return res.json({ success: true, booking: updated });
   } catch (err) {
     next(err);
   }

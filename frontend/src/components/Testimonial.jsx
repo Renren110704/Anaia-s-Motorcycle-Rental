@@ -1,10 +1,58 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { testimonialStyles as styles } from "../assets/dummyStyles";
 import testimonials from "../assets/Testimonialdata";
 import { FaQuoteLeft, FaStar } from "react-icons/fa";
 import { GiFullMotorcycleHelmet } from "react-icons/gi";
+import axios from "axios";
+import API_BASE_URL from "../apiBase";
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { Accept: "application/json" },
+});
 
 const Testimonial = () => {
+  const [featuredTestimonials, setFeaturedTestimonials] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchFeaturedTestimonials = async () => {
+      try {
+        const { data } = await api.get("/api/reviews/testimonials", {
+          params: { limit: 6 },
+        });
+        const rows = Array.isArray(data) ? data : data.testimonials || [];
+        if (!mounted) return;
+        setFeaturedTestimonials(rows);
+      } catch {
+        // Keep static fallback when API is unavailable.
+        if (!mounted) return;
+        setFeaturedTestimonials([]);
+      }
+    };
+
+    fetchFeaturedTestimonials();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const renderedTestimonials = useMemo(() => {
+    if (featuredTestimonials.length > 0) {
+      return featuredTestimonials.map((item, index) => ({
+        id: item.id || `featured-${index}`,
+        name: item.name || "Renter",
+        role: item.role || "Renter",
+        comment: item.comment || "",
+        rating: Number(item.rating || 0),
+        car: item.motorcycle || "Rented Motorcycle",
+      }));
+    }
+
+    return testimonials;
+  }, [featuredTestimonials]);
+
   return (
     <div className={styles.container}>
       <div className={styles.innerContainer}>
@@ -15,7 +63,7 @@ const Testimonial = () => {
 
         {/* TESTIMONIALS CARD */}
         <div className={styles.grid}>
-          {testimonials.map((t, index) => {
+          {renderedTestimonials.map((t, index) => {
             const IconComponent = styles.icons[index % styles.icons.length];
 
             return (

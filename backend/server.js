@@ -11,6 +11,8 @@ import motorcycleBookingRouter from "./routes/motorcycleBookingRoutes.js";
 import motorcyclePaymentRouter from "./routes/motorcyclePaymentRoutes.js";
 import systemLogRouter from "./routes/systemLogRoutes.js";
 import trackingRouter from "./routes/trackingRoutes.js";
+import reviewRouter from "./routes/reviewRoutes.js";
+import discountRoutes from "./routes/discountRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -155,6 +157,8 @@ app.use("/api/motorcycle-bookings", motorcycleBookingRouter);
 app.use("/api/motorcycle-payments", motorcyclePaymentRouter);
 app.use("/api/system-logs", systemLogRouter);
 app.use("/api/tracking", trackingRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/discounts", discountRoutes);
 
 app.get("/api/ping", (req, res) =>
   res.json({

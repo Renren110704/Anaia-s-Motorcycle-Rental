@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from "react";
 import ReactDOM from "react-dom/client";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import {
@@ -32,6 +33,7 @@ import {
 } from "react-icons/fa";
 import Navbar from "../components/Navbar";
 import API_BASE_URL from "../apiBase";
+import ReviewModal from "../components/ReviewModal";
 
 const API_BASE = API_BASE_URL;
 const TIMEOUT = 30000;
@@ -223,6 +225,15 @@ const daysBetween = (start, end) => {
   } catch {
     return 0;
   }
+};
+
+const daysBetweenWithTime = (pickupDate, pickupTime, returnDate, returnTime) => {
+  const start = combineLocalDateTime(pickupDate, pickupTime);
+  const end = combineLocalDateTime(returnDate, returnTime);
+  if (!start || !end) return 0;
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 };
 
 const toDateInput = (value) => {
@@ -434,6 +445,7 @@ const normalizeBooking = (booking) => {
     distanceTierLabel: details.distanceTierLabel ?? "",
     helmetRequested: details.helmetRequested ?? false,
     destinationCity: details.destinationCity ?? "",
+    returnInspection: booking.returnInspection || {},
     // Downpayment: stored in details.downpayment or fall back to raw.reservationFee
     downpayment: details.downpayment ?? booking.reservationFee ?? DOWNPAYMENT,
     status: rawStatus || "pending_reservation",
@@ -472,6 +484,7 @@ const STATUS_TABS = [
     icon: FaCreditCard,
   },
   { key: "active", label: "Active", icon: FaPlayCircle },
+  { key: "inspection", label: "Inspection", icon: FaExclamationTriangle },
   { key: "completed", label: "Completed", icon: FaCheckCircle },
   { key: "cancelled", label: "Cancelled", icon: FaTimesCircle },
   { key: "rejected", label: "Rejected", icon: FaTrash },
@@ -492,6 +505,11 @@ const STATUS_BADGE = {
     text: "Active",
     cls: "bg-blue-100 text-blue-800 border border-blue-300",
     icon: FaPlayCircle,
+  },
+  inspection: {
+    text: "Inspection",
+    cls: "bg-purple-100 text-purple-800 border border-purple-300",
+    icon: FaExclamationTriangle,
   },
   completed: {
     text: "Completed",
@@ -529,7 +547,7 @@ const StatusBadge = ({ status, isDeleted }) => {
 };
 
 // ── Tab button ────────────────────────────────────────────────────────────────
-const TabButton = ({ tab, isActive, count, onClick }) => {
+const TabButton = ({ tab, isActive, count, issueCount, onClick }) => {
   const Icon = tab.icon;
   return (
     <button
@@ -545,7 +563,19 @@ const TabButton = ({ tab, isActive, count, onClick }) => {
       <Icon
         className={`text-xs ${isActive ? "text-white" : "text-[#b50002]"}`}
       />
-      {tab.label}
+      <span className="inline-flex items-start">
+        {tab.label}
+        {issueCount > 0 && tab.key === "inspection" && (
+          <sup
+            className={`ml-1 text-[0.65rem] font-black leading-none align-super ${
+              isActive ? "text-white" : "text-[#b50002]"
+            }`}
+            aria-label={`${issueCount} inspection issue${issueCount === 1 ? "" : "s"}`}
+          >
+            {issueCount}
+          </sup>
+        )}
+      </span>
       <span
         className={`text-xs font-bold px-1.5 py-0.5 rounded-full
         ${isActive ? "bg-white/20 text-white" : "bg-[#171717]/10 text-[#171717]"}`}
@@ -659,7 +689,7 @@ const DetailRow = ({ label, value, valueClass = "text-[#171717]" }) => (
 );
 
 // ── Booking Row ───────────────────────────────────────────────────────────────
-const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgreement }) => {
+const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onDownloadAgreement }) => {
   const [expanded, setExpanded] = useState(false);
   const [reuploadRef, setReuploadRef] = useState(booking.paymentReferenceId || "");
   const [reuploadSentAt, setReuploadSentAt] = useState(
@@ -672,6 +702,11 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
   const [reuploading, setReuploading] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [bookingReview, setBookingReview] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const days = daysBetween(booking.dates.pickup, booking.dates.return);
   const motorcycleName =
     `${booking.motorcycle.make} ${booking.motorcycle.model}`.trim();
@@ -685,11 +720,16 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
     booking.requiresProofReupload || booking.paymentStatus === "rejected";
   const originalPickupDateInput = toDateInput(booking.dates.pickup);
   const originalReturnDateInput = toDateInput(booking.dates.return);
+  const originalReturnTime = booking.times.return || "08:00";
   const [rescheduleForm, setRescheduleForm] = useState({
     pickupDate: originalPickupDateInput,
     pickupTime: booking.times.pickup || "08:00",
     returnDate: originalReturnDateInput,
     returnTime: booking.times.return || "08:00",
+  });
+  const [extensionForm, setExtensionForm] = useState({
+    returnDate: originalReturnDateInput,
+    returnTime: originalReturnTime,
   });
 
   const canReschedule =
@@ -697,10 +737,16 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
       booking.status,
     ) && !booking.isDeleted;
 
+  const canExtend = booking.status === "active" && !booking.isDeleted;
+
   useEffect(() => {
     setRescheduleForm({
       pickupDate: toDateInput(booking.dates.pickup),
       pickupTime: booking.times.pickup || "08:00",
+      returnDate: toDateInput(booking.dates.return),
+      returnTime: booking.times.return || "08:00",
+    });
+    setExtensionForm({
       returnDate: toDateInput(booking.dates.return),
       returnTime: booking.times.return || "08:00",
     });
@@ -715,6 +761,35 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
     setReuploadPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [reuploadFile]);
+
+  const fetchBookingReview = useCallback(async () => {
+    if (booking.status !== "completed" || booking.isDeleted) {
+      setBookingReview(null);
+      return;
+    }
+
+    try {
+      setReviewLoading(true);
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.get(`${API_BASE}/api/reviews/booking/${booking.id}`, {
+        headers,
+      });
+      setBookingReview(response?.data?.review || response?.data || null);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        setBookingReview(null);
+      } else {
+        console.error("Failed to fetch booking review:", err);
+      }
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [booking.id, booking.isDeleted, booking.status]);
+
+  useEffect(() => {
+    fetchBookingReview();
+  }, [fetchBookingReview]);
 
   const existingProofPreview = booking.raw?.paymentProofImage
     ? resolveImageUrl(booking.raw.paymentProofImage)
@@ -736,6 +811,23 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
       ? dailyRate * rescheduledDays + booking.distanceFee + booking.helmetFee
       : grossTotal;
   const rescheduledDueAtPickup = Math.max(0, rescheduledGrossTotal - downpayment);
+
+  const extensionDays = daysBetweenWithTime(
+    originalPickupDateInput,
+    booking.times.pickup || "08:00",
+    extensionForm.returnDate,
+    extensionForm.returnTime,
+  );
+  const extensionGrossTotal =
+    dailyRate > 0
+      ? dailyRate * Math.max(extensionDays, 1) + booking.distanceFee + booking.helmetFee
+      : grossTotal;
+  const extensionAdditionalAmount = Math.max(0, extensionGrossTotal - grossTotal);
+  const latestExtension = Array.isArray(booking.raw?.extensions)
+    ? booking.raw.extensions[booking.raw.extensions.length - 1]
+    : null;
+  const originalReturnDateFromExtension = latestExtension?.previousReturnDate || null;
+  const originalReturnTimeFromExtension = latestExtension?.previousReturnTime || "";
 
   const minPickupDate = useMemo(() => {
     const today = getTodayStart();
@@ -825,6 +917,50 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
     return true;
   };
 
+  const validateExtension = async () => {
+    const { returnDate, returnTime } = extensionForm;
+    if (!returnDate || !returnTime) {
+      await alertModal("Please select a new return date and time.", {
+        isError: true,
+      });
+      return false;
+    }
+
+    if (!isTimeWithinRentalHours(returnTime)) {
+      await alertModal("Return time must be between 8:00 AM and 8:00 PM only.", {
+        isError: true,
+      });
+      return false;
+    }
+
+    const currentReturnDateTime = combineLocalDateTime(
+      originalReturnDateInput,
+      originalReturnTime,
+    );
+    const nextReturnDateTime = combineLocalDateTime(returnDate, returnTime);
+    if (!currentReturnDateTime || !nextReturnDateTime) {
+      await alertModal("Return date/time is invalid.", { isError: true });
+      return false;
+    }
+
+    if (nextReturnDateTime <= currentReturnDateTime) {
+      await alertModal(
+        "New return time must be later than your current return time.",
+        { isError: true },
+      );
+      return false;
+    }
+
+    if (extensionDays <= 0) {
+      await alertModal("Please select a valid extension duration.", {
+        isError: true,
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const submitReupload = async () => {
     if (!reuploadRef.trim()) {
       await alertModal("Please enter your payment reference ID.", {
@@ -882,7 +1018,30 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
     }
   };
 
+  const submitExtension = async () => {
+    const isValid = await validateExtension();
+    if (!isValid) return;
+
+    const confirmed = await confirmModal(
+      "Extend your rental to the new return date/time?",
+      { confirmLabel: "Yes, Extend" },
+    );
+    if (!confirmed) return;
+
+    try {
+      setExtending(true);
+      await onExtend(booking.id, {
+        returnDate: extensionForm.returnDate,
+        returnTime: extensionForm.returnTime,
+      });
+      setIsExtending(false);
+    } finally {
+      setExtending(false);
+    }
+  };
+
   return (
+    <>
     <div
       className={`bg-white/70 backdrop-blur-sm border border-white/50 rounded-2xl overflow-hidden shadow-lg shadow-black/10 transition-all duration-200
       ${booking.isDeleted ? "opacity-60" : "hover:shadow-xl hover:shadow-black/15 hover:bg-white/90"}`}
@@ -1113,11 +1272,29 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
                   </span>
                 </div>
               )}
+              {booking.raw?.returnInspection?.clearanceStatus === "penalty_required" &&
+                booking.raw?.returnInspection?.penaltyAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-[#171717]/50 flex items-center gap-1">
+                    <FaExclamationTriangle className="text-[#b50002]" /> Penalty
+                  </span>
+                  <span className={`font-semibold ${booking.raw?.returnInspection?.penaltySettled ? "text-green-600" : "text-[#b50002]"}`}>
+                    +{formatPrice(booking.raw.returnInspection.penaltyAmount)}
+                  </span>
+                </div>
+              )}
               {/* Gross total */}
               <div className="border-t border-[#171717]/15 pt-1.5 flex justify-between">
                 <span className="font-bold text-[#171717]">Total</span>
                 <span className="font-black text-[#171717]">
-                  {formatPrice(grossTotal)}
+                  {formatPrice(
+                    grossTotal +
+                    (booking.raw?.returnInspection?.clearanceStatus === "penalty_required" &&
+                    booking.raw?.returnInspection?.penaltyAmount > 0 &&
+                    !booking.raw?.returnInspection?.penaltySettled
+                      ? booking.raw.returnInspection.penaltyAmount
+                      : 0)
+                  )}
                 </span>
               </div>
               {/* Downpayment deducted */}
@@ -1136,6 +1313,118 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
               </div>
             </DetailCard>
           </div>
+
+          {/* Inspection Section */}
+          {booking.status === "inspection" && booking.returnInspection && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <FaExclamationTriangle className="text-purple-700 text-lg" />
+                <h3 className="text-sm font-bold text-purple-900">
+                  Return Inspection Status
+                </h3>
+              </div>
+
+              <div className="space-y-3">
+                {/* Status message */}
+                <div className="bg-white rounded-lg p-3 border border-purple-200">
+                  <p className="text-sm font-semibold text-purple-900 mb-1">
+                    Inspection Status:
+                  </p>
+                  <p className="text-sm text-purple-800">
+                    Your rented motorcycle is currently under inspection. Please wait for the admin to settle your penalties if you have any before you rent another motorcycle.
+                  </p>
+                </div>
+
+                {/* Damage Found Section */}
+                {booking.returnInspection.clearanceStatus === "damage_found" && (
+                  <>
+                    {booking.returnInspection.damageNotes && (
+                      <div>
+                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
+                          Damage Notes
+                        </p>
+                        <p className="text-sm text-purple-900 bg-white rounded-lg p-2 border border-purple-100">
+                          {booking.returnInspection.damageNotes}
+                        </p>
+                      </div>
+                    )}
+                    {booking.returnInspection.mechanicNotes && (
+                      <div>
+                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
+                          Mechanic Notes
+                        </p>
+                        <p className="text-sm text-purple-900 bg-white rounded-lg p-2 border border-purple-100">
+                          {booking.returnInspection.mechanicNotes}
+                        </p>
+                      </div>
+                    )}
+                    {booking.returnInspection.repairEstimateAmount > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
+                          Repair Estimate
+                        </p>
+                        <div className="bg-white rounded-lg p-2 border border-purple-100 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-purple-800">Amount:</span>
+                            <span className="text-sm font-semibold text-purple-900">
+                              ₱{booking.returnInspection.repairEstimateAmount.toLocaleString()}
+                            </span>
+                          </div>
+                          {booking.returnInspection.repairEstimateNotes && (
+                            <p className="text-xs text-purple-700 mt-1">
+                              {booking.returnInspection.repairEstimateNotes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {Array.isArray(booking.returnInspection.damagePhotos) &&
+                      booking.returnInspection.damagePhotos.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-2">
+                            Damage Photos
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {booking.returnInspection.damagePhotos.map((photo, idx) => (
+                              <img
+                                key={idx}
+                                src={photo}
+                                alt={`Damage ${idx + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border border-purple-200"
+                                onError={(e) => {
+                                  e.target.src = "https://via.placeholder.com/400x300.png?text=Image+Not+Found";
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </>
+                )}
+
+                {/* Penalty Required / Damage Found - Penalty Section */}
+                {booking.returnInspection.clearanceStatus === "penalty_required" && (
+                  <>
+                    {booking.returnInspection.penaltyAmount > 0 && (
+                      <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                        <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-1">
+                          Penalty Amount
+                        </p>
+                        <p className="text-lg font-black text-red-900">
+                          ₱{booking.returnInspection.penaltyAmount.toLocaleString()}
+                        </p>
+                        {booking.returnInspection.penaltySummary && (
+                          <p className="text-xs text-red-800 mt-2">
+                            {booking.returnInspection.penaltySummary}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {needsReupload && !booking.isDeleted && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
@@ -1401,7 +1690,182 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
             </div>
           )}
 
+          {canExtend && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-emerald-900">
+                    Extend your rental
+                  </p>
+                  <p className="text-xs text-emerald-800/80">
+                    Update the return schedule and see the new total instantly.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsExtending((prev) => !prev)}
+                  className="px-3 py-2 bg-[#171717] text-white text-xs sm:text-sm font-bold rounded-lg hover:brightness-110 transition-all"
+                >
+                  {isExtending ? "Hide" : "Extend"}
+                </button>
+              </div>
+
+              {isExtending && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2 bg-emerald-100/60 border border-emerald-200 rounded-lg p-3 text-xs">
+                    <p className="font-semibold text-emerald-900">Original Schedule</p>
+                    <div className="mt-1 text-emerald-900/80 flex flex-wrap gap-x-4 gap-y-1">
+                      <span>
+                        Pickup: {formatDate(booking.dates.pickup)}
+                        {booking.times.pickup && ` · ${formatTime(booking.times.pickup)}`}
+                      </span>
+                      <span>
+                        Return: {formatDate(originalReturnDateFromExtension || booking.dates.return)}
+                        {(originalReturnTimeFromExtension || booking.times.return) &&
+                          ` · ${formatTime(originalReturnTimeFromExtension || booking.times.return)}`}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
+                      New Return Date
+                    </label>
+                    <input
+                      type="date"
+                      value={extensionForm.returnDate}
+                      min={originalReturnDateInput}
+                      max={formatDateInput(sixMonthsFromToday())}
+                      onChange={(e) =>
+                        setExtensionForm((prev) => ({
+                          ...prev,
+                          returnDate: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
+                      New Return Time
+                    </label>
+                    <select
+                      value={extensionForm.returnTime}
+                      onChange={(e) =>
+                        setExtensionForm((prev) => ({
+                          ...prev,
+                          returnTime: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
+                    >
+                      <option value="">Select time</option>
+                      {ALL_TIME_SLOTS.map((slot) => (
+                        <option key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 bg-white border border-[#171717]/10 rounded-lg p-3">
+                    <p className="text-xs font-bold text-[#171717]/60 uppercase tracking-wider mb-2">
+                      Extension Price Preview
+                    </p>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#171717]/60">
+                          ₱{dailyRate.toLocaleString()} × {Math.max(extensionDays, 1)}d
+                        </span>
+                        <span className="font-semibold text-[#171717]">
+                          {formatPrice(dailyRate * Math.max(extensionDays, 1))}
+                        </span>
+                      </div>
+                      {booking.distanceFee > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#171717]/60">Distance Fee</span>
+                          <span className="font-semibold text-[#b50002]">
+                            +{formatPrice(booking.distanceFee)}
+                          </span>
+                        </div>
+                      )}
+                      {booking.helmetFee > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#171717]/60">Helmet Fee</span>
+                          <span className="font-semibold text-[#b50002]">
+                            +{formatPrice(booking.helmetFee)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="border-t border-[#171717]/15 pt-1 mt-1 flex items-center justify-between">
+                        <span className="font-bold text-[#171717]">Extension Total</span>
+                        <span className="font-black text-[#171717]">
+                          {formatPrice(extensionGrossTotal)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#171717]/60">Additional Due</span>
+                        <span className="font-semibold text-emerald-700">
+                          +{formatPrice(extensionAdditionalAmount)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900/80 mt-1">
+                        Extension fee is paid upon return.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center justify-end">
+                    <button
+                      onClick={submitExtension}
+                      disabled={extending}
+                      className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-600/30 hover:brightness-110 disabled:opacity-60"
+                    >
+                      {extending ? "Saving..." : "Confirm Extension"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Footer bar */}
+          {booking.status === "completed" && !booking.isDeleted && (
+            <div className="bg-[#f8f8f8] rounded-xl border border-black/10 p-3 mt-3">
+              <p className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide mb-2">
+                Your Review Status
+              </p>
+              {reviewLoading ? (
+                <p className="text-sm text-[#171717]/60">Loading review details...</p>
+              ) : bookingReview ? (
+                <>
+                  <p className="text-sm text-[#171717]">
+                    Review status: <span className="font-bold capitalize">{bookingReview.status || "pending"}</span>
+                  </p>
+                  {bookingReview.adminReplyMessage ? (
+                    <div className="mt-2 bg-white rounded-lg border border-[#b50002]/20 p-3">
+                      <p className="text-xs font-semibold text-[#b50002] uppercase tracking-wide mb-1">
+                        Admin Reply
+                      </p>
+                      <p className="text-sm text-[#171717] leading-relaxed">{bookingReview.adminReplyMessage}</p>
+                      {bookingReview.adminRepliedAt && (
+                        <p className="text-xs text-[#171717]/50 mt-2">
+                          Replied on {formatDateTime(bookingReview.adminRepliedAt)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#171717]/55 mt-1">
+                      No admin reply yet.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-[#171717]/60">
+                  No review submitted yet.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2 flex-wrap">
               <StatusBadge
@@ -1438,10 +1902,37 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onDownloadAgr
                 : "Rent Again"}
               <FaArrowRight className="text-xs" />
             </Link>
+                      {booking.status === "completed" && !booking.isDeleted && (
+                        <button
+                          onClick={() => {
+                            if (bookingReview) {
+                              setExpanded(true);
+                              return;
+                            }
+                            setShowReviewModal(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#fbbf24] text-[#171717] text-sm font-bold rounded-xl
+                                  shadow-lg shadow-[#fbbf24]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                          {bookingReview ? "View Review" : "⭐ Review"}
+                        </button>
+                      )}
           </div>
         </div>
       )}
+      
     </div>
+
+    {showReviewModal &&
+         createPortal(
+           <ReviewModal
+             booking={booking.raw}
+             onSuccess={fetchBookingReview}
+             onClose={() => setShowReviewModal(false)}
+           />,
+           document.body,
+         )}
+    </>
   );
 };
 
@@ -1681,6 +2172,39 @@ const MyBookings = () => {
     }
   }, []);
 
+  const extendBooking = useCallback(async (bookingId, payload) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      };
+
+      const response = await axios.patch(
+        `${API_BASE}/api/motorcycle-bookings/${bookingId}/extend`,
+        {
+          returnDate: payload.returnDate,
+          returnTime: payload.returnTime,
+        },
+        { headers },
+      );
+
+      const updated = normalizeBooking(
+        response?.data?.booking || response?.data || { _id: bookingId },
+      );
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? updated : b)),
+      );
+      await alertModal("Rental extended successfully.");
+    } catch (err) {
+      await alertModal(
+        err.response?.data?.message || "Failed to extend rental.",
+        { isError: true },
+      );
+      throw err;
+    }
+  }, []);
+
   const downloadRentalAgreement = useCallback(async (bookingId, customerName) => {
     try {
       const token = localStorage.getItem("token");
@@ -1722,6 +2246,19 @@ const MyBookings = () => {
       return acc;
     }, {});
   }, [bookings]);
+
+  const inspectionIssueCount = useMemo(
+    () =>
+      bookings.filter(
+        (booking) =>
+          !booking.isDeleted &&
+          booking.status === "inspection" &&
+          ["damage_found", "penalty_required"].includes(
+            booking.raw?.returnInspection?.clearanceStatus,
+          ),
+      ).length,
+    [bookings],
+  );
 
   const filteredBookings = useMemo(() => {
     if (activeTab === "rejected") return bookings.filter((b) => b.isDeleted);
@@ -1765,6 +2302,7 @@ const MyBookings = () => {
                     tab={tab}
                     isActive={activeTab === tab.key}
                     count={tabCounts[tab.key] || 0}
+                    issueCount={tab.key === "inspection" ? inspectionIssueCount : 0}
                     onClick={setActiveTab}
                   />
                 ))}
@@ -1855,6 +2393,7 @@ const MyBookings = () => {
                       onCancel={cancelBooking}
                       onReupload={reuploadPaymentProof}
                       onReschedule={rescheduleBooking}
+                      onExtend={extendBooking}
                       onDownloadAgreement={downloadRentalAgreement}
                     />
                   ))}

@@ -16,6 +16,7 @@ const motorcycleBookingSubSchema = new Schema(
         "pending_reservation",
         "pending_full_payment",
         "active",
+        "inspection",
         "completed",
         "cancelled",
       ],
@@ -55,7 +56,15 @@ const motorcycleSchema = new Schema({
   hasHelmet: { type: Boolean, default: true },
   status: {
     type: String,
-    enum: ["available", "pending", "rented", "maintenance"],
+    enum: [
+      "available",
+      "pending",
+      "rented",
+      "maintenance",
+      "inspection",
+      "under_review",
+      "repair_needed",
+    ],
     default: "available",
   },
   image: { type: String, default: "" },
@@ -83,6 +92,7 @@ motorcycleSchema.methods.isAvailableForRange = function (
     "pending_reservation",
     "pending_full_payment",
     "active",
+    "inspection",
   ]
 ) {
   if (!requestedPickup || !requestedReturn) return false;
@@ -115,6 +125,7 @@ motorcycleSchema.methods.getAvailabilitySummary = function (nowDate = new Date()
         "pending_reservation",
         "pending_full_payment",
         "active",
+          "inspection",
       ].includes(b.status),
     )
     .map((b) => ({
@@ -182,6 +193,7 @@ motorcycleSchema.statics.computeAvailabilityForMotorcycles = function (
           "pending_reservation",
           "pending_full_payment",
           "active",
+          "inspection",
         ].includes(b.status),
       )
       .map((b) => ({

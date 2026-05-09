@@ -104,7 +104,11 @@ const AddMotorcycle = () => {
         traccarDeviceId: data.traccarDeviceId || "",
       }).forEach(([k, v]) => formData.append(k, v));
       if (data.image) {
-        formData.append("image", data.image, data.image.name || "motorcycle-image");
+        formData.append(
+          "image",
+          data.image,
+          data.image.name || "motorcycle-image",
+        );
       }
 
       await api.post("/api/motorcycles", formData);
@@ -118,7 +122,9 @@ const AddMotorcycle = () => {
       resetForm();
     } catch (err) {
       toast.error(
-        err.response?.data?.message || err.message || "Failed to list motorcycle",
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to list motorcycle",
         {
           position: "top-right",
           autoClose: 4000,
@@ -156,7 +162,6 @@ const AddMotorcycle = () => {
 
       <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-[#d0d0d0] to-[#b9b9b9] backdrop-blur-md rounded-3xl shadow-2xl shadow-black/20 border border-[#171717]/10">
         <form onSubmit={handleSubmit} className={AddCarPageStyles.form}>
-
           {/* ── Row 1: Unit ID + Tracker ID side by side ── */}
           <div className="mb-5">
             <p className="text-xs font-black text-[#171717]/55 uppercase tracking-widest mb-2">
@@ -175,7 +180,10 @@ const AddMotorcycle = () => {
                   maxLength={30}
                 />
               </F>
-              <F icon={FaSatelliteDish} label="GPS Tracker ID (Traccar Device Unique ID)">
+              <F
+                icon={FaSatelliteDish}
+                label="GPS Tracker ID (Traccar Device Unique ID)"
+              >
                 <input
                   name="traccarDeviceId"
                   value={data.traccarDeviceId}
@@ -189,7 +197,8 @@ const AddMotorcycle = () => {
             </div>
             {data.traccarDeviceId && (
               <p className="text-xs text-[#171717]/50 mt-1.5 ml-1">
-                📡 This ID must match the device's unique ID registered in Traccar.
+                📡 This ID must match the device's unique ID registered in
+                Traccar.
               </p>
             )}
           </div>
@@ -212,7 +221,9 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Honda", "Yamaha", "Suzuki", "Kawasaki"].map((b) => (
-                      <option key={b} value={b}>{b}</option>
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
                     ))}
                   </select>
                 </F>
@@ -225,7 +236,9 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Scooter", "Naked", "Underbone"].map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
                 </F>
@@ -281,7 +294,9 @@ const AddMotorcycle = () => {
                     className={selectCls}
                   >
                     {["Unleaded", "Premium"].map((f) => (
-                      <option key={f} value={f}>{f}</option>
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
                     ))}
                   </select>
                 </F>
@@ -332,7 +347,10 @@ const AddMotorcycle = () => {
                       value={data.hasABS ? "yes" : "no"}
                       onChange={(e) =>
                         handleChange({
-                          target: { name: "hasABS", value: e.target.value === "yes" },
+                          target: {
+                            name: "hasABS",
+                            value: e.target.value === "yes",
+                          },
                         })
                       }
                       className={selectCls}
@@ -347,7 +365,10 @@ const AddMotorcycle = () => {
                       value={data.hasHelmet ? "yes" : "no"}
                       onChange={(e) =>
                         handleChange({
-                          target: { name: "hasHelmet", value: e.target.value === "yes" },
+                          target: {
+                            name: "hasHelmet",
+                            value: e.target.value === "yes",
+                          },
                         })
                       }
                       className={selectCls}
@@ -393,7 +414,9 @@ const AddMotorcycle = () => {
                           />
                         </svg>
                         <p className={AddCarPageStyles.imageUploadText}>
-                          <span className={AddCarPageStyles.imageUploadTextSemibold}>
+                          <span
+                            className={AddCarPageStyles.imageUploadTextSemibold}
+                          >
                             Click to upload
                           </span>{" "}
                           or drag and drop
@@ -436,7 +459,9 @@ const AddMotorcycle = () => {
               className="px-8 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-sm text-white bg-[#171717] shadow-lg shadow-[#171717]/25 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 focus:outline-none"
             >
               <FaMotorcycle style={{ fontSize: 14 }} />
-              <span className={AddCarPageStyles.buttonText}>Add Motorcycle</span>
+              <span className={AddCarPageStyles.buttonText}>
+                Add Motorcycle
+              </span>
             </button>
           </div>
         </form>

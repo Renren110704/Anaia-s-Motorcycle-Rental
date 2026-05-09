@@ -11,12 +11,14 @@ import {
   releaseCheckoutLock,
   updateMotorcycleBooking, 
   updateMotorcycleBookingStatus, 
+  updateReturnInspection,
   restoreMotorcycleBooking,
   permanentDeleteMotorcycleBooking,
   confirmFullPayment, 
   requestBookingProofReupload,
   reuploadBookingPaymentProof,
   downloadRentalAgreement,
+  extendMotorcycleBooking,
 } from '../controllers/motorcycleBookingController.js'
 import { uploads } from '../middlewares/uploads.js';
 
@@ -31,9 +33,18 @@ motorcycleBookingRouter.get('/mybooking', authMiddleware, getMyMotorcycleBooking
 motorcycleBookingRouter.get('/:bookingId/rental-agreement', downloadRentalAgreement);
 motorcycleBookingRouter.put('/:id', uploads.single('motorcycleImage'), updateMotorcycleBooking); 
 motorcycleBookingRouter.patch('/:id/status', updateMotorcycleBookingStatus); 
+motorcycleBookingRouter.patch(
+  '/:id/return-inspection',
+  uploads.fields([
+    { name: 'damagePhotos', maxCount: 8 },
+    { name: 'repairAttachments', maxCount: 5 },
+  ]),
+  updateReturnInspection,
+);
 motorcycleBookingRouter.patch('/:id/confirm-payment', confirmFullPayment);
 motorcycleBookingRouter.patch('/:id/request-reupload', requestBookingProofReupload);
 motorcycleBookingRouter.patch('/:id/reupload-proof', authMiddleware, uploads.single('paymentProofImage'), reuploadBookingPaymentProof);
+motorcycleBookingRouter.patch('/:id/extend', authMiddleware, extendMotorcycleBooking);
 motorcycleBookingRouter.delete('/:id', deleteMotorcycleBooking); 
 motorcycleBookingRouter.delete('/:id/location-log', deleteMotorcycleBookingLocationLog);
 motorcycleBookingRouter.patch('/:id/restore', restoreMotorcycleBooking);

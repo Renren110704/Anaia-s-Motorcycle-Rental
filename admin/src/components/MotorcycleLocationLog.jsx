@@ -12,7 +12,10 @@ import {
   FaMotorcycle,
   FaSync,
   FaTrash,
+  FaIdBadge,
+  FaSatelliteDish,
 } from "react-icons/fa";
+import { AlertTriangle, MapPin, Clock, Trash2 } from "lucide-react";
 
 const BASE = API_BASE_URL;
 const STORAGE_KEY = "motorcycleLocationLogV1";
@@ -22,6 +25,11 @@ const api = axios.create({
   headers: { Accept: "application/json" },
 });
 
+// ── Shared styles (same as ManageMotorcycle) ──────────────────────────────────
+const labelCls =
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const parseDate = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -42,75 +50,111 @@ const formatTimestamp = (value) => {
 const buildLocationText = (record) => {
   if (record?.resolvedLocation) return record.resolvedLocation;
   if (record?.locationText) return record.locationText;
-
   const lat = Number(record?.lat);
   const lng = Number(record?.lng);
-  if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+  if (!Number.isNaN(lat) && !Number.isNaN(lng))
     return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  }
-
   return "No location data available";
 };
 
 const getLocationLogPriority = (log) => {
-  const source = String(log?.source || "").trim().toLowerCase();
+  const source = String(log?.source || "")
+    .trim()
+    .toLowerCase();
   if (source === "traccar live" || source === "live gps") return 1;
   if (source === "gps snapshot" || source === "booking gps") return 2;
   if (source === "booking destination") return 3;
   return 4;
 };
 
-const getEntryLookupKey = (log) => {
-  return String(log?.unitId || log?.id || log?.bookingId || log?.motorcycleId || "").trim();
-};
+const getEntryLookupKey = (log) =>
+  String(
+    log?.unitId || log?.id || log?.bookingId || log?.motorcycleId || "",
+  ).trim();
 
 const getPreferredLog = (current, candidate) => {
   if (!current) return candidate;
   if (!candidate) return current;
-
-  const currentPriority = getLocationLogPriority(current);
-  const candidatePriority = getLocationLogPriority(candidate);
-  if (candidatePriority !== currentPriority) {
-    return candidatePriority < currentPriority ? candidate : current;
-  }
-
-  const currentTime = parseDate(current.lastUpdatedAt)?.getTime() || 0;
-  const candidateTime = parseDate(candidate.lastUpdatedAt)?.getTime() || 0;
-  return candidateTime >= currentTime ? candidate : current;
+  const cp = getLocationLogPriority(current);
+  const dp = getLocationLogPriority(candidate);
+  if (dp !== cp) return dp < cp ? candidate : current;
+  const ct = parseDate(current.lastUpdatedAt)?.getTime() || 0;
+  const dt = parseDate(candidate.lastUpdatedAt)?.getTime() || 0;
+  return dt >= ct ? candidate : current;
 };
 
-const isProtectedLiveTrackerLog = (log) => {
-  const source = String(log?.source || "").toLowerCase();
-  return source === "traccar live";
+// ── Source badge ──────────────────────────────────────────────────────────────
+const SourceBadge = ({ source }) => {
+  const s = String(source || "").toLowerCase();
+  const isLive = s === "traccar live" || s === "live gps";
+  const isGps = s === "gps snapshot" || s === "booking gps";
+  if (isLive)
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-violet-50 text-violet-600 border-violet-200">
+        <FaSatelliteDish className="text-[10px]" /> Traccar Live
+      </span>
+    );
+  if (isGps)
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-blue-50 text-blue-600 border-blue-200">
+        <MapPin className="w-3 h-3" /> GPS Snapshot
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-slate-50 text-slate-500 border-slate-200">
+      {source || "—"}
+    </span>
+  );
 };
 
+// ── Status badge ──────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const s = String(status || "").toLowerCase();
+  const styles =
+    s === "active"
+      ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+      : s === "completed"
+        ? "bg-blue-50 text-blue-600 border-blue-200"
+        : "bg-slate-50 text-slate-500 border-slate-200";
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${styles}`}
+    >
+      {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown"}
+    </span>
+  );
+};
+
+// ── Confirm Modal (same structure as ManageMotorcycle's ConfirmModal) ─────────
 const ConfirmModal = ({ message, onConfirm, onCancel }) => (
   <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
     onClick={onCancel}
   >
     <div
-      className="bg-[#f4f3f3] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#171717]/10"
+      className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="text-center">
-        <div className="mx-auto flex items-center justify-center h-16 w-16">
-          <FaExclamationTriangle className="h-8 w-8 text-[#b50002]" />
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertTriangle className="w-6 h-6 text-[#b50002]" />
         </div>
-        <h3 className="text-xl font-bold text-[#171717] mb-2">Confirm Delete</h3>
-        <p className="text-[#171717] mb-6">{message}</p>
+        <h3 className="text-lg font-black text-[#171717] mb-2">
+          Confirm Delete
+        </h3>
+        <p className="text-slate-500 text-sm mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
+            className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
           >
-            Yes
+            Yes, Delete
           </button>
         </div>
       </div>
@@ -120,15 +164,14 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => (
 
 const confirmModal = (message) =>
   new Promise((resolve) => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = ReactDOM.createRoot(container);
-    const cleanup = (result) => {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const root = ReactDOM.createRoot(el);
+    const cleanup = (r) => {
       root.unmount();
-      document.body.removeChild(container);
-      resolve(result);
+      document.body.removeChild(el);
+      resolve(r);
     };
-
     root.render(
       <ConfirmModal
         message={message}
@@ -138,6 +181,42 @@ const confirmModal = (message) =>
     );
   });
 
+// ── Skeleton row ──────────────────────────────────────────────────────────────
+const SkeletonRow = () => (
+  <tr>
+    {[...Array(7)].map((_, i) => (
+      <td key={i} className="px-5 py-3.5">
+        <div
+          className="h-4 bg-slate-100 rounded-lg animate-pulse"
+          style={{ width: `${50 + i * 8}%` }}
+        />
+      </td>
+    ))}
+  </tr>
+);
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+const EmptyState = ({ onRefresh }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12 text-center">
+    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <FaMotorcycle className="text-slate-200 text-3xl" />
+    </div>
+    <h3 className="font-black text-[#171717] text-lg mb-1">
+      No location history yet
+    </h3>
+    <p className="text-slate-400 text-sm mb-4">
+      Start GPS tracking or refresh after active booking updates.
+    </p>
+    <button
+      onClick={onRefresh}
+      className="px-5 py-2 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+    >
+      Refresh
+    </button>
+  </div>
+);
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const MotorcycleLocationLog = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -146,16 +225,13 @@ const MotorcycleLocationLog = () => {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
       const res = await api.get("/api/tracking/location-log", {
         params: { limit: 300 },
       });
-
       const rows = Array.isArray(res.data)
         ? res.data
         : res.data?.data || res.data?.logs || [];
-
       setLogs(Array.isArray(rows) ? rows : []);
     } catch (err) {
       console.error(err);
@@ -172,7 +248,6 @@ const MotorcycleLocationLog = () => {
         "Would you like to delete this location record?",
       );
       if (!confirmed) return;
-
       try {
         await api.delete("/api/tracking/location-log", {
           data: {
@@ -182,7 +257,6 @@ const MotorcycleLocationLog = () => {
             unitId: log.unitId || "",
           },
         });
-
         const raw = localStorage.getItem(STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
         const existing = Array.isArray(parsed)
@@ -190,7 +264,6 @@ const MotorcycleLocationLog = () => {
           : Object.values(parsed || {});
         const targetKey =
           log.id || log.unitId || log.motorcycleId || log.bookingId;
-
         const next = existing.filter((entry) => {
           const entryKey =
             entry.id || entry.unitId || entry.motorcycleId || entry.bookingId;
@@ -206,7 +279,6 @@ const MotorcycleLocationLog = () => {
             entry.bookingId === log.bookingId
           );
         });
-
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         await loadLogs();
       } catch (err) {
@@ -220,24 +292,18 @@ const MotorcycleLocationLog = () => {
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
-
   useEffect(() => {
-    const timer = setInterval(() => {
-      loadLogs();
-    }, 10000);
+    const timer = setInterval(loadLogs, 10000);
     return () => clearInterval(timer);
   }, [loadLogs]);
 
   const filteredLogs = useMemo(() => {
     const bestLogByUnit = new Map();
-
     logs.forEach((log) => {
       const key = getEntryLookupKey(log);
       if (!key) return;
-      const current = bestLogByUnit.get(key);
-      bestLogByUnit.set(key, getPreferredLog(current, log));
+      bestLogByUnit.set(key, getPreferredLog(bestLogByUnit.get(key), log));
     });
-
     return Array.from(bestLogByUnit.values());
   }, [logs]);
 
@@ -251,157 +317,259 @@ const MotorcycleLocationLog = () => {
     [filteredLogs],
   );
 
+  const liveCount = sortedLogs.filter((l) => {
+    const s = String(l.source || "").toLowerCase();
+    return s === "traccar live" || s === "live gps";
+  }).length;
+
+  const gpsCount = sortedLogs.filter((l) => {
+    const s = String(l.source || "").toLowerCase();
+    return s === "gps snapshot" || s === "booking gps";
+  }).length;
+
   return (
-    <div className="min-h-screen pt-32 bg-[#e3e3e3] text-[#171717] py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-4 rounded-3xl bg-gradient-to-br from-[#171717] via-[#212121] to-[#b50002] p-4 sm:p-5 border border-white/10 mt-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
+        {/* Header — matches ManageMotorcycle */}
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] font-black text-[#b9b9b9]/80 mb-1">
-              Fallback Tracking
-            </p>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Motorcycle Location Log
             </h1>
-            <p className="text-xs sm:text-sm text-[#b9b9b9]/80 mt-1.5 max-w-2xl">
-              Last known location snapshots per unit. Use this if live GPS is unavailable or the
-              tracker is destroyed.
+            <p className="text-slate-400 text-sm mt-1">
+              Last known location snapshots per unit · refreshes every 10
+              seconds
             </p>
           </div>
-
           <div className="flex items-center gap-2">
             <Link
-              to="/manage-motorcycles"
-              className="flex items-center justify-center gap-2 py-2.5 px-4 bg-[#b9b9b9] text-[#171717] font-bold text-sm rounded-xl shadow-lg shadow-black/20 hover:bg-[#a8a8a8] transition-all"
-            >
-              <FaArrowLeft /> Back
-            </Link>
-            <Link
               to="/motorcycle-tracking"
-              className="flex items-center justify-center gap-2 py-2.5 px-4 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-black/30 hover:brightness-110 transition-all"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all"
             >
-              <FaMapMarkedAlt /> View Locations
+              <FaMapMarkedAlt className="text-xs" /> Live Map
             </Link>
             <button
               onClick={loadLogs}
-              className="flex items-center justify-center gap-2 py-2.5 px-4 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-black/30 hover:brightness-110 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
             >
-              <FaSync /> Refresh
+              <FaSync className="text-xs" /> Refresh
             </button>
+            <Link
+              to="/manage-motorcycles"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all"
+            >
+              <FaArrowLeft className="text-xs" /> Back
+            </Link>
           </div>
         </div>
-      </div>
 
-      <div className="mb-5 flex items-center gap-2 text-sm bg-[#b9b9b9] rounded-xl px-4 py-3 shadow-lg shadow-black/20">
-        <FaExclamationTriangle className="text-[#b50002]" />
-        Entries show the newest known location per unit and when that location was last updated.
-      </div>
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          {[
+            {
+              label: "Total Entries",
+              value: loading ? null : sortedLogs.length,
+              sub: "Unique units logged",
+              subColor: "text-slate-400",
+              accent: "bg-blue-500",
+              icon: FaMotorcycle,
+            },
+            {
+              label: "Live GPS",
+              value: loading ? null : liveCount,
+              sub: "Traccar transmitting",
+              subColor: "text-violet-500",
+              accent: "bg-violet-500",
+              icon: FaSatelliteDish,
+            },
+            {
+              label: "GPS Snapshots",
+              value: loading ? null : gpsCount,
+              sub: "Last known position",
+              subColor: "text-blue-500",
+              accent: "bg-emerald-500",
+              icon: MapPin,
+            },
+          ].map(({ label, value, sub, subColor, accent, icon: Icon }) => (
+            <div
+              key={label}
+              className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 overflow-hidden"
+            >
+              <div
+                className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
+              />
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+                  {label}
+                </p>
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10`}
+                >
+                  <Icon
+                    className={`w-4 h-4 ${accent.replace("bg-", "text-")}`}
+                  />
+                </div>
+              </div>
+              <p className="text-[2.2rem] font-black text-[#171717] leading-none mb-2">
+                {value === null ? (
+                  <span className="inline-block w-10 h-7 bg-slate-100 rounded-lg animate-pulse" />
+                ) : (
+                  value
+                )}
+              </p>
+              <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>
+            </div>
+          ))}
+        </div>
 
-      {loading ? (
-        <div className="bg-[#b9b9b9] rounded-2xl p-10 text-center shadow-lg shadow-black/20 font-semibold">
-          Loading location log...
-        </div>
-      ) : error ? (
-        <div className="bg-red-100 border border-red-300 text-red-800 rounded-2xl p-6 shadow-lg shadow-red-200/30">
-          {error}
-        </div>
-      ) : sortedLogs.length === 0 ? (
-        <div className="bg-[#b9b9b9] rounded-2xl p-10 text-center shadow-lg shadow-black/20">
-          <FaMotorcycle className="mx-auto text-4xl text-[#171717]/30 mb-3" />
-          <p className="font-bold text-[#171717]">No location history yet</p>
-          <p className="text-sm text-[#171717]/60 mt-1">
-            Start GPS tracking or refresh this page after active booking updates.
+        {/* Info banner */}
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          </div>
+          <p className="text-[12px] font-semibold text-amber-700">
+            Entries show the newest known location per unit. Use this if live
+            GPS is unavailable or the tracker is destroyed.
           </p>
         </div>
-      ) : (
-        <div className="rounded-2xl overflow-hidden shadow-lg shadow-black/20">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse">
-              <thead>
-                <tr className="bg-[#171717]">
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Unit
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Motorcycle
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Last Known Location
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Last Updated
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Source
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Booking
-                  </th>
-                  <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#b9b9b9]">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedLogs.map((log, idx) => (
-                  <tr
-                    key={`${log.id}-${idx}`}
-                    className={`${idx % 2 === 0 ? "bg-[#b9b9b9]" : "bg-[#c4c4c4]"} border-b border-[#171717]/10`}
-                  >
-                    <td className="px-4 py-4 text-sm font-bold text-[#171717]">
-                      {log.unitId || "—"}
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-bold text-[#171717]">{log.motorcycleName}</p>
-                      <p className="text-xs text-[#171717]/60 mt-1">{log.customer || "No rider info"}</p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-start gap-2 text-sm text-[#171717]">
-                        <FaMapMarkerAlt className="text-[#b50002] mt-0.5" />
-                        <span>{buildLocationText(log)}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2 text-sm text-[#171717]">
-                        <FaClock className="text-[#b50002]" />
-                        <span>{formatTimestamp(log.lastUpdatedAt)}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-[#171717]">{log.source || "—"}</td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                          log.status === "active"
-                            ? "bg-green-900/30 text-green-800 border border-green-800/30"
-                            : log.status === "completed"
-                              ? "bg-blue-900/30 text-blue-800 border border-blue-800/30"
-                              : "bg-[#171717]/10 text-[#171717] border border-[#171717]/20"
-                        }`}
-                      >
-                        {log.status || "unknown"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      {isProtectedLiveTrackerLog(log) ? (
-                        <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[#171717]/20 text-[#171717]/60 text-xs font-bold border border-[#171717]/20">
-                          Protected
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => deleteLogEntry(log)}
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-800 text-white text-xs font-bold hover:bg-red-700 transition-colors shadow-lg shadow-black/20"
-                          title="Delete location log entry"
-                        >
-                          <FaTrash /> Delete
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4">
+            <FaExclamationTriangle className="text-[#b50002] flex-shrink-0" />
+            <p className="text-[12px] font-semibold text-[#b50002]">{error}</p>
+          </div>
+        )}
+
+        {/* Table */}
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <tbody className="divide-y divide-slate-50">
+                {[...Array(5)].map((_, i) => (
+                  <SkeletonRow key={i} />
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : sortedLogs.length === 0 ? (
+          <EmptyState onRefresh={loadLogs} />
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-slate-50">
+                    {[
+                      "Unit",
+                      "Motorcycle",
+                      "Last Known Location",
+                      "Last Updated",
+                      "Source",
+                      "Booking",
+                      "Action",
+                    ].map((col) => (
+                      <th
+                        key={col}
+                        className="text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {sortedLogs.map((log, idx) => (
+                    <tr
+                      key={`${log.id}-${idx}`}
+                      className="hover:bg-slate-50/60 transition-colors"
+                    >
+                      {/* Unit */}
+                      <td className="px-5 py-3.5">
+                        {log.unitId ? (
+                          <span className="text-[11px] font-black text-[#b50002] tracking-wider uppercase">
+                            {log.unitId}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-sm">—</span>
+                        )}
+                      </td>
+
+                      {/* Motorcycle */}
+                      <td className="px-5 py-3.5">
+                        <p className="font-black text-[13px] text-[#171717] leading-tight">
+                          {log.motorcycleName}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {log.customer || "No rider info"}
+                        </p>
+                      </td>
+
+                      {/* Location */}
+                      <td className="px-5 py-3.5 max-w-[220px]">
+                        <div className="flex items-start gap-2">
+                          <FaMapMarkerAlt className="text-[#b50002] text-[11px] mt-0.5 flex-shrink-0" />
+                          <span className="text-[13px] text-slate-600 break-words">
+                            {buildLocationText(log)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Last Updated */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                          <span className="text-[12px] text-slate-500">
+                            {formatTimestamp(log.lastUpdatedAt)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Source */}
+                      <td className="px-5 py-3.5">
+                        <SourceBadge source={log.source} />
+                      </td>
+
+                      {/* Booking status */}
+                      <td className="px-5 py-3.5">
+                        <StatusBadge status={log.status} />
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-5 py-3.5">
+                        <button
+                          onClick={() => deleteLogEntry(log)}
+                          title="Delete location log entry"
+                          className="p-1.5 rounded-lg bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer count */}
+            <div className="px-5 py-3 border-t border-slate-50 flex items-center justify-between">
+              <p className="text-[11px] text-slate-400 font-semibold">
+                Showing{" "}
+                <span className="text-[#171717] font-black">
+                  {sortedLogs.length}
+                </span>{" "}
+                {sortedLogs.length === 1 ? "entry" : "entries"}
+              </p>
+              <button
+                onClick={loadLogs}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-[#b50002] transition-colors"
+              >
+                <FaSync className="text-[10px]" /> Refresh
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -8,6 +8,7 @@ import Profile from "./pages/Profile";
 import ContactPage from "./pages/ContactPage";
 import MotorcyclePage from "./pages/MotorcyclePage";
 import MotorcycleDetailPage from "./pages/MotorcycleDetailPage";
+import CalendarPage from "./pages/CalendarPage";
 import { FaArrowUp } from "react-icons/fa";
 import MyBooking from "./pages/MyBooking";
 
@@ -54,6 +55,7 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/motorcycles" element={<MotorcyclePage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
 
         <Route
           path="/motorcycles/:id"

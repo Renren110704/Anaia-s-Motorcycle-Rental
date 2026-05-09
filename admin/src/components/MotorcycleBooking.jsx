@@ -10,6 +10,7 @@ import {
   FaChevronRight,
   FaChevronUp,
   FaClock,
+  FaClipboardCheck,
   FaCog,
   FaCreditCard,
   FaEdit,
@@ -33,11 +34,28 @@ import {
   FaBan,
   FaUpload,
 } from "react-icons/fa";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  RotateCcw,
+  Trash2,
+  XCircle,
+  ClipboardList,
+  Ban,
+  Upload,
+} from "lucide-react";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
 const ITEMS_PER_PAGE = 10;
+
+// ── Shared styles (matching ManageMotorcycle) ─────────────────────────────────
+const labelCls =
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const nextSortState = (cur) =>
@@ -54,167 +72,6 @@ const formatTime = (timeStr) => {
   return `${displayHour}:${min} ${period}`;
 };
 
-// ── Modal helpers ─────────────────────────────────────────────────────────────
-const ModalShell = ({ onBackdropClick, children }) => (
-  <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
-    onClick={onBackdropClick}
-  >
-    <div
-      className="bg-[#f4f3f3] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#171717]/10"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {children}
-    </div>
-  </div>
-);
-
-const ConfirmModal = ({
-  message,
-  onConfirm,
-  onCancel,
-  isPermanent,
-  confirmLabel,
-}) => (
-  <ModalShell onBackdropClick={onCancel}>
-    <div className="text-center">
-      <div className="mx-auto flex items-center justify-center h-16 w-16">
-        <FaExclamationTriangle
-          className={`h-8 w-8 ${isPermanent ? "text-[#b50002]" : "text-[#b50002]"}`}
-        />
-      </div>
-      <h3 className="text-xl font-bold text-[#171717] mb-2">
-        {isPermanent ? "Permanent Action" : "Confirm Action"}
-      </h3>
-      <p className="text-[#171717] mb-6">{message}</p>
-      <div className="flex space-x-3">
-        <button
-          onClick={onCancel}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onConfirm}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-        >
-          {confirmLabel ?? (isPermanent ? "Reject Forever" : "Confirm")}
-        </button>
-      </div>
-    </div>
-  </ModalShell>
-);
-
-const AlertModal = ({ message, onClose, isError }) => (
-  <ModalShell onBackdropClick={onClose}>
-    <div className="text-center">
-      <div className="mx-auto flex items-center justify-center h-16 w-16">
-        {isError ? (
-          <FaExclamationTriangle className="h-8 w-8 text-[#b50002]" />
-        ) : (
-          <FaCheckCircle className="h-8 w-8 text-green-500" />
-        )}
-      </div>
-      <h3 className="text-xl font-bold text-[#171717] mb-2">
-        {isError ? "Error" : "Notice"}
-      </h3>
-      <p className="text-[#171717] mb-6">{message}</p>
-      <button
-        onClick={onClose}
-        className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-      >
-        OK
-      </button>
-    </div>
-  </ModalShell>
-);
-
-const ReuploadCommentModal = ({
-  defaultValue,
-  onCancel,
-  onSubmit,
-  submitting,
-}) => {
-  const [comment, setComment] = useState(defaultValue || "");
-
-  return (
-    <ModalShell onBackdropClick={onCancel}>
-      <h3 className="text-xl font-bold text-[#171717] mb-2">
-        Request Proof Re-upload
-      </h3>
-      <p className="text-sm text-[#171717]/70 mb-3">
-        Enter a clear reason so the renter knows what to fix.
-      </p>
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        rows={4}
-        className="w-full bg-[#c7c5c5] text-sm px-3 py-2 rounded-lg mb-4 focus:outline-none focus:ring-1 focus:ring-[#171717] text-[#171717] resize-none"
-        placeholder="Please re-upload a clearer payment receipt."
-      />
-      <div className="flex gap-3">
-        <button
-          onClick={onCancel}
-          disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => onSubmit(comment)}
-          disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
-        >
-          {submitting ? "Sending..." : "Send Request"}
-        </button>
-      </div>
-    </ModalShell>
-  );
-};
-
-const confirmModal = (message, { isPermanent = false, confirmLabel } = {}) =>
-  new Promise((resolve) => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = ReactDOM.createRoot(container);
-    const cleanup = (r) => {
-      root.unmount();
-      document.body.removeChild(container);
-      resolve(r);
-    };
-    root.render(
-      <ConfirmModal
-        message={message}
-        isPermanent={isPermanent}
-        confirmLabel={confirmLabel}
-        onConfirm={() => cleanup(true)}
-        onCancel={() => cleanup(false)}
-      />,
-    );
-  });
-
-const alertModal = (message, { isError = false } = {}) =>
-  new Promise((resolve) => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = ReactDOM.createRoot(container);
-    const cleanup = () => {
-      root.unmount();
-      document.body.removeChild(container);
-      resolve();
-    };
-    root.render(
-      <AlertModal message={message} isError={isError} onClose={cleanup} />,
-    );
-  });
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-// Date only — used for pickup / return columns
 const formatDate = (s) => {
   if (!s) return "—";
   const d = new Date(s);
@@ -222,7 +79,6 @@ const formatDate = (s) => {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
 
-// Date + time — used for "Booked on" so the exact timestamp is visible
 const formatDateTime = (s) => {
   if (!s) return "—";
   const d = new Date(s);
@@ -240,24 +96,18 @@ const makeImageUrl = (filename) => {
   const s = String(filename).trim();
   if (!s) return "";
   if (/^data:image\//i.test(s)) return s;
-  if (/^https?:\/\//i.test(s)) return s; // Cloudinary full URLs pass through here ✅
-  // Handle Cloudinary partial URLs
-  if (s.startsWith('/dxta0nmdy/') || s.startsWith('dxta0nmdy/')) {
-    return `https://res.cloudinary.com/${s.replace(/^\/+/, '')}`;
-  }
-  // For local fallback paths, use API_BASE_URL (same as client)
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/dxta0nmdy/") || s.startsWith("dxta0nmdy/"))
+    return `https://res.cloudinary.com/${s.replace(/^\/+/, "")}`;
   const cleanPath = s.replace(/^\/+/, "").replace(/^uploads\//, "");
   return `${API_BASE_URL}/uploads/${cleanPath}`;
 };
 
 const normalizeDetails = (d = {}, motorcycle = {}) => ({
-  // Spec fields: prefer details object, then fall back to motorcycle snapshot.
-  // motorcycleInfo uses key "fuel" (mapped from fuelType), so check both.
   fuel: d.fuelType || d.fuel || motorcycle.fuel || motorcycle.fuelType || "",
   engineSize: d.engineSize ?? motorcycle.engineSize ?? "",
   transmission: d.transmission || motorcycle.transmission || "",
   hasABS: d.hasABS ?? motorcycle.hasABS ?? false,
-  // Fee fields — stored in details by the booking form
   distanceFee: d.distanceFee != null ? Number(d.distanceFee) : null,
   distanceTierLabel: d.distanceTierLabel ?? "",
   helmetRequested: !!d.helmetRequested,
@@ -333,109 +183,292 @@ const paymentLabel = (ps) => {
   return "Pending";
 };
 
-// ── Stat Tab ──────────────────────────────────────────────────────────────────
-const StatTab = ({
-  title,
+const getAllowedNextStatuses = (currentStatus) => {
+  switch (currentStatus) {
+    case "pending_reservation":
+    case "pending_full_payment":
+    case "pending":
+      return ["cancelled"];
+    case "active":
+      return ["inspection"];
+    default:
+      return [];
+  }
+};
+
+// ── Confirm Modal (ManageMotorcycle style) ────────────────────────────────────
+const ConfirmModal = ({
+  message,
+  onConfirm,
+  onCancel,
+  isPermanent,
+  confirmLabel,
+}) => (
+  <div
+    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    onClick={onCancel}
+  >
+    <div
+      className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-center">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertTriangle className="w-6 h-6 text-[#b50002]" />
+        </div>
+        <h3 className="text-lg font-black text-[#171717] mb-2">
+          {isPermanent ? "Permanent Action" : "Confirm Action"}
+        </h3>
+        <p className="text-slate-500 text-sm mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+          >
+            {confirmLabel ?? (isPermanent ? "Delete Forever" : "Confirm")}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const AlertModal = ({ message, onClose, isError }) => (
+  <div
+    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <div
+      className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-center">
+        <div
+          className={`mx-auto w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${isError ? "bg-red-50" : "bg-emerald-50"}`}
+        >
+          {isError ? (
+            <AlertTriangle className="w-6 h-6 text-[#b50002]" />
+          ) : (
+            <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+          )}
+        </div>
+        <h3 className="text-lg font-black text-[#171717] mb-2">
+          {isError ? "Error" : "Notice"}
+        </h3>
+        <p className="text-slate-500 text-sm mb-6">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl bg-[#171717] text-white font-bold text-sm hover:brightness-110 transition-all"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const ReuploadCommentModal = ({
+  defaultValue,
+  onCancel,
+  onSubmit,
+  submitting,
+}) => {
+  const [comment, setComment] = useState(defaultValue || "");
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+      onClick={!submitting ? onCancel : undefined}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center mb-4">
+          <Upload className="w-6 h-6 text-orange-500" />
+        </div>
+        <h3 className="text-lg font-black text-[#171717] mb-1">
+          Request Re-upload
+        </h3>
+        <p className="text-slate-400 text-sm mb-4">
+          Enter a clear reason so the renter knows what to fix.
+        </p>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={4}
+          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none mb-4"
+          placeholder="Please re-upload a clearer payment receipt."
+        />
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={submitting}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(comment)}
+            disabled={submitting}
+            className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all disabled:opacity-60"
+          >
+            {submitting ? "Sending..." : "Send Request"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const confirmModal = (message, { isPermanent = false, confirmLabel } = {}) =>
+  new Promise((resolve) => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = ReactDOM.createRoot(container);
+    const cleanup = (r) => {
+      root.unmount();
+      document.body.removeChild(container);
+      resolve(r);
+    };
+    root.render(
+      <ConfirmModal
+        message={message}
+        isPermanent={isPermanent}
+        confirmLabel={confirmLabel}
+        onConfirm={() => cleanup(true)}
+        onCancel={() => cleanup(false)}
+      />,
+    );
+  });
+
+const alertModal = (message, { isError = false } = {}) =>
+  new Promise((resolve) => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = ReactDOM.createRoot(container);
+    const cleanup = () => {
+      root.unmount();
+      document.body.removeChild(container);
+      resolve();
+    };
+    root.render(
+      <AlertModal message={message} isError={isError} onClose={cleanup} />,
+    );
+  });
+
+// ── Stat Card (identical to ManageMotorcycle) ─────────────────────────────────
+const StatCard = ({
+  label,
   value,
+  sub,
+  subColor,
   icon: Icon,
-  isActive,
+  accent,
   onClick,
-  accentColor,
-  subtitle,
+  isActive,
+  loading,
 }) => (
   <button
     onClick={onClick}
-    className={`
-      flex-1 min-w-[130px] flex items-center justify-between px-5 py-4 rounded-2xl
-      transition-all duration-200 cursor-pointer shadow-lg shadow-black/20
-      ${
-        isActive
-          ? "bg-[#171717] scale-[1.02] shadow-xl shadow-black/30"
-          : "bg-[#b9b9b9] hover:bg-[#a8a8a8] hover:scale-[1.01]"
-      }
-    `}
+    className={`relative text-left bg-white rounded-2xl border shadow-sm p-5 overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full
+      ${isActive ? "border-[#b50002]/30" : "border-slate-100"}`}
   >
-    <div className="text-left">
-      <p
-        className={`text-xs font-bold uppercase tracking-widest mb-1 ${isActive ? "text-[#b9b9b9]" : "text-[#171717]/60"}`}
-      >
-        {title}
-      </p>
-      <p
-        className={`text-2xl font-bold ${isActive ? "text-white" : "text-[#171717]"}`}
-      >
-        {value}
-      </p>
-      {subtitle && (
-        <p
-          className={`text-xs mt-0.5 font-semibold ${isActive ? "text-[#b9b9b9]/70" : "text-[#171717]/50"}`}
-        >
-          {subtitle}
-        </p>
-      )}
-    </div>
     <div
-      className={`p-3 rounded-xl ${isActive ? "bg-white/10" : "bg-[#171717]/5"}`}
-    >
-      <Icon
-        className={`text-2xl ${isActive ? accentColor || "text-white" : "text-[#171717]"}`}
-      />
+      className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
+    />
+    <div className="flex items-start justify-between mb-3">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+        {label}
+      </p>
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10`}
+      >
+        <Icon className={`w-4 h-4 ${accent.replace("bg-", "text-")}`} />
+      </div>
     </div>
+    <p className="text-[2.2rem] font-black text-[#171717] leading-none mb-2">
+      {loading ? (
+        <span className="inline-block w-10 h-7 bg-slate-100 rounded-lg animate-pulse" />
+      ) : (
+        value
+      )}
+    </p>
+    <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>
   </button>
 );
 
-// ── Sort icon ─────────────────────────────────────────────────────────────────
+// ── Sort Icon ─────────────────────────────────────────────────────────────────
 const SortIcon = ({ state }) => {
   if (state === "asc")
     return (
-      <FaChevronUp className="text-[#b50002] text-xs ml-1 flex-shrink-0" />
+      <FaChevronUp className="text-[#b50002] text-[10px] ml-1 flex-shrink-0" />
     );
   if (state === "desc")
     return (
-      <FaChevronDown className="text-[#b50002] text-xs ml-1 flex-shrink-0" />
+      <FaChevronDown className="text-[#b50002] text-[10px] ml-1 flex-shrink-0" />
     );
-  return <FaSort className="text-[#b9b9b9]/40 text-xs ml-1 flex-shrink-0" />;
+  return <FaSort className="text-slate-300 text-[10px] ml-1 flex-shrink-0" />;
 };
 
-// ── Pagination ────────────────────────────────────────────────────────────────
+// ── Skeleton Row ──────────────────────────────────────────────────────────────
+const SkeletonRow = () => (
+  <tr>
+    {[...Array(8)].map((_, i) => (
+      <td key={i} className="px-5 py-3.5">
+        <div
+          className="h-4 bg-slate-100 rounded-lg animate-pulse"
+          style={{ width: `${50 + i * 6}%` }}
+        />
+      </td>
+    ))}
+  </tr>
+);
+
+// ── Pagination (identical to ManageMotorcycle) ────────────────────────────────
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   if (totalPages <= 1) return null;
   const pages = [];
-  const delta = 2;
   for (let i = 1; i <= totalPages; i++) {
     if (
       i === 1 ||
       i === totalPages ||
-      (i >= currentPage - delta && i <= currentPage + delta)
+      (i >= currentPage - 2 && i <= currentPage + 2)
     )
       pages.push(i);
   }
   const withEllipsis = [];
   let prev = null;
-  for (const page of pages) {
-    if (prev && page - prev > 1) withEllipsis.push("...");
-    withEllipsis.push(page);
-    prev = page;
+  for (const p of pages) {
+    if (prev && p - prev > 1) withEllipsis.push("...");
+    withEllipsis.push(p);
+    prev = p;
   }
   return (
     <div className="flex items-center justify-center gap-2 mt-6">
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-lg bg-[#b9b9b9] text-[#171717] disabled:opacity-40 hover:bg-[#a0a0a0] transition-colors shadow-lg shadow-black/20"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
-        <FaChevronLeft />
+        <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-[#171717]">
+          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
             …
           </span>
         ) : (
           <button
             key={item}
             onClick={() => onPageChange(item)}
-            className={`w-9 h-9 rounded-lg font-semibold text-sm transition-all shadow-lg shadow-black/20 ${currentPage === item ? "bg-[#b50002] text-white scale-105" : "bg-[#b9b9b9] text-[#171717] hover:bg-[#a0a0a0]"}`}
+            className={`w-9 h-9 rounded-xl font-bold text-sm transition-all shadow-sm
+              ${currentPage === item ? "bg-[#b50002] text-white shadow-[#b50002]/30" : "bg-white border border-slate-100 text-slate-500 hover:border-[#b50002]/20 hover:text-[#b50002]"}`}
           >
             {item}
           </button>
@@ -444,78 +477,92 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-lg bg-[#b9b9b9] text-[#171717] disabled:opacity-40 hover:bg-[#a0a0a0] transition-colors shadow-lg shadow-black/20"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
-        <FaChevronRight />
+        <FaChevronRight className="text-xs" />
       </button>
     </div>
   );
 };
 
-// ── Status badge ──────────────────────────────────────────────────────────────
+// ── Status Badge ──────────────────────────────────────────────────────────────
+const STATUS_STYLE = {
+  pending_reservation: "bg-amber-50 text-amber-600 border-amber-200",
+  pending_full_payment: "bg-orange-50 text-orange-600 border-orange-200",
+  pending: "bg-amber-50 text-amber-600 border-amber-200",
+  active: "bg-blue-50 text-blue-600 border-blue-200",
+  inspection: "bg-violet-50 text-violet-600 border-violet-200",
+  completed: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  cancelled: "bg-slate-50 text-slate-500 border-slate-200",
+  rejected: "bg-red-50 text-[#b50002] border-red-200",
+};
+
+const STATUS_LABEL = {
+  pending_reservation: "Pending Reservation",
+  pending_full_payment: "Pending Full Payment",
+  active: "Active",
+  inspection: "Inspection",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  rejected: "Rejected",
+};
+
 const StatusBadge = ({ status, isDeleted }) => {
-  if (isDeleted)
-    return (
-      <span className="inline-flex px-3 py-1 rounded-full text-sm font-semibold bg-red-900/30 text-red-800 border border-red-800/40">
-        Rejected
-      </span>
-    );
-  const map = {
-    pending_reservation:
-      "bg-yellow-900/30 text-yellow-800 border border-yellow-800/30",
-    pending_full_payment:
-      "bg-orange-900/30 text-orange-800 border border-orange-800/30",
-    pending: "bg-yellow-900/30 text-yellow-800 border border-yellow-800/30",
-    active: "bg-blue-900/30 text-blue-800 border border-blue-800/30",
-    completed: "bg-green-900/30 text-green-800 border border-green-800/30",
-    cancelled: "bg-red-900/30 text-red-800 border border-red-800/30",
-  };
+  const key = isDeleted ? "rejected" : status;
   const cls =
-    map[status] || "bg-gray-700/30 text-gray-700 border border-gray-600/30";
+    STATUS_STYLE[key] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  const label = isDeleted
+    ? "Rejected"
+    : (STATUS_LABEL[status] ??
+      String(status).charAt(0).toUpperCase() + String(status).slice(1));
   return (
     <span
-      className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold  ${cls}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cls}`}
     >
-      {(status === "pending_reservation" && "Pending Reservation") ||
-        (status === "pending_full_payment" && "Pending Full Payment") ||
-        String(status || "unknown")
-          .charAt(0)
-          .toUpperCase() + String(status || "unknown").slice(1)}
+      {label}
     </span>
   );
 };
 
-// ── Payment badge ─────────────────────────────────────────────────────────────
+// ── Payment Badge ─────────────────────────────────────────────────────────────
+const PAYMENT_STYLE = {
+  fully_paid: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  reservation_paid: "bg-orange-50 text-orange-600 border-orange-200",
+  pending_verification: "bg-amber-50 text-amber-600 border-amber-200",
+  pending: "bg-slate-50 text-slate-500 border-slate-200",
+};
+
 const PaymentBadge = ({ paymentStatus }) => {
-  const map = {
-    fully_paid: "bg-green-900/30 text-green-800 border border-green-800/30",
-    reservation_paid:
-      "bg-orange-900/30 text-orange-800 border border-orange-800/30",
-    pending_verification:
-      "bg-yellow-900/30 text-yellow-800 border border-yellow-800/30",
-    pending: "bg-gray-700/30 text-gray-700 border border-gray-600/30",
-  };
-  const cls = map[paymentStatus] || map.pending;
+  const cls = PAYMENT_STYLE[paymentStatus] ?? PAYMENT_STYLE.pending;
   return (
     <span
-      className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${cls}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cls}`}
     >
       {paymentLabel(paymentStatus)}
     </span>
   );
 };
 
-const getAllowedNextStatuses = (currentStatus) => {
-  switch (currentStatus) {
-    case "pending_reservation":
-    case "pending_full_payment":
-      return ["cancelled"];
-    case "active":
-      return ["completed"];
-    default:
-      return [];
-  }
-};
+// ── Empty State ───────────────────────────────────────────────────────────────
+const EmptyState = ({ onReset }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12 text-center">
+    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <FaSearch className="text-slate-200 text-3xl" />
+    </div>
+    <h3 className="font-black text-[#171717] text-lg mb-1">
+      No bookings found
+    </h3>
+    <p className="text-slate-400 text-sm mb-4">
+      Try adjusting your filters or search term
+    </p>
+    <button
+      onClick={onReset}
+      className="px-5 py-2 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+    >
+      Clear Filters
+    </button>
+  </div>
+);
 
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 const DetailDrawer = ({
@@ -530,10 +577,16 @@ const DetailDrawer = ({
   const [isEditing, setIsEditing] = useState(false);
   const [newStatus, setNewStatus] = useState(booking.status);
   const details = booking.details || {};
-  const isEditLocked = ["completed", "cancelled"].includes(booking.status);
+  const latestExtension = Array.isArray(booking.extensions)
+    ? booking.extensions[booking.extensions.length - 1]
+    : null;
+  const originalReturnDate = latestExtension?.previousReturnDate || null;
+  const originalReturnTime = latestExtension?.previousReturnTime || "";
+  const isEditLocked = ["completed", "cancelled", "inspection"].includes(
+    booking.status,
+  );
   const allowedStatusOptions = getAllowedNextStatuses(booking.status);
 
-  // Compute base rental for fee breakdown
   const dailyRate = booking.dailyRate || 0;
   const pickupDate = booking.pickupDate ? new Date(booking.pickupDate) : null;
   const returnDate = booking.returnDate ? new Date(booking.returnDate) : null;
@@ -545,14 +598,10 @@ const DetailDrawer = ({
         )
       : 1;
   const baseRental = dailyRate * days;
-
-  // Use stored detail values; fall back to deriving from total amount
   const reservationFee = booking.reservationFee || 200;
   const storedDistanceFee = details.distanceFee;
   const storedHelmetFee = details.helmetFee;
   const helmetRequested = details.helmetRequested;
-
-  // If details are missing but amount > baseRental + reservationFee, derive the extra
   const knownExtras =
     (storedDistanceFee != null ? storedDistanceFee : 0) +
     (helmetRequested && storedHelmetFee != null ? storedHelmetFee : 0);
@@ -560,8 +609,6 @@ const DetailDrawer = ({
     0,
     (booking.amount || 0) - baseRental - reservationFee - knownExtras,
   );
-
-  // Final resolved fees to display
   const distanceFee =
     storedDistanceFee != null
       ? storedDistanceFee
@@ -572,30 +619,58 @@ const DetailDrawer = ({
     storedHelmetFee != null ? storedHelmetFee : helmetRequested ? 100 : 0;
 
   const handleSave = async () => {
-    if (!allowedStatusOptions.includes(newStatus)) {
-      return;
-    }
+    if (!allowedStatusOptions.includes(newStatus)) return;
     await onEditStatus(booking.id, newStatus);
     setIsEditing(false);
   };
 
+  const Section = ({ title, children }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-50">
+        <h3 className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+          {title}
+        </h3>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+
+  const Row = ({ icon: Icon, label, value, valueClass = "" }) => (
+    <div className="flex items-start gap-3">
+      <Icon className="text-[#b50002] text-sm flex-shrink-0 mt-0.5" />
+      <span className="text-slate-400 text-xs w-28 flex-shrink-0 font-medium pt-0.5">
+        {label}
+      </span>
+      <span
+        className={`text-[#171717] text-sm font-semibold flex-1 ${valueClass}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[9990] flex" onClick={onClose}>
-      <div className="flex-1 bg-black/50 backdrop-blur-sm" />
+      <div className="flex-1 bg-black/30 backdrop-blur-sm" />
       <div
-        className="w-full max-w-2xl bg-[#e3e3e3] h-full overflow-y-auto shadow-2xl"
+        className="w-full max-w-xl bg-[#f7f8fa] h-full overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#171717] px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
           <div>
-            <h2 className="text-lg font-bold text-white">{booking.customer}</h2>
-            <p className="text-sm text-[#b9b9b9]">
+            <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
+              Booking Detail
+            </p>
+            <h2 className="font-black text-[#171717] text-lg leading-tight">
+              {booking.customer}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
               {booking.motorcycle}
               {booking.unitId ? ` · ${booking.unitId}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {booking.isDeleted ? (
               <>
                 <button
@@ -604,10 +679,10 @@ const DetailDrawer = ({
                     onRestore(e, booking.id);
                     onClose();
                   }}
-                  className="p-2 rounded-lg bg-green-800 text-white hover:bg-green-700 transition-colors"
+                  className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                   title="Restore"
                 >
-                  <FaTrashRestore />
+                  <RotateCcw className="w-4 h-4" />
                 </button>
                 <button
                   onClick={(e) => {
@@ -615,10 +690,10 @@ const DetailDrawer = ({
                     onDelete(e, booking.id, true);
                     onClose();
                   }}
-                  className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
+                  className="p-2 rounded-xl bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
                   title="Reject Forever"
                 >
-                  <FaTrash />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </>
             ) : (
@@ -633,14 +708,14 @@ const DetailDrawer = ({
                       e.stopPropagation();
                       onConfirmPayment(e, booking.id);
                     }}
-                    className="p-2 rounded-lg bg-green-800 text-white hover:bg-green-700 transition-colors"
+                    className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                     title={
                       booking.status === "pending_reservation"
                         ? "Confirm Reservation"
                         : "Confirm Full Payment"
                     }
                   >
-                    <FaCheckCircle />
+                    <CheckCircle2 className="w-4 h-4" />
                   </button>
                 )}
                 {booking.status === "pending_reservation" && (
@@ -649,10 +724,10 @@ const DetailDrawer = ({
                       e.stopPropagation();
                       onRequestReupload(e, booking.id);
                     }}
-                    className="p-2 rounded-lg bg-orange-700 text-white hover:bg-orange-600 transition-colors"
+                    className="p-2 rounded-xl bg-orange-50 text-orange-500 hover:bg-orange-100 transition-colors"
                     title="Request Re-upload"
                   >
-                    <FaUpload />
+                    <Upload className="w-4 h-4" />
                   </button>
                 )}
                 {!["active", "completed"].includes(booking.status) && (
@@ -662,169 +737,158 @@ const DetailDrawer = ({
                       onDelete(e, booking.id, false);
                       onClose();
                     }}
-                    className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
+                    className="p-2 rounded-xl bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
                     title="Reject"
                   >
-                    <FaTrash />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </>
             )}
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-[#b9b9b9]/20 text-[#b9b9b9] hover:bg-[#b9b9b9]/40 transition-colors"
+              className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
             >
               <FaTimes />
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* Status row */}
-          <div className="bg-[#b9b9b9] rounded-xl p-4 flex items-center justify-between shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3">
-              <StatusBadge
-                status={booking.status}
-                isDeleted={booking.isDeleted}
-              />
-              <PaymentBadge paymentStatus={booking.paymentStatus} />
-            </div>
-            {!booking.isDeleted &&
-              (isEditing ? (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    className="bg-[#c7c5c5] text-sm px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-[#171717] text-[#171717]"
-                  >
-                    {allowedStatusOptions.map((opt) => (
-                      <option value={opt} key={opt}>
-                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleSave}
-                    className="px-3 py-1 rounded-lg bg-[#171717] text-white font-bold text-sm
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-3 py-1 rounded-lg bg-[#b50002] text-white font-bold text-sm
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+        <div className="p-5 space-y-4">
+          {/* Status + Amount row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className={labelCls}>Status</p>
+              <div className="flex flex-col gap-2">
+                <StatusBadge
+                  status={booking.status}
+                  isDeleted={booking.isDeleted}
+                />
+                <PaymentBadge paymentStatus={booking.paymentStatus} />
+              </div>
+              {!booking.isDeleted &&
                 !isEditLocked &&
                 allowedStatusOptions.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setNewStatus(allowedStatusOptions[0]);
-                      setIsEditing(true);
-                    }}
-                    className="flex px-3 items-center justify-center gap-1.5 py-1.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-                  >
-                    <FaEdit className="text-xs" /> Edit Status
-                  </button>
-                )
-              ))}
-          </div>
-
-          {/* Amount highlight */}
-          <div className="bg-[#171717] rounded-xl p-4 flex items-center justify-between shadow-lg shadow-black/20">
-            <div>
-              <p className="text-[#b9b9b9] text-xs uppercase tracking-widest font-bold mb-1">
+                  <div className="mt-3 pt-3 border-t border-slate-50">
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        <select
+                          value={newStatus}
+                          onChange={(e) => setNewStatus(e.target.value)}
+                          className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-slate-200 text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                        >
+                          {allowedStatusOptions.map((opt) => (
+                            <option value={opt} key={opt}>
+                              {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleSave}
+                          className="px-2 py-1.5 rounded-lg bg-[#b50002] text-white font-bold text-xs"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          className="px-2 py-1.5 rounded-lg border border-slate-200 text-slate-500 text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setNewStatus(allowedStatusOptions[0]);
+                          setIsEditing(true);
+                        }}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-[#b50002] hover:underline"
+                      >
+                        <FaEdit className="text-[10px]" /> Edit Status
+                      </button>
+                    )}
+                  </div>
+                )}
+            </div>
+            <div className="bg-[#171717] rounded-2xl p-4 flex flex-col justify-between">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-1">
                 Total Amount
               </p>
               <p className="text-3xl font-black text-white">
                 ₱{(booking.amount || 0).toLocaleString()}
               </p>
-            </div>
-            <div className="p-3 bg-white/10 rounded-xl">
-              <FaMoneyBillWave className="text-white text-2xl" />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Due at pickup:{" "}
+                <span className="text-white font-bold">
+                  ₱
+                  {Math.max(
+                    0,
+                    (booking.amount || 0) - reservationFee,
+                  ).toLocaleString()}
+                </span>
+              </p>
             </div>
           </div>
 
-          {/* ── Fee Breakdown ── */}
-          <div className="bg-[#b9b9b9] rounded-xl overflow-hidden shadow-lg shadow-black/20">
-            <div className="px-4 py-3 bg-[#171717]/10 border-b border-[#171717]/10">
-              <h3 className="text-sm font-bold text-[#171717] uppercase tracking-wider flex items-center gap-2">
-                <FaReceipt className="text-[#b50002]" /> Fee Breakdown
-              </h3>
-            </div>
-            <div className="p-4 space-y-2 text-sm">
-              {/* Daily rate × days */}
+          {/* Fee Breakdown */}
+          <Section title="Fee Breakdown">
+            <div className="space-y-2.5 text-sm">
               {dailyRate > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#171717]/70">
+                  <span className="text-slate-500">
                     Rate/day (₱{dailyRate.toLocaleString()} × {days}{" "}
                     {days === 1 ? "day" : "days"})
                   </span>
-                  <span className="font-semibold text-[#171717]">
+                  <span className="font-bold text-[#171717]">
                     ₱{baseRental.toLocaleString()}
                   </span>
                 </div>
               )}
-
-              {/* Distance fee */}
               {distanceFee > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#171717]/70 flex items-center gap-1.5">
-                    <FaMapMarkerAlt className="text-orange-500 text-xs" />
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <FaMapMarkerAlt className="text-orange-400 text-xs" />
                     Distance Fee
                     {details.distanceTierLabel && (
-                      <span className="text-xs text-[#171717]/50">
+                      <span className="text-[11px] text-slate-400">
                         ({details.distanceTierLabel})
                       </span>
                     )}
                   </span>
-                  <span className="font-semibold text-orange-600">
+                  <span className="font-bold text-orange-500">
                     +₱{distanceFee.toLocaleString()}
                   </span>
                 </div>
               )}
-
-              {/* Helmet fee */}
               {(helmetRequested || helmetFee > 0) && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#171717]/70 flex items-center gap-1.5">
-                    <FaHardHat className="text-[#b50002] text-xs" />
-                    Additional Helmet
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <FaHardHat className="text-[#b50002] text-xs" /> Additional
+                    Helmet
                   </span>
-                  <span className="font-semibold text-[#b50002]">
+                  <span className="font-bold text-[#b50002]">
                     +₱{helmetFee.toLocaleString()}
                   </span>
                 </div>
               )}
-
-              {/* Gross total */}
-              <div className="border-t border-[#171717]/15 pt-2 mt-1 flex items-center justify-between">
+              <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                 <span className="font-bold text-[#171717]">Total</span>
-                <span className="font-black text-[#171717] text-base">
+                <span className="font-black text-[#171717]">
                   ₱{(booking.amount || 0).toLocaleString()}
                 </span>
               </div>
-
-              {/* Downpayment — already collected */}
               <div className="flex items-center justify-between">
-                <span className="text-[#171717]/70 flex items-center gap-1.5">
-                  <FaCreditCard className="text-[#b50002] text-xs" />
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <FaCreditCard className="text-[#b50002] text-xs" />{" "}
                   Downpayment (paid)
                 </span>
-                <span className="font-semibold text-green-700">
+                <span className="font-bold text-emerald-600">
                   −₱{reservationFee.toLocaleString()}
                 </span>
               </div>
-
-              {/* Due at pickup */}
-              <div className="border-t border-[#171717]/15 pt-2 mt-1 flex items-center justify-between">
+              <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                 <span className="font-bold text-[#171717]">Due at Pickup</span>
-                <span className="font-black text-[#b50002] text-base">
+                <span className="font-black text-[#b50002]">
                   ₱
                   {Math.max(
                     0,
@@ -833,296 +897,233 @@ const DetailDrawer = ({
                 </span>
               </div>
             </div>
-          </div>
+          </Section>
+
+          {/* Extension */}
+          {latestExtension && (
+            <Section title="Extension Details">
+              <div className="space-y-2.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Original Pickup</span>
+                  <span className="font-semibold text-[#171717]">
+                    {formatDate(booking.pickupDate)}
+                    {booking.pickupTime &&
+                      ` · ${formatTime(booking.pickupTime)}`}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Original Return</span>
+                  <span className="font-semibold text-[#171717]">
+                    {formatDate(originalReturnDate || booking.returnDate)}
+                    {(originalReturnTime || booking.returnTime) &&
+                      ` · ${formatTime(originalReturnTime || booking.returnTime)}`}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Extended Return</span>
+                  <span className="font-semibold text-[#171717]">
+                    {formatDate(booking.returnDate)}
+                    {booking.returnTime &&
+                      ` · ${formatTime(booking.returnTime)}`}
+                  </span>
+                </div>
+                <div className="border-t border-slate-100 pt-2 flex justify-between">
+                  <span className="font-bold text-[#171717]">
+                    Additional Due
+                  </span>
+                  <span className="font-black text-[#b50002]">
+                    +₱
+                    {Number(
+                      latestExtension.additionalAmount || 0,
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </Section>
+          )}
 
           {/* Motorcycle */}
-          <div className="bg-[#b9b9b9] rounded-xl overflow-hidden shadow-lg shadow-black/20">
-            <div className="px-4 py-3 bg-[#171717]/10 border-b border-[#171717]/10">
-              <h3 className="text-sm font-bold text-[#171717] uppercase tracking-wider">
-                Motorcycle
-              </h3>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-4 mb-4">
-                {booking.motorcycleImage && (
-                  <div className="w-20 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[#171717]/5">
-                    <img
-                      src={makeImageUrl(booking.motorcycleImage)}
-                      alt={booking.motorcycle}
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
+          <Section title="Motorcycle">
+            <div className="flex items-center gap-4 mb-4">
+              {booking.motorcycleImage && (
+                <div className="w-20 h-14 flex-shrink-0 rounded-xl overflow-hidden bg-slate-50 border border-slate-100">
+                  <img
+                    src={makeImageUrl(booking.motorcycleImage)}
+                    alt={booking.motorcycle}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <p className="font-black text-[#171717]">
+                  {booking.motorcycle}
+                </p>
+                {booking.unitId && (
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-100 text-[11px] font-bold text-[#b50002]">
+                    <FaIdBadge className="text-[10px]" /> {booking.unitId}
+                  </span>
                 )}
-                <div>
-                  <p className="text-base font-bold text-[#171717]">
-                    {booking.motorcycle}
+                {booking.dailyRate > 0 && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ₱{booking.dailyRate.toLocaleString()}/day
                   </p>
-                  {booking.unitId && (
-                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-[#171717]/10 border border-[#171717]/20 text-xs font-semibold text-[#171717]">
-                      <FaIdBadge className="text-[#b50002]" /> {booking.unitId}
-                    </span>
-                  )}
-                  {booking.dailyRate > 0 && (
-                    <p className="text-xs text-[#171717]/60 mt-1">
-                      ₱{booking.dailyRate.toLocaleString()}/day
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <FaGasPump className="text-[#b50002]" />
-                  <span className="text-[#171717]">
-                    {details.fuel || booking.motorcycleFuel || "—"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FaCog className="text-[#b50002]" />
-                  <span className="text-[#171717]">
-                    {details.engineSize || booking.motorcycleEngineSize
-                      ? `${details.engineSize || booking.motorcycleEngineSize}cc`
-                      : "—"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FaCog className="text-[#b50002]" />
-                  <span className="text-[#171717]">
-                    {details.transmission ||
-                      booking.motorcycleTransmission ||
-                      "—"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FaShieldAlt className="text-[#b50002]" />
-                  <span className="text-[#171717]">
-                    ABS:{" "}
-                    {(details.hasABS ?? booking.motorcycleHasABS)
-                      ? "Yes"
-                      : "No"}
-                  </span>
-                </div>
+                )}
               </div>
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              {[
+                {
+                  icon: FaGasPump,
+                  val: details.fuel || booking.motorcycleFuel || "—",
+                },
+                {
+                  icon: FaCog,
+                  val:
+                    details.engineSize || booking.motorcycleEngineSize
+                      ? `${details.engineSize || booking.motorcycleEngineSize}cc`
+                      : "—",
+                },
+                {
+                  icon: FaCog,
+                  val:
+                    details.transmission ||
+                    booking.motorcycleTransmission ||
+                    "—",
+                },
+                {
+                  icon: FaShieldAlt,
+                  val: `ABS: ${(details.hasABS ?? booking.motorcycleHasABS) ? "Yes" : "No"}`,
+                },
+              ].map(({ icon: Icon, val }, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Icon className="text-[#b50002] text-xs flex-shrink-0" />
+                  <span className="text-xs text-slate-600 font-medium">
+                    {val}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
 
           {/* Customer */}
-          <div className="bg-[#b9b9b9] rounded-xl overflow-hidden shadow-lg shadow-black/20">
-            <div className="px-4 py-3 bg-[#171717]/10 border-b border-[#171717]/10">
-              <h3 className="text-sm font-bold text-[#171717] uppercase tracking-wider">
-                Customer
-              </h3>
+          <Section title="Customer">
+            <div className="space-y-2.5">
+              <Row icon={FaUser} label="Name" value={booking.customer} />
+              <Row
+                icon={FaEnvelope}
+                label="Email"
+                value={booking.email || "—"}
+              />
+              <Row icon={FaPhone} label="Phone" value={booking.phone || "—"} />
+              <Row
+                icon={FaMapMarkerAlt}
+                label="Address"
+                value={buildFullAddress(booking.address)}
+              />
             </div>
-            <div className="p-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <FaUser className="text-[#b50002] flex-shrink-0" />
-                <span className="text-[#171717]">{booking.customer}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaEnvelope className="text-[#b50002] flex-shrink-0" />
-                <span className="text-[#171717]">{booking.email || "—"}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaPhone className="text-[#b50002] flex-shrink-0" />
-                <span className="text-[#171717]">{booking.phone || "—"}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <FaMapMarkerAlt className="text-[#b50002] flex-shrink-0 mt-0.5" />
-                <span className="text-[#171717]">
-                  {buildFullAddress(booking.address)}
-                </span>
-              </div>
-            </div>
-          </div>
+          </Section>
 
-          {/* Booking dates + times */}
-          <div className="bg-[#b9b9b9] rounded-xl overflow-hidden shadow-lg shadow-black/20">
-            <div className="px-4 py-3 bg-[#171717]/10 border-b border-[#171717]/10">
-              <h3 className="text-sm font-bold text-[#171717] uppercase tracking-wider">
-                Payment Proof
-              </h3>
-            </div>
-            <div className="p-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <FaReceipt className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-36 flex-shrink-0">
-                  Reference ID
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.paymentReferenceId || "—"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaMoneyBillWave className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-36 flex-shrink-0">
-                  Amount Sent
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.paymentSentAmount
+          {/* Payment Proof */}
+          <Section title="Payment Proof">
+            <div className="space-y-2.5">
+              <Row
+                icon={FaReceipt}
+                label="Reference ID"
+                value={booking.paymentReferenceId || "—"}
+              />
+              <Row
+                icon={FaMoneyBillWave}
+                label="Amount Sent"
+                value={
+                  booking.paymentSentAmount
                     ? `₱${Number(booking.paymentSentAmount).toLocaleString()}`
-                    : "—"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaClock className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-36 flex-shrink-0">
-                  Payment Time
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.paymentSentAt
+                    : "—"
+                }
+              />
+              <Row
+                icon={FaClock}
+                label="Payment Time"
+                value={
+                  booking.paymentSentAt
                     ? formatDateTime(booking.paymentSentAt)
-                    : "—"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaCheckCircle className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-36 flex-shrink-0">
-                  Receipt Check
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.receiptVerification?.status || "pending"}
-                  {typeof booking.receiptVerification?.score === "number" &&
-                    ` (${booking.receiptVerification.score}%)`}
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <FaInfoCircle className="text-[#b50002] mt-0.5" />
-                <span className="text-[#171717]/60 w-36 flex-shrink-0">
-                  Admin Review
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.requiresProofReupload
-                    ? "Re-upload requested"
-                    : "No action needed"}
-                  {booking.adminReviewComment
-                    ? `: ${booking.adminReviewComment}`
-                    : ""}
-                </span>
-              </div>
+                    : "—"
+                }
+              />
+              <Row
+                icon={FaCheckCircle}
+                label="Receipt Check"
+                value={`${booking.receiptVerification?.status || "pending"}${typeof booking.receiptVerification?.score === "number" ? ` (${booking.receiptVerification.score}%)` : ""}`}
+              />
+              <Row
+                icon={FaInfoCircle}
+                label="Admin Review"
+                value={`${booking.requiresProofReupload ? "Re-upload requested" : "No action needed"}${booking.adminReviewComment ? `: ${booking.adminReviewComment}` : ""}`}
+              />
               {booking.paymentProofImage && (
                 <div className="pt-2">
                   <img
                     src={makeImageUrl(booking.paymentProofImage)}
                     alt="Payment proof"
-                    className="max-h-72 w-full object-contain rounded-lg border border-[#171717]/10 bg-white"
+                    className="max-h-64 w-full object-contain rounded-xl border border-slate-100 bg-slate-50"
                   />
                 </div>
               )}
             </div>
-          </div>
+          </Section>
 
-          {/* Booking dates + times */}
-          <div className="bg-[#b9b9b9] rounded-xl overflow-hidden shadow-lg shadow-black/20">
-            <div className="px-4 py-3 bg-[#171717]/10 border-b border-[#171717]/10">
-              <h3 className="text-sm font-bold text-[#171717] uppercase tracking-wider">
-                Booking Details
-              </h3>
-            </div>
-            <div className="p-4 space-y-2 text-sm">
-              {/* Pickup date + time */}
-              <div className="flex items-center gap-2">
-                <FaCalendarAlt className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Pickup
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {formatDate(booking.pickupDate)}
-                  {booking.pickupTime && (
-                    <span className="ml-2 text-[#b50002] font-semibold">
-                      · {formatTime(booking.pickupTime)}
-                    </span>
-                  )}
-                </span>
-              </div>
-
-              {/* Return date + time */}
-              <div className="flex items-center gap-2">
-                <FaCalendarAlt className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Return
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {formatDate(booking.returnDate)}
-                  {booking.returnTime && (
-                    <span className="ml-2 text-[#b50002] font-semibold">
-                      · {formatTime(booking.returnTime)}
-                    </span>
-                  )}
-                </span>
-              </div>
-
-              {/* Duration */}
-              <div className="flex items-center gap-2">
-                <FaClock className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Duration
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {days} {days === 1 ? "day" : "days"}
-                </span>
-              </div>
-
-              {/* Booked on */}
-              <div className="flex items-center gap-2">
-                <FaCalendarAlt className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Booked on
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {formatDateTime(booking.bookingDate)}
-                </span>
-              </div>
-
-              {/* Destination */}
-              <div className="flex items-center gap-2">
-                <FaMapMarkerAlt className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Destination
-                </span>
-                <span className="text-[#171717] font-medium">
-                  {booking.destination || "—"}
-                </span>
-              </div>
-
-              {/* Reservation fee */}
-              <div className="flex items-center gap-2">
-                <FaCreditCard className="text-[#b50002]" />
-                <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                  Reservation Fee
-                </span>
-                <span className="text-[#171717] font-medium">
-                  ₱{booking.reservationFee || 200} —{" "}
-                  {booking.reservationFeePaid ? "Paid" : "Unpaid"}
-                </span>
-              </div>
-
+          {/* Booking Details */}
+          <Section title="Booking Details">
+            <div className="space-y-2.5">
+              <Row
+                icon={FaCalendarAlt}
+                label="Pickup"
+                value={`${formatDate(booking.pickupDate)}${booking.pickupTime ? ` · ${formatTime(booking.pickupTime)}` : ""}`}
+              />
+              <Row
+                icon={FaCalendarAlt}
+                label="Return"
+                value={`${formatDate(booking.returnDate)}${booking.returnTime ? ` · ${formatTime(booking.returnTime)}` : ""}`}
+              />
+              <Row
+                icon={FaClock}
+                label="Duration"
+                value={`${days} ${days === 1 ? "day" : "days"}`}
+              />
+              <Row
+                icon={FaCalendarAlt}
+                label="Booked on"
+                value={formatDateTime(booking.bookingDate)}
+              />
+              <Row
+                icon={FaMapMarkerAlt}
+                label="Destination"
+                value={booking.destination || "—"}
+              />
+              <Row
+                icon={FaCreditCard}
+                label="Reservation"
+                value={`₱${booking.reservationFee || 200} — ${booking.reservationFeePaid ? "Paid" : "Unpaid"}`}
+              />
               {booking.reservationPaymentMethod && (
-                <div className="flex items-center gap-2">
-                  <FaCreditCard className="text-[#b50002]" />
-                  <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                    Payment Method
-                  </span>
-                  <span className="text-[#171717] font-medium">
-                    {booking.reservationPaymentMethod}
-                  </span>
-                </div>
+                <Row
+                  icon={FaCreditCard}
+                  label="Payment Method"
+                  value={booking.reservationPaymentMethod}
+                />
               )}
-
               {booking.isDeleted && booking.deletedAt && (
-                <div className="flex items-center gap-2">
-                  <FaBan className="text-red-800" />
-                  <span className="text-[#171717]/60 w-28 flex-shrink-0">
-                    Rejected on
-                  </span>
-                  <span className="text-red-800 font-medium">
-                    {formatDate(booking.deletedAt)}
-                  </span>
-                </div>
+                <Row
+                  icon={FaBan}
+                  label="Rejected on"
+                  value={formatDate(booking.deletedAt)}
+                  valueClass="text-[#b50002]"
+                />
               )}
             </div>
-          </div>
+          </Section>
         </div>
       </div>
     </div>
@@ -1142,40 +1143,31 @@ const BookingTable = ({
   onRequestReupload,
 }) => {
   const cols = [
-    { label: "Customer", key: "customer", width: "w-[180px]", sortable: true },
-    {
-      label: "Motorcycle",
-      key: "motorcycle",
-      width: "w-[200px]",
-      sortable: true,
-    },
-    { label: "Pickup", key: "pickupDate", width: "w-[140px]", sortable: true },
-    { label: "Return", key: "returnDate", width: "w-[140px]", sortable: true },
-    { label: "Booked", key: "bookingDate", width: "w-[110px]", sortable: true },
-    { label: "Amount", key: "amount", width: "w-[110px]", sortable: true },
-    {
-      label: "Payment",
-      key: "paymentStatus",
-      width: "w-[150px]",
-      sortable: true,
-    },
-    { label: "Status", key: "status", width: "w-[120px]", sortable: false },
-    { label: "Actions", key: null, width: "w-[110px]", sortable: false },
+    { label: "Customer", key: "customer", sortable: true },
+    { label: "Motorcycle", key: "motorcycle", sortable: true },
+    { label: "Pickup", key: "pickupDate", sortable: true },
+    { label: "Return", key: "returnDate", sortable: true },
+    { label: "Booked", key: "bookingDate", sortable: true },
+    { label: "Amount", key: "amount", sortable: true },
+    { label: "Payment", key: "paymentStatus", sortable: true },
+    { label: "Status", key: null, sortable: false },
+    { label: "Actions", key: null, sortable: false },
   ];
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-lg shadow-black/20">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1200px] border-collapse">
+        <table className="w-full">
           <thead>
-            <tr className="bg-[#171717]">
+            <tr className="border-b border-slate-50">
               {cols.map((col) => (
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`${col.width} px-4 py-4 text-left text-sm font-bold uppercase tracking-wider text-[#b9b9b9] whitespace-nowrap first:pl-5 last:pr-5 ${col.sortable ? "cursor-pointer select-none hover:text-white transition-colors" : ""}`}
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                    ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
-                  <span className="inline-flex items-center gap-0.5">
+                  <span className="inline-flex items-center">
                     {col.label}
                     {col.sortable && (
                       <SortIcon
@@ -1187,84 +1179,80 @@ const BookingTable = ({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {bookings.map((booking, idx) => (
+          <tbody className="divide-y divide-slate-50">
+            {bookings.map((booking) => (
               <tr
                 key={booking.id}
                 onClick={() => onRowClick(booking)}
-                className={`
-                  border-b border-[#171717]/10 cursor-pointer transition-all duration-150
-                  ${idx % 2 === 0 ? "bg-[#b9b9b9]" : "bg-[#c4c4c4]"}
-                  ${booking.isDeleted ? "opacity-55" : "hover:bg-[#a8a8a8]"}
-                `}
+                className={`hover:bg-slate-50/60 transition-colors cursor-pointer ${booking.isDeleted ? "opacity-50" : ""}`}
               >
                 {/* Customer */}
-                <td className="px-4 py-4 pl-5">
-                  <p className="text-base font-bold text-[#171717] truncate">
+                <td className="px-5 py-3.5">
+                  <p className="font-black text-[13px] text-[#171717] leading-tight">
                     {booking.customer}
                   </p>
-                  <p className="text-xs text-[#171717]/60 truncate">
+                  <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
                     {booking.email}
                   </p>
                 </td>
 
                 {/* Motorcycle */}
-                <td className="px-4 py-4">
-                  <p className="text-base text-[#171717] font-semibold truncate">
+                <td className="px-5 py-3.5">
+                  <p className="font-bold text-[13px] text-[#171717]">
                     {booking.motorcycle}
                   </p>
                   {booking.unitId && (
-                    <span className="inline-flex items-center gap-1 py-0.5 text-xs font-bold text-[#171717]">
+                    <span className="text-[11px] font-black text-[#b50002] tracking-wider uppercase">
                       {booking.unitId}
                     </span>
                   )}
                 </td>
 
-                {/* Pickup date + time */}
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
+                {/* Pickup */}
+                <td className="px-5 py-3.5">
+                  <p className="text-[13px] text-slate-600">
                     {formatDate(booking.pickupDate)}
-                  </span>
+                  </p>
                   {booking.pickupTime && (
-                    <p className="text-xs text-[#b50002] font-semibold mt-0.5">
+                    <p className="text-[11px] text-[#b50002] font-bold">
                       {formatTime(booking.pickupTime)}
                     </p>
                   )}
                 </td>
 
-                {/* Return date + time */}
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
+                {/* Return */}
+                <td className="px-5 py-3.5">
+                  <p className="text-[13px] text-slate-600">
                     {formatDate(booking.returnDate)}
-                  </span>
+                  </p>
                   {booking.returnTime && (
-                    <p className="text-xs text-[#b50002] font-semibold mt-0.5">
+                    <p className="text-[11px] text-[#b50002] font-bold">
                       {formatTime(booking.returnTime)}
                     </p>
                   )}
                 </td>
 
-                {/* Booked on */}
-                <td className="px-4 py-4">
-                  <span className="text-base text-[#171717]">
+                {/* Booked */}
+                <td className="px-5 py-3.5">
+                  <p className="text-[13px] text-slate-500">
                     {formatDateTime(booking.bookingDate)}
-                  </span>
+                  </p>
                 </td>
 
                 {/* Amount */}
-                <td className="px-4 py-4">
-                  <span className="text-base font-bold text-[#171717]">
+                <td className="px-5 py-3.5">
+                  <span className="font-black text-[13px] text-[#171717]">
                     ₱{(booking.amount || 0).toLocaleString()}
                   </span>
                 </td>
 
                 {/* Payment */}
-                <td className="px-4 py-4">
+                <td className="px-5 py-3.5">
                   <PaymentBadge paymentStatus={booking.paymentStatus} />
                 </td>
 
                 {/* Status */}
-                <td className="px-4 py-4">
+                <td className="px-5 py-3.5">
                   <StatusBadge
                     status={booking.status}
                     isDeleted={booking.isDeleted}
@@ -1273,25 +1261,25 @@ const BookingTable = ({
 
                 {/* Actions */}
                 <td
-                  className="px-4 py-4 pr-5"
+                  className="px-5 py-3.5"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {booking.isDeleted ? (
                       <>
                         <button
                           onClick={(e) => onRestore(e, booking.id)}
-                          className="p-2 rounded-lg bg-green-800 text-white hover:bg-green-700 transition-colors"
                           title="Restore"
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                         >
-                          <FaTrashRestore className="text-xl" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={(e) => onDelete(e, booking.id, true)}
-                          className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
                           title="Reject Forever"
+                          className="p-1.5 rounded-lg bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
                         >
-                          <FaTrash className="text-xl" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
                     ) : (
@@ -1303,26 +1291,28 @@ const BookingTable = ({
                         ].includes(booking.status) && (
                           <button
                             onClick={(e) => onConfirmPayment(e, booking.id)}
-                            className="p-2 rounded-lg bg-green-800 text-white hover:bg-green-700 transition-colors"
                             title={
                               booking.status === "pending_reservation"
                                 ? "Confirm Reservation"
                                 : "Confirm Full Payment"
                             }
+                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                           >
-                            <FaCheckCircle className="text-xl" />
+                            <CheckCircle2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                         {booking.status === "pending_reservation" && (
                           <button
                             onClick={(e) => onRequestReupload(e, booking.id)}
-                            className="p-2 rounded-lg bg-orange-700 text-white hover:bg-orange-600 transition-colors"
                             title="Request Re-upload"
+                            className="p-1.5 rounded-lg bg-orange-50 text-orange-500 hover:bg-orange-100 transition-colors"
                           >
-                            <FaUpload className="text-xl" />
+                            <Upload className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {!['completed', 'cancelled'].includes(booking.status) && (
+                        {!["completed", "cancelled", "inspection"].includes(
+                          booking.status,
+                        ) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1332,19 +1322,21 @@ const BookingTable = ({
                                 booking.paymentStatus,
                               );
                             }}
-                            className="p-2 rounded-lg bg-[#171717] text-white hover:bg-green-800 transition-colors"
                             title="Edit Status"
+                            className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
                           >
-                            <FaEdit className="text-xl" />
+                            <FaEdit className="text-sm" />
                           </button>
                         )}
-                        {!["active", "completed"].includes(booking.status) && (
+                        {!["active", "completed", "inspection"].includes(
+                          booking.status,
+                        ) && (
                           <button
                             onClick={(e) => onDelete(e, booking.id, false)}
-                            className="p-2 rounded-lg bg-red-800 text-white hover:bg-red-700 transition-colors"
                             title="Reject"
+                            className="p-1.5 rounded-lg bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
                           >
-                            <FaTrash className="text-xl" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </>
@@ -1360,25 +1352,7 @@ const BookingTable = ({
   );
 };
 
-// ── No results ────────────────────────────────────────────────────────────────
-const NoBookingsView = ({ onResetFilters }) => (
-  <div className="bg-[#b9b9b9] rounded-2xl p-12 text-center shadow-lg shadow-black/20">
-    <FaSearch className="mx-auto text-5xl text-[#171717]/40 mb-4" />
-    <h3 className="text-xl font-bold text-[#171717] mb-2">No Bookings Found</h3>
-    <p className="text-[#171717]/70 mb-6">
-      Try adjusting your search or filter criteria.
-    </p>
-    <button
-      onClick={onResetFilters}
-      className="w-40 py-2.5 px-4 rounded-xl mt-6 items-center justify-center gap-2 font-semibold text-sm text-white bg-[#b50002]
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-    >
-      Reset Filters
-    </button>
-  </div>
-);
-
-// ── Inline status-edit modal ──────────────────────────────────────────────────
+// ── Edit Status Modal ─────────────────────────────────────────────────────────
 const EditStatusModal = ({
   bookingId,
   currentStatus,
@@ -1387,49 +1361,64 @@ const EditStatusModal = ({
   onCancel,
 }) => {
   const filteredStatuses = getAllowedNextStatuses(currentStatus);
-  const [newStatus, setNewStatus] = useState(filteredStatuses[0] || currentStatus);
+  const [newStatus, setNewStatus] = useState(
+    filteredStatuses[0] || currentStatus,
+  );
 
   return (
-    <ModalShell onBackdropClick={onCancel}>
-      <h3 className="text-xl font-bold text-[#171717] mb-4">
-        Edit Booking Status
-      </h3>
-      <select
-        value={newStatus}
-        onChange={(e) => setNewStatus(e.target.value)}
-        className="w-full bg-[#c7c5c5] text-sm px-3 py-2 rounded-lg mb-4 focus:outline-none focus:ring-1 focus:ring-[#171717] text-[#171717]"
-        disabled={filteredStatuses.length === 0}
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
+        onClick={(e) => e.stopPropagation()}
       >
-        {filteredStatuses.map((opt) => (
-          <option value={opt} key={opt}>
-            {opt.charAt(0).toUpperCase() + opt.slice(1)}
-          </option>
-        ))}
-      </select>
-      <div className="flex gap-3">
-        <button
-          onClick={onCancel}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => onSave(bookingId, newStatus)}
+        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
+          <FaEdit className="text-[#b50002] text-lg" />
+        </div>
+        <h3 className="text-lg font-black text-[#171717] mb-1">
+          Edit Booking Status
+        </h3>
+        <p className="text-slate-400 text-sm mb-4">
+          Select the new status for this booking.
+        </p>
+        <select
+          value={newStatus}
+          onChange={(e) => setNewStatus(e.target.value)}
           disabled={filteredStatuses.length === 0}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
+          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30 mb-4"
         >
-          Save
-        </button>
+          {filteredStatuses.map((opt) => (
+            <option value={opt} key={opt}>
+              {opt.charAt(0).toUpperCase() + opt.slice(1)}
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(bookingId, newStatus)}
+            disabled={filteredStatuses.length === 0}
+            className="flex-1 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all disabled:opacity-60"
+          >
+            Save Changes
+          </button>
+        </div>
       </div>
-    </ModalShell>
+    </div>
   );
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const MotorcycleBooking = () => {
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("pending_reservation");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1473,6 +1462,7 @@ const MotorcycleBooking = () => {
           pickupTime: b.pickupTime || "",
           returnDate: b.returnDate || b.return || b.endDate || "",
           returnTime: b.returnTime || "",
+          extensions: Array.isArray(b.extensions) ? b.extensions : [],
           destination: b.destination || "Not specified",
           bookingDate: b.bookingDate || b.createdAt || "",
           status: normalizedStatus.toString(),
@@ -1490,7 +1480,6 @@ const MotorcycleBooking = () => {
           adminReviewComment: b.adminReviewComment || "",
           adminReviewedAt: b.adminReviewedAt || null,
           details,
-          // Snapshot spec fields — fallback for old bookings where details is empty
           motorcycleFuel: motorcycleInfo.fuel || "",
           motorcycleTransmission: motorcycleInfo.transmission || "",
           motorcycleEngineSize: motorcycleInfo.engineSize || "",
@@ -1513,6 +1502,8 @@ const MotorcycleBooking = () => {
       await alertModal("Failed to load bookings from server.", {
         isError: true,
       });
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -1523,7 +1514,6 @@ const MotorcycleBooking = () => {
     setCurrentPage(1);
   }, [searchTerm, selectedStatus, colSort]);
 
-  // ── Counts ────────────────────────────────────────────────────────────────
   const counts = useMemo(
     () => ({
       pendingReservation: bookings.filter(
@@ -1534,6 +1524,9 @@ const MotorcycleBooking = () => {
       ).length,
       active: bookings.filter((b) => !b.isDeleted && b.status === "active")
         .length,
+      inspection: bookings.filter(
+        (b) => !b.isDeleted && b.status === "inspection",
+      ).length,
       completed: bookings.filter(
         (b) => !b.isDeleted && b.status === "completed",
       ).length,
@@ -1541,30 +1534,21 @@ const MotorcycleBooking = () => {
         (b) => !b.isDeleted && b.status === "cancelled",
       ).length,
       rejected: bookings.filter((b) => b.isDeleted).length,
-      totalRequests: bookings.filter((b) => !b.isDeleted).length,
     }),
     [bookings],
   );
 
-  // ── Column sort ───────────────────────────────────────────────────────────
-  const handleColSort = (key) => {
+  const handleColSort = (key) =>
     setColSort((prev) => {
       if (prev.key !== key) return { key, dir: "asc" };
       const next = nextSortState(prev.dir);
       return next === null ? { key: null, dir: null } : { key, dir: next };
     });
-  };
 
-  // ── Filtered + sorted ─────────────────────────────────────────────────────
   const filteredBookings = useMemo(() => {
     let list = [...bookings];
-
-    if (selectedStatus === "rejected") {
-      list = list.filter((b) => b.isDeleted);
-    } else {
-      list = list.filter((b) => !b.isDeleted && b.status === selectedStatus);
-    }
-
+    if (selectedStatus === "rejected") list = list.filter((b) => b.isDeleted);
+    else list = list.filter((b) => !b.isDeleted && b.status === selectedStatus);
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
@@ -1575,16 +1559,14 @@ const MotorcycleBooking = () => {
           (b.email || "").toLowerCase().includes(q),
       );
     }
-
     if (colSort.key && colSort.dir) {
       list.sort((a, b) => {
-        let aVal = a[colSort.key];
-        let bVal = b[colSort.key];
-        if (typeof aVal === "number" || (!isNaN(Number(aVal)) && aVal !== "")) {
+        let aVal = a[colSort.key],
+          bVal = b[colSort.key];
+        if (typeof aVal === "number" || (!isNaN(Number(aVal)) && aVal !== ""))
           return colSort.dir === "asc"
             ? Number(aVal) - Number(bVal)
             : Number(bVal) - Number(aVal);
-        }
         if (colSort.key.includes("Date")) {
           const da = aVal ? new Date(aVal).getTime() : 0;
           const db = bVal ? new Date(bVal).getTime() : 0;
@@ -1600,7 +1582,6 @@ const MotorcycleBooking = () => {
         return db - da;
       });
     }
-
     return list;
   }, [bookings, searchTerm, selectedStatus, colSort]);
 
@@ -1650,18 +1631,16 @@ const MotorcycleBooking = () => {
       await alertModal("Booking not found", { isError: true });
       return;
     }
-
     const confirmed = await confirmModal(
       permanent
         ? `Permanently delete the booking for ${booking.customer}? This cannot be undone.`
         : `Reject the booking for ${booking.customer}?`,
       {
         isPermanent: permanent,
-        confirmLabel: permanent ? "Reject Forever" : "Yes, Reject",
+        confirmLabel: permanent ? "Delete Forever" : "Yes, Reject",
       },
     );
     if (!confirmed) return;
-
     try {
       if (!booking._id) {
         setBookings((prev) => prev.filter((p) => p.id !== bookingId));
@@ -1724,7 +1703,7 @@ const MotorcycleBooking = () => {
     }
     const isReservationStage = booking.status === "pending_reservation";
     const confirmText = isReservationStage
-      ? `Confirm reservation payment proof for ${booking.customer}? This will move the booking to Pending Full Payment and send a digital receipt email.`
+      ? `Confirm reservation payment for ${booking.customer}? This will move the booking to Pending Full Payment and send a digital receipt.`
       : `Confirm full payment of ₱${booking.amount} for ${booking.customer}? This will activate the booking.`;
     const confirmed = await confirmModal(confirmText, {
       confirmLabel: isReservationStage
@@ -1778,7 +1757,6 @@ const MotorcycleBooking = () => {
       await alertModal("Booking not found", { isError: true });
       return;
     }
-
     setReuploadModalBookingId(booking.id);
     setReuploadModalDefaultComment(
       booking.adminReviewComment ||
@@ -1794,7 +1772,6 @@ const MotorcycleBooking = () => {
       });
       return;
     }
-
     const bookingId = reuploadModalBookingId;
     const booking = bookings.find(
       (b) => b.id === bookingId || b._id === bookingId,
@@ -1803,7 +1780,6 @@ const MotorcycleBooking = () => {
       await alertModal("Booking not found", { isError: true });
       return;
     }
-
     try {
       setSendingReuploadRequest(true);
       const response = await api.patch(
@@ -1838,10 +1814,8 @@ const MotorcycleBooking = () => {
             updated.adminReviewComment ?? prev.adminReviewComment,
           adminReviewedAt: updated.adminReviewedAt || prev.adminReviewedAt,
         }));
-
       setReuploadModalBookingId(null);
       setReuploadModalDefaultComment("");
-
       await alertModal(
         response?.data?.message || "Re-upload request sent successfully.",
       );
@@ -1855,126 +1829,157 @@ const MotorcycleBooking = () => {
     }
   };
 
-  const clearSearch = () => setSearchTerm("");
+  const statCards = [
+    {
+      label: "Pending Reservation",
+      value: counts.pendingReservation,
+      sub: "Awaiting confirmation",
+      subColor: "text-amber-500",
+      icon: Clock,
+      accent: "bg-amber-500",
+      status: "pending_reservation",
+    },
+    {
+      label: "Pending Full Payment",
+      value: counts.pendingFullPayment,
+      sub: "Awaiting full payment",
+      subColor: "text-orange-500",
+      icon: CreditCard,
+      accent: "bg-orange-500",
+      status: "pending_full_payment",
+    },
+    {
+      label: "Active",
+      value: counts.active,
+      sub: "Currently rented",
+      subColor: "text-blue-500",
+      icon: CheckCircle2,
+      accent: "bg-blue-500",
+      status: "active",
+    },
+    {
+      label: "Inspection",
+      value: counts.inspection,
+      sub: "Under review",
+      subColor: "text-violet-500",
+      icon: ClipboardList,
+      accent: "bg-violet-500",
+      status: "inspection",
+    },
+    {
+      label: "Completed",
+      value: counts.completed,
+      sub: "Successfully closed",
+      subColor: "text-emerald-500",
+      icon: CheckCircle2,
+      accent: "bg-emerald-500",
+      status: "completed",
+    },
+    {
+      label: "Cancelled",
+      value: counts.cancelled,
+      sub: "Cancelled by user",
+      subColor: "text-slate-400",
+      icon: XCircle,
+      accent: "bg-slate-400",
+      status: "cancelled",
+    },
+    {
+      label: "Rejected",
+      value: counts.rejected,
+      sub: "Soft rejected",
+      subColor: "text-slate-400",
+      icon: Trash2,
+      accent: "bg-slate-400",
+      status: "rejected",
+    },
+  ];
+
   const selectedStatusLabel =
-    selectedStatus === "pending_reservation"
-      ? "Pending Reservation"
-      : selectedStatus === "pending_full_payment"
-        ? "Pending Full Payment"
-        : selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1);
+    statCards.find((s) => s.status === selectedStatus)?.label ?? selectedStatus;
 
   return (
-    <div className="min-h-screen pt-32 bg-[#e3e3e3] py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-4 rounded-3xl bg-gradient-to-br from-[#171717] via-[#212121] to-[#b50002] p-4 sm:p-5 border border-white/10 mt-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] font-black text-[#b9b9b9]/80 mb-1">
-              Booking Summary
-            </p>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
-              Booking Dashboard
-            </h1>
-            <p className="text-xs sm:text-sm text-[#b9b9b9]/80 mt-1.5 max-w-xl">
-              Monitor payment flow, verify receipts, and manage booking
-              lifecycle.
-            </p>
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
+        {/* Header */}
+        <div className="mb-7">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+            Booking Dashboard
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Monitor payment flow, verify receipts, and manage booking lifecycle.
+          </p>
+        </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-2 xl:grid-cols-7 gap-3 sm:gap-4 mb-6">
+          {statCards.map((s) => (
+            <StatCard
+              key={s.label}
+              {...s}
+              loading={loading}
+              isActive={selectedStatus === s.status}
+              onClick={() => setSelectedStatus(s.status)}
+            />
+          ))}
+        </div>
+
+        {/* Search + toolbar */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
+          <div className="relative">
+            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
+            <input
+              type="text"
+              placeholder="Search by customer, motorcycle, unit ID, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+              >
+                <FaTimes className="text-sm" />
+              </button>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-2xl mx-auto">
-          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#171717]" />
-          <input
-            type="text"
-            placeholder="Search by customer, motorcycle, unit ID, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-12 py-3 bg-[#c7c5c5] rounded-lg text-[#171717] placeholder-gray-500 focus:outline-none shadow-lg shadow-black/20 focus:ring-1 focus:ring-[#171717]"
-          />
-          {searchTerm && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#171717]"
-            >
-              <FaTimes />
-            </button>
-          )}
+        {/* Result count */}
+        <div className="flex items-center justify-between px-1 mb-4">
+          <p className="text-[11px] text-slate-400 font-semibold">
+            Showing{" "}
+            {filteredBookings.length === 0
+              ? 0
+              : Math.min(
+                  (currentPage - 1) * ITEMS_PER_PAGE + 1,
+                  filteredBookings.length,
+                )}
+            –{Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)}{" "}
+            of{" "}
+            <span className="text-[#171717] font-black">
+              {filteredBookings.length}
+            </span>{" "}
+            <span>{selectedStatusLabel}</span> bookings
+            {searchTerm && " (filtered)"}
+          </p>
         </div>
-      </div>
 
-      {/* Status Tabs */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <StatTab
-          title="Pending Reservation"
-          value={counts.pendingReservation}
-          icon={FaClock}
-          isActive={selectedStatus === "pending_reservation"}
-          onClick={() => setSelectedStatus("pending_reservation")}
-          // subtitle={`All requests: ${counts.totalRequests}`}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Pending Full Payment"
-          value={counts.pendingFullPayment}
-          icon={FaCreditCard}
-          isActive={selectedStatus === "pending_full_payment"}
-          onClick={() => setSelectedStatus("pending_full_payment")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Active"
-          value={counts.active}
-          icon={FaCheckCircle}
-          isActive={selectedStatus === "active"}
-          onClick={() => setSelectedStatus("active")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Completed"
-          value={counts.completed}
-          icon={FaCalendarAlt}
-          isActive={selectedStatus === "completed"}
-          onClick={() => setSelectedStatus("completed")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Cancelled"
-          value={counts.cancelled}
-          icon={FaBan}
-          isActive={selectedStatus === "cancelled"}
-          onClick={() => setSelectedStatus("cancelled")}
-          accentColor="text-white"
-        />
-        <StatTab
-          title="Rejected"
-          value={counts.rejected}
-          icon={FaTrash}
-          isActive={selectedStatus === "rejected"}
-          onClick={() => setSelectedStatus("rejected")}
-          accentColor="text-white"
-        />
-      </div>
-
-      {/* Result count */}
-      <div className="text-center text-[#171717] mb-4 text-sm">
-        Showing{" "}
-        {filteredBookings.length === 0
-          ? 0
-          : Math.min(
-              (currentPage - 1) * ITEMS_PER_PAGE + 1,
-              filteredBookings.length,
-            )}
-        –{Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)} of{" "}
-        {filteredBookings.length}{" "}
-        <span className="font-semibold">{selectedStatusLabel}</span> bookings
-        {searchTerm && " (filtered)"}
-      </div>
-
-      {/* Table */}
-      {paginated.length > 0 ? (
-        <>
+        {/* Table */}
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <tbody className="divide-y divide-slate-50">
+                {[...Array(5)].map((_, i) => (
+                  <SkeletonRow key={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : paginated.length === 0 ? (
+          <EmptyState onReset={() => setSearchTerm("")} />
+        ) : (
           <BookingTable
             bookings={paginated}
             onRowClick={setDrawerBooking}
@@ -1986,15 +1991,14 @@ const MotorcycleBooking = () => {
             onConfirmPayment={handleConfirmPayment}
             onRequestReupload={handleRequestReupload}
           />
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
-        </>
-      ) : (
-        <NoBookingsView onResetFilters={() => setSearchTerm("")} />
-      )}
+        )}
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      </div>
 
       {/* Detail Drawer */}
       {drawerBooking && (
@@ -2009,7 +2013,7 @@ const MotorcycleBooking = () => {
         />
       )}
 
-      {/* Inline Edit Status Modal */}
+      {/* Edit Status Modal */}
       {editingId && (
         <EditStatusModal
           bookingId={editingId}
@@ -2020,6 +2024,7 @@ const MotorcycleBooking = () => {
         />
       )}
 
+      {/* Reupload Modal */}
       {reuploadModalBookingId && (
         <ReuploadCommentModal
           defaultValue={reuploadModalDefaultComment}

@@ -43,6 +43,7 @@ const Navbar = () => {
   const navLinks = [
     { to: "/", label: "Home" },
     { to: "/motorcycles", label: "Motorcycles" },
+    { to: "/calendar", label: "Calendar" },
     { to: "/contact", label: "Contact" },
     { to: "/bookings", label: "Bookings" },
   ];

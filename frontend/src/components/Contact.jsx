@@ -142,17 +142,17 @@ const Contact = () => {
                 <InfoRow
                   icon={FaWhatsapp}
                   label="WhatsApp"
-                  value="+639811991157"
+                  value="0917 623 1426"
                 />
                 <InfoRow
                   icon={FaEnvelope}
                   label="Email"
-                  value="anaiasmotorcyclerental@gmail.com"
+                  value="jpineda132020@gmail.com"
                 />
                 <InfoRow
                   icon={FaMapMarkerAlt}
                   label="Location"
-                  value="Bacoor, Cavite"
+                  value="Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite"
                 />
                 <InfoRow
                   icon={FaClock}

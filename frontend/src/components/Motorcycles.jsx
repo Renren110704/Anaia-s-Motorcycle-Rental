@@ -15,6 +15,7 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles";
+import { getBestDiscount, computeDiscountedPrice } from "./DiscountBadge";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const ITEMS_PER_PAGE = 12;
@@ -142,6 +143,9 @@ const Motorcycles = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Active promos
+  const [activePromos, setActivePromos] = useState([]);
 
   const abortControllerRef = useRef(null);
   const topRef = useRef(null);
@@ -363,6 +367,33 @@ const Motorcycles = () => {
     sortBy,
     isMotorcycleUnavailable,
   ]);
+
+  // Fetch active promos
+  useEffect(() => {
+    const fetchPromos = async () => {
+      try {
+        const res = await axios.get("/api/discounts/active");
+        const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
+        const normalized = raw.map(p => ({
+          ...p,
+          discountType: p.discountType || p.type || "percentage",
+          discountValue: Number(p.discountValue ?? p.value ?? 0),
+          startDate: p.startDate || p.validFrom || null,
+          endDate: p.endDate || p.validTo || null,
+          maxUses: (p.maxUses ?? p.usageLimit) !== undefined ? Number(p.maxUses ?? p.usageLimit) : null,
+          usedCount: Number(p.usedCount ?? p.usageCount ?? 0),
+          minRentalDays: Number(p.minRentalDays ?? p.minimumRentalDays ?? 0),
+          applicableVehicleIds: p.applicableVehicleIds || p.applicableVehicleUnits || [],
+          applicableCategories: p.applicableCategories || [],
+          isActive: p.isActive !== false,
+        }));
+        setActivePromos(normalized);
+      } catch (err) {
+        setActivePromos([]);
+      }
+    };
+    fetchPromos();
+  }, []);
 
   useEffect(() => {
     fetchMotorcycles();
@@ -932,12 +963,22 @@ const Motorcycles = () => {
                       )}
                     </div>
                     <div className={carPageStyles.priceBadge}>
-                      ₱
-                      {motorcycle.dailyRate ??
-                        motorcycle.price ??
-                        motorcycle.pricePerDay ??
-                        "—"}
-                      /day
+                      {(() => {
+                        const originalPrice = motorcycle.dailyRate ?? motorcycle.price ?? motorcycle.pricePerDay ?? 0;
+                        const bestDiscount = getBestDiscount(motorcycle, activePromos, 1);
+                        const discountedPrice = bestDiscount ? computeDiscountedPrice(originalPrice, bestDiscount) : originalPrice;
+                        
+                        if (bestDiscount && discountedPrice < originalPrice) {
+                          return (
+                            <div className="flex flex-col items-start gap-0.5">
+                              <span className="text-xs opacity-60 line-through">₱{Math.round(originalPrice)}</span>
+                              <span className="text-sm font-bold">₱{Math.round(discountedPrice)}</span>
+                            </div>
+                          );
+                        }
+                        return <span>₱{Math.round(originalPrice)}</span>;
+                      })()}
+                      <span className="text-xs opacity-70 block mt-0.5">/day</span>
                     </div>
                   </div>
 

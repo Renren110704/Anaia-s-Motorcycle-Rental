@@ -43,104 +43,126 @@ const AdminLogin = ({ onLogin }) => {
         backgroundPosition: "center",
       }}
     >
-      <div className="w-full max-w-md bg-[#f4f3f3]/95 backdrop-blur-sm rounded-3xl border border-[#171717]/10 shadow-2xl p-6 sm:p-7">
-        <div className="flex items-center gap-3 mb-5">
-          <img
-            src={logo}
-            alt="Anaia's Logo"
-            className="w-24 h-16 object-cover rounded-xl  p-2"
-          />
-          <div>
-            <p className="text-[#171717] font-black text-lg leading-tight">
-              Admin Portal
-            </p>
-            <p className="text-[#171717]/55 text-xs">
-              Anaia's Motorcycle Rental
-            </p>
-          </div>
-        </div>
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
 
-        <h1 className="text-2xl font-black text-[#171717] tracking-tight">
-          Sign In
-        </h1>
+      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden">
+        {/* Top accent bar */}
+        
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#171717]/70 mb-1.5">
-              Username / Email
-            </label>
-            <input
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl bg-white/60 border border-[#171717]/15 px-3 py-2.5 text-sm outline-none focus-within:border-black transition-all hover:bg-white/90"
-              autoComplete="username"
-              required
+        <div className="p-7">
+          {/* Logo + brand */}
+          <div className="flex items-center gap-3 mb-5">
+            <img
+              src={logo}
+              alt="Anaia's Logo"
+              className="w-24 h-16 object-cover rounded-xl  p-2"
             />
+            <div>
+              <p className="text-[#171717] font-black text-lg leading-tight">
+                Admin Portal
+              </p>
+              <p className="text-[#171717]/55 text-xs">
+                Anaia's Motorcycle Rental
+              </p>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#171717]/70 mb-1.5">
-              Password
-            </label>
-            <div className="relative">
+          <h1 className="text-2xl font-black text-[#171717] tracking-tight mb-1">
+            Sign In
+          </h1>
+          <p className="text-slate-400 text-sm mb-6">
+            Enter your credentials to continue.
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
+            <div>
+              <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                Username / Email
+              </label>
               <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl bg-white/60 border border-[#171717]/15 px-3 py-2.5 pr-10 text-sm outline-none focus-within:border-black transition-all hover:bg-white/90"
+                type="text"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 transition-colors"
+                autoComplete="username"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#171717]/45 hover:text-[#171717] transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <FaEyeSlash /> : <FaEye />}
-              </button>
             </div>
-          </div>
 
-          <div className="rounded-xl border border-[#171717]/10 bg-[#f8f8f8] p-3">
-            <p className="text-xs font-semibold text-[#171717]/75 mb-2 uppercase tracking-wider">
-              Password Rules
-            </p>
-            <div className="space-y-1">
-              {PASSWORD_RULES.map((rule) => {
-                const met = !validation.errors.includes(rule);
-                return (
-                  <p
-                    key={rule}
-                    className={`text-xs flex items-center ${met ? "text-emerald-700" : "text-[#171717]/55"}`}
-                  >
-                    {met ? (
-                      <FaCheck className="w-3.5 h-3.5 mr-2 text-emerald-700" />
-                    ) : (
-                      <FaTimes className="w-3.5 h-3.5 mr-2 text-[#171717]/60" />
-                    )}
-                    {rule}
-                  </p>
-                );
-              })}
+            {/* Password */}
+            <div>
+              <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 transition-colors"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <FaEyeSlash className="text-sm" />
+                  ) : (
+                    <FaEye className="text-sm" />
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
 
-          {error && (
-            <div className="text-sm text-[#b50002] bg-[#b50002]/10 border border-[#b50002]/20 rounded-xl px-3 py-2">
-              {error}
+            {/* Password rules */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
+              <p className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2.5">
+                Password Rules
+              </p>
+              <div className="space-y-1.5">
+                {PASSWORD_RULES.map((rule) => {
+                  const met = !validation.errors.includes(rule);
+                  return (
+                    <p
+                      key={rule}
+                      className={`text-xs flex items-center gap-2 font-medium ${
+                        met ? "text-emerald-600" : "text-slate-400"
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[9px]
+                          ${met ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-300"}`}
+                      >
+                        {met ? <FaCheck /> : <FaTimes />}
+                      </span>
+                      {rule}
+                    </p>
+                  );
+                })}
+              </div>
             </div>
-          )}
 
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl
-                  shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]
-                  disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
-          >
-            Login
-          </button>
-        </form>
+            {/* Error */}
+            {error && (
+              <div className="text-sm text-[#b50002] bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 font-medium">
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+            >
+              Sign In
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

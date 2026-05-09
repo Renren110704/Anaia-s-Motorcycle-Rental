@@ -6,7 +6,9 @@ import logo from "../assets/logo.png";
 import {
   BarChart3,
   CalendarCheck,
+  ClipboardCheck,
   FileText,
+  MessageSquare,
   Menu,
   PlusCircle,
   Store,
@@ -24,6 +26,8 @@ const navLinks = [
   { path: "/manage-motorcycles", icon: FaMotorcycle, label: "Manage" },
   { path: "/analytics", icon: BarChart3, label: "Analytics" },
   { path: "/walk-in-rentals", icon: Store, label: "Walk-In" },
+  { path: "/return-inspection", icon: ClipboardCheck, label: "Inspection" },
+  { path: "/reviews", icon: MessageSquare, label: "Reviews" },
   { path: "/system-log", icon: FileText, label: "Logs" },
   {
     path: "/bookings",
@@ -256,8 +260,8 @@ const Navbar = ({ onLogout }) => {
                   Confirm Logout
                 </h3>
                 <p className="text-[#171717] mb-6 text-sm">
-                  Are you sure you want to logout? You will need to login again to
-                  access admin.
+                  Are you sure you want to logout? You will need to login again
+                  to access admin.
                 </p>
                 <div className="flex gap-3">
                   <button

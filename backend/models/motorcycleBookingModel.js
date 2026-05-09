@@ -36,6 +36,48 @@ const motorcycleSummarySchema = new Schema(
   { _id: false },
 );
 
+// ── Return inspection sub-document ─────────────────────────────────────────
+const returnInspectionSchema = new Schema(
+  {
+    clearanceStatus: {
+      type: String,
+      enum: [
+        "pending_inspection",
+        "cleared",
+        "damage_found",
+        "penalty_required",
+      ],
+      default: "pending_inspection",
+    },
+    damageNotes: { type: String, default: "" },
+    mechanicNotes: { type: String, default: "" },
+    repairEstimateAmount: { type: Number, default: 0 },
+    repairEstimateNotes: { type: String, default: "" },
+    repairAttachments: { type: [String], default: [] },
+    damagePhotos: { type: [String], default: [] },
+    penaltyAmount: { type: Number, default: 0 },
+    penaltySummary: { type: String, default: "" },
+    penaltySettled: { type: Boolean, default: false },
+    vehicleStatus: {
+      type: String,
+      enum: [
+        "inspection",
+        "under_review",
+        "repair_needed",
+        "available",
+        "maintenance",
+        "pending",
+        "rented",
+      ],
+      default: "inspection",
+    },
+    startedAt: { type: Date, default: null },
+    clearedAt: { type: Date, default: null },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false, default: {} },
+);
+
 // ── Booking details sub-document (fees, extras, pickup location) ──────────────
 // Previously missing — caused helmet fee & distance fee to be silently dropped.
 const bookingDetailsSchema = new Schema(
@@ -99,6 +141,7 @@ const motorcycleBookingSchema = new Schema(
         "pending_reservation",
         "pending_full_payment",
         "active",
+        "inspection",
         "completed",
         "cancelled",
       ],
@@ -148,6 +191,25 @@ const motorcycleBookingSchema = new Schema(
 
     // ── The previously-missing details field ──────────────────────────────────
     details: { type: bookingDetailsSchema, default: () => ({}) },
+
+    returnInspection: { type: returnInspectionSchema, default: () => ({}) },
+
+    extensions: {
+      type: [
+        {
+          requestedAt: { type: Date, default: Date.now },
+          requestedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+          previousReturnDate: { type: Date, default: null },
+          previousReturnTime: { type: String, default: "" },
+          newReturnDate: { type: Date, default: null },
+          newReturnTime: { type: String, default: "" },
+          previousAmount: { type: Number, default: 0 },
+          newAmount: { type: Number, default: 0 },
+          additionalAmount: { type: Number, default: 0 },
+        },
+      ],
+      default: () => [],
+    },
 
     address: { type: addressSchema, default: () => ({}) },
     isDeleted: { type: Boolean, default: false },

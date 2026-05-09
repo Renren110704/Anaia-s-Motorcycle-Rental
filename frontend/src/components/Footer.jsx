@@ -10,6 +10,7 @@ import {
   FaPhone,
   FaTwitter,
   FaYoutube,
+  FaTiktok,
 } from "react-icons/fa";
 import { GiCarKey } from "react-icons/gi";
 
@@ -44,11 +45,14 @@ const Footer = () => {
 
             <div className={styles.socialIcons}>
               {[
-                { Icon: FaFacebookF, href: "https://www.facebook.com/" },
-                { Icon: FaTwitter, href: "https://twitter.com/" },
-                { Icon: FaInstagram, href: "https://www.instagram.com/" },
-                { Icon: FaLinkedinIn, href: "https://www.linkedin.com/" },
-                { Icon: FaYoutube, href: "https://www.youtube.com/" },
+                {
+                  Icon: FaFacebookF,
+                  href: "https://www.facebook.com/anaiasmotorcyclerental",
+                },
+                {
+                  Icon: FaTiktok,
+                  href: "https://www.tiktok.com/@anaiasmotorcyclerental",
+                },
               ].map(({ Icon, href }, i) => (
                 <a
                   href={href}
@@ -65,10 +69,7 @@ const Footer = () => {
 
           {/* QUICK LINKS */}
           <div>
-            <h3 className={styles.sectionTitle}>
-              Quick Links
-              
-            </h3>
+            <h3 className={styles.sectionTitle}>Quick Links</h3>
             <ul className={styles.linkList}>
               {["Home", "Motorcycles", "Contact Us"].map((link, i) => (
                 <li key={i}>
@@ -77,8 +78,8 @@ const Footer = () => {
                       link === "Home"
                         ? "/"
                         : link === "Contact Us"
-                        ? "/contact"
-                        : "/motorcycles"
+                          ? "/contact"
+                          : "/motorcycles"
                     }
                     className={styles.linkItem}
                   >
@@ -92,9 +93,7 @@ const Footer = () => {
 
           {/* CONTACT */}
           <div>
-            <h3 className={styles.sectionTitle}>
-              Contact Us
-            </h3>
+            <h3 className={styles.sectionTitle}>Contact Us</h3>
 
             <ul className={styles.contactList}>
               <li className={styles.contactItem}>
@@ -106,12 +105,12 @@ const Footer = () => {
 
               <li className={styles.contactItem}>
                 <FaPhone className={styles.contactIcon} />
-                <span>+639811991157</span>
+                <span>0917 623 1426</span>
               </li>
 
               <li className={styles.contactItem}>
                 <FaEnvelope className={styles.contactIcon} />
-                <span>anaiasmotorcyclerental@gmail.com</span>
+                <span>jpineda132020@gmail.com</span>
               </li>
             </ul>
 
@@ -126,9 +125,7 @@ const Footer = () => {
 
           {/* NEWSLETTER */}
           <div>
-            <h3 className={styles.sectionTitle}>
-              Newsletter
-            </h3>
+            <h3 className={styles.sectionTitle}>Newsletter</h3>
             <p className={styles.newsletterText}>
               Subscribe for special offers and updates
             </p>
@@ -150,9 +147,7 @@ const Footer = () => {
 
         {/* BOTTOM COPYRIGHT */}
         <div className={styles.copyright}>
-          <p>
-            &copy; {new Date().getFullYear()}. All rights reserved.
-          </p>
+          <p>&copy; {new Date().getFullYear()}. All rights reserved.</p>
           <p className="mt-3 md:mt-0">
             Designed by{" "}
             <a
@@ -166,7 +161,6 @@ const Footer = () => {
           </p>
         </div>
       </div>
-      
     </footer>
   );
 };

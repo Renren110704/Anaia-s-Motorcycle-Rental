@@ -143,7 +143,7 @@ const reviewSchema = new Schema(
 );
 
 // Index for faster queries
-reviewSchema.index({ bookingId: 1 });
+// Note: bookingId index is automatically created by unique: true constraint
 reviewSchema.index({ userId: 1 });
 reviewSchema.index({ motorcycleId: 1 });
 reviewSchema.index({ createdAt: -1 });

@@ -1082,6 +1082,9 @@ const MotorcycleDetail = () => {
     formData.pickupTime,
   );
 
+  const days = calculateDays(formData.pickupDate, formData.returnDate);
+  const applicableDiscount = useApplicableDiscount(motorcycle, days);
+
   useEffect(() => {
     if (!formData.returnDate || validReturnSlots.length === 0) return;
     if (!validReturnSlots.some((s) => s.value === formData.returnTime))
@@ -1370,7 +1373,6 @@ const MotorcycleDetail = () => {
       : []),
   ].filter(Boolean);
   const price = Number(motorcycle.price ?? motorcycle.dailyRate ?? 0) || 0;
-  const days = calculateDays(formData.pickupDate, formData.returnDate);
   const {
     fee: distanceFee,
     tier: distanceTier,
@@ -1379,7 +1381,6 @@ const MotorcycleDetail = () => {
   } = getDistanceFee(formData.destinationCity);
   const helmetFee = formData.wantsHelmet ? HELMET_FEE : 0;
   const baseRental = days * price;
-  const applicableDiscount = useApplicableDiscount(motorcycle, days);
   const discountAmount = applicableDiscount
     ? applicableDiscount.discountType === "percentage"
       ? (baseRental * applicableDiscount.discountValue) / 100

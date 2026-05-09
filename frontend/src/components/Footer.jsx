@@ -4,12 +4,8 @@ import { Link } from "react-router-dom";
 import {
   FaEnvelope,
   FaFacebookF,
-  FaInstagram,
-  FaLinkedinIn,
   FaMapMarkedAlt,
   FaPhone,
-  FaTwitter,
-  FaYoutube,
   FaTiktok,
 } from "react-icons/fa";
 import { GiCarKey } from "react-icons/gi";

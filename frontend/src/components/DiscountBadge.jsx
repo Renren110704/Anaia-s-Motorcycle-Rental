@@ -448,7 +448,7 @@ export const ActivePromoBanner = () => {
   );
 };
 
-export default {
+const discountBadgeExports = {
   useApplicableDiscount,
   getBestDiscount,
   computeDiscountedPrice,
@@ -458,3 +458,5 @@ export default {
   PriceSummaryWithDiscount,
   ActivePromoBanner,
 };
+
+export default discountBadgeExports;

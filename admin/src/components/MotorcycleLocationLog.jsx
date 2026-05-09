@@ -5,14 +5,11 @@ import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import {
   FaArrowLeft,
-  FaClock,
   FaExclamationTriangle,
   FaMapMarkerAlt,
   FaMapMarkedAlt,
   FaMotorcycle,
   FaSync,
-  FaTrash,
-  FaIdBadge,
   FaSatelliteDish,
 } from "react-icons/fa";
 import { AlertTriangle, MapPin, Clock, Trash2 } from "lucide-react";
@@ -24,10 +21,6 @@ const api = axios.create({
   baseURL: BASE,
   headers: { Accept: "application/json" },
 });
-
-// ── Shared styles (same as ManageMotorcycle) ──────────────────────────────────
-const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const parseDate = (value) => {

@@ -10,7 +10,6 @@ import {
   FileText,
   LayoutDashboard,
   MessageSquare,
-  PlusCircle,
   Store,
   Menu,
   X,

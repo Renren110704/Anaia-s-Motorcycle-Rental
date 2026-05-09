@@ -8,9 +8,7 @@ import {
   Settings,
 } from "lucide-react";
 import axios from "axios";
-import API_BASE_URL from "../apiBase";
 import { homeCarsStyles as styles } from "../assets/dummyStyles";
-import { getBestDiscount, computeDiscountedPrice } from "./DiscountBadge";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -106,7 +104,6 @@ const HomeMotorcycles = () => {
   const [error, setError] = useState("");
   const [animateCards, setAnimateCards] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
-  const [activePromos, setActivePromos] = useState([]);
   const abortRef = useRef(null);
 
   const base = 'https://anaias-motorcycle-rental.onrender.com';
@@ -162,33 +159,6 @@ const HomeMotorcycles = () => {
     const filtered = motorcycles.filter((m) => !isMotorcycleUnavailable(m));
     setFilteredMotorcycles(filtered);
   }, [motorcycles]);
-
-  // Fetch active promos
-  useEffect(() => {
-    const fetchPromos = async () => {
-      try {
-        const res = await axios.get(`${API_BASE_URL}/api/discounts/active`);
-        const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
-        const normalized = raw.map(p => ({
-          ...p,
-          discountType: p.discountType || p.type || "percentage",
-          discountValue: Number(p.discountValue ?? p.value ?? 0),
-          startDate: p.startDate || p.validFrom || null,
-          endDate: p.endDate || p.validTo || null,
-          maxUses: (p.maxUses ?? p.usageLimit) !== undefined ? Number(p.maxUses ?? p.usageLimit) : null,
-          usedCount: Number(p.usedCount ?? p.usageCount ?? 0),
-          minRentalDays: Number(p.minRentalDays ?? p.minimumRentalDays ?? 0),
-          applicableVehicleIds: p.applicableVehicleIds || p.applicableVehicleUnits || [],
-          applicableCategories: p.applicableCategories || [],
-          isActive: p.isActive !== false,
-        }));
-        setActivePromos(normalized);
-      } catch (err) {
-        setActivePromos([]);
-      }
-    };
-    fetchPromos();
-  }, []);
 
   const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
   const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
@@ -490,23 +460,9 @@ const HomeMotorcycles = () => {
                 <div className={styles.borderOverlay}></div>
 
                 <div className={styles.priceBadge}>
-                  {(() => {
-                    const originalPrice = motorcycle.dailyRate ?? motorcycle.price ?? 0;
-                    const bestDiscount = getBestDiscount(motorcycle, activePromos, 1);
-                    const discountedPrice = bestDiscount ? computeDiscountedPrice(originalPrice, bestDiscount) : originalPrice;
-                    
-                    if (bestDiscount && discountedPrice < originalPrice) {
-                      return (
-                        <span className={styles.priceText}>
-                          <span className="line-through opacity-60 text-xs">₱{Math.round(originalPrice)}</span>
-                          {" "}
-                          <span className="font-bold">₱{Math.round(discountedPrice)}</span>
-                          /day
-                        </span>
-                      );
-                    }
-                    return <span className={styles.priceText}>₱{Math.round(originalPrice)}/day</span>;
-                  })()}
+                  <span className={styles.priceText}>
+                    ₱{motorcycle.dailyRate ?? motorcycle.price ?? 0}/day
+                  </span>
                 </div>
 
                 <div className="absolute right-4 top-4 z-20">

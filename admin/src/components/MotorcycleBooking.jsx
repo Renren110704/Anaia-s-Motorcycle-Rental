@@ -10,12 +10,10 @@ import {
   FaChevronRight,
   FaChevronUp,
   FaClock,
-  FaClipboardCheck,
   FaCog,
   FaCreditCard,
   FaEdit,
   FaEnvelope,
-  FaExclamationTriangle,
   FaGasPump,
   FaHardHat,
   FaIdBadge,
@@ -28,15 +26,11 @@ import {
   FaSort,
   FaTimes,
   FaUser,
-  FaTrash,
-  FaTrashRestore,
   FaMoneyBillWave,
   FaBan,
-  FaUpload,
 } from "react-icons/fa";
 import {
   AlertTriangle,
-  ArrowRight,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -44,7 +38,6 @@ import {
   Trash2,
   XCircle,
   ClipboardList,
-  Ban,
   Upload,
 } from "lucide-react";
 

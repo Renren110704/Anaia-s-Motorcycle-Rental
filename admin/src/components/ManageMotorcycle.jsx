@@ -14,7 +14,6 @@ import {
   FaGasPump,
   FaShieldAlt,
   FaTimes,
-  FaTrash,
   FaSearch,
   FaThLarge,
   FaList,

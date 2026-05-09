@@ -5,19 +5,14 @@ import {
   FaCheckCircle,
   FaSearch,
   FaTimes,
-  FaExclamationTriangle,
-  FaWrench,
   FaImages,
   FaFileInvoiceDollar,
   FaMotorcycle,
-  FaIdCard,
-  FaEnvelope,
   FaCalendarAlt,
   FaChevronDown,
 } from "react-icons/fa";
 import {
   AlertTriangle,
-  RotateCcw,
   CheckCircle2,
   ClipboardList,
   Wrench,
@@ -32,8 +27,6 @@ const api = axios.create({
 });
 
 // ── Shared style tokens (mirrors ManageMotorcycle) ─────────────────────────
-const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 const fieldCls =
   "w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30";
 

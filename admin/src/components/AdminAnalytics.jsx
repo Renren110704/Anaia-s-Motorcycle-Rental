@@ -4,8 +4,6 @@ import API_BASE_URL from "../apiBase";
 import {
   FaCalendarAlt,
   FaCheckCircle,
-  FaClock,
-  FaCreditCard,
   FaExclamationTriangle,
   FaFileExport,
   FaFilter,
@@ -14,12 +12,9 @@ import {
   FaPrint,
   FaRedo,
   FaShieldAlt,
-  FaChevronLeft,
-  FaChevronRight,
 } from "react-icons/fa";
 import {
   Bike,
-  Wrench,
   TrendingUp,
   AlertTriangle,
   Clock,
@@ -40,10 +35,6 @@ const monthKey = (dateLike) => {
   if (Number.isNaN(d.getTime())) return "Unknown";
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 };
-
-// ── Shared styles (mirrors ManageMotorcycle) ──────────────────────────────────
-const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 
 // ── Stat Card (mirrors ManageMotorcycle StatCard) ─────────────────────────────
 const StatCard = ({
@@ -597,27 +588,6 @@ const AdminAnalytics = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [filteredBookings]);
-
-  const earningsBreakdownItems = useMemo(() => {
-    return [
-      { label: "Reservation Fees", value: earningsAndExpenses.reservationFees },
-      { label: "Unit Rental", value: earningsAndExpenses.unitRental },
-      { label: "Helmet Fees", value: earningsAndExpenses.helmetFees },
-      { label: "Distance Fees", value: earningsAndExpenses.distanceFees },
-      {
-        label: "Extensions (Completed)",
-        value: earningsAndExpenses.extensions,
-      },
-      {
-        label: "Pending Extensions",
-        value: earningsAndExpenses.pendingExtensions,
-      },
-      { label: "Penalties", value: earningsAndExpenses.penalties },
-      { label: "Other", value: earningsAndExpenses.other },
-    ]
-      .filter((m) => m.value > 0)
-      .map((m) => ({ label: m.label, count: m.value }));
-  }, [earningsAndExpenses]);
 
   const exportCSV = useCallback(() => {
     const lines = [

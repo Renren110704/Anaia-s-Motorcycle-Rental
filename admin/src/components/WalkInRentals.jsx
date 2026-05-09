@@ -15,14 +15,13 @@ import {
   FaSearch,
   FaTachometerAlt,
   FaUser,
-  FaIdCard,
   FaTag,
   FaCog,
   FaShieldAlt,
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { PlusCircle, ArrowRight } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 
 const baseURL = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
@@ -33,8 +32,6 @@ const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 // ── Shared styles (same as ManageMotorcycle) ──────────────────────────────────
 const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
-const fieldCls =
-  "w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30";
 const fieldClsIcon =
   "w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 appearance-none";
 

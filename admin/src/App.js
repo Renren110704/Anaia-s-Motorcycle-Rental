@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import { Navigate, Route, Routes } from "react-router-dom";
-import AddMotorcycle from "./components/AddMotorcycle";
 import ManageMotorcycle from "./components/ManageMotorcycle";
 import MotorcycleBooking from "./components/MotorcycleBooking";
 import MotorcycleTracking from "./components/MotorcycleTracking";

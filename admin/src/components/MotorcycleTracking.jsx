@@ -8,12 +8,10 @@ import React, {
 import {
   FaMotorcycle,
   FaMapMarkerAlt,
-  FaClock,
   FaTimes,
   FaSearch,
   FaArrowLeft,
   FaUser,
-  FaIdBadge,
   FaBell,
   FaExclamationTriangle,
   FaCalendarAlt,
@@ -24,9 +22,6 @@ import {
   FaSatelliteDish,
   FaSyncAlt,
   FaExclamationCircle,
-  FaShieldAlt,
-  FaGasPump,
-  FaCog,
 } from "react-icons/fa";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";

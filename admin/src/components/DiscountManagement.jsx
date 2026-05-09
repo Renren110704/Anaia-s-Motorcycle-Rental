@@ -3,7 +3,6 @@ import {
   Tag,
   Plus,
   Search,
-  Filter,
   Edit2,
   Trash2,
   ToggleLeft,

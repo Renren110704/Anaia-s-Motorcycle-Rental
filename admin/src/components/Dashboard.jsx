@@ -5,7 +5,6 @@ import {
   TrendingUp,
   AlertTriangle,
   Clock,
-  CheckCircle2,
   Store,
   ClipboardCheck,
   CalendarCheck,

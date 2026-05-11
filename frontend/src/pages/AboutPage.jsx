@@ -69,14 +69,6 @@ const MILESTONES = [
   },
 ];
 
-// ─── Hero background — use the shop photo URL or a local import ─────
-// Replace the src below with: import shopPhoto from "../assets/shop.png"
-// and use {shopPhoto} if you add the image to your assets folder.
-const SHOP_PHOTO =
-  "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1800&q=80";
-// ↑ Fallback stock photo — swap with the actual shop image in production.
-// If you import the uploaded image, use that import variable instead.
-
 export default function AboutPage() {
   const [mounted, setMounted] = useState(false);
   const [valRef, valVisible] = useScrollReveal();

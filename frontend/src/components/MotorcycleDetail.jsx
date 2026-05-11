@@ -18,7 +18,6 @@ import {
   FaReceipt,
   FaCheckCircle,
   FaChevronDown,
-  FaChevronUp,
   FaInfoCircle,
   FaExclamationTriangle,
   FaMotorcycle,

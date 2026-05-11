@@ -1,13 +1,6 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
-  FaMotorcycle,
   FaCog,
   FaFilter,
   FaGasPump,
@@ -21,20 +14,13 @@ import {
   FaChevronUp,
   FaChevronDown,
   FaSort,
-  FaIdCard,
-  FaTag,
-  FaLayerGroup,
   FaCalendarAlt,
-  FaTachometerAlt,
-  FaHardHat,
   FaTools,
   FaCheckCircle,
-  FaClock,
 } from "react-icons/fa";
 import {
   Wrench,
   Bike,
-  ArrowRight,
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
@@ -89,7 +75,11 @@ const getAutomaticMaintenanceDate = () =>
 const formatMaintenanceDate = (startValue, endValue) => {
   const start = startValue ? new Date(startValue) : null;
   const end = endValue ? new Date(endValue) : null;
-  if ((!start || Number.isNaN(start.getTime())) && (!end || Number.isNaN(end.getTime()))) return "Not scheduled";
+  if (
+    (!start || Number.isNaN(start.getTime())) &&
+    (!end || Number.isNaN(end.getTime()))
+  )
+    return "Not scheduled";
   const today = startOfDay(new Date());
   // Normalize
   const s = start || end;
@@ -98,14 +88,27 @@ const formatMaintenanceDate = (startValue, endValue) => {
   const sDay = startOfDay(s);
   const eDay = startOfDay(e);
   if (eDay < today) return "Overdue";
-  if (sDay.getTime() === today.getTime() || (sDay <= today && today <= eDay)) return "Due today";
-  const sLabel = s.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-  const eLabel = e.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  if (sDay.getTime() === today.getTime() || (sDay <= today && today <= eDay))
+    return "Due today";
+  const sLabel = s.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const eLabel = e.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
   return sLabel === eLabel ? sLabel : `${sLabel} — ${eLabel}`;
 };
 
 const isMaintenanceOverdue = (startValue, endValue) => {
-  const end = endValue ? new Date(endValue) : (startValue ? new Date(startValue) : null);
+  const end = endValue
+    ? new Date(endValue)
+    : startValue
+      ? new Date(startValue)
+      : null;
   if (!end || Number.isNaN(end.getTime())) return false;
   return startOfDay(end) < startOfDay(new Date());
 };
@@ -159,9 +162,12 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
     isDeleted: raw.isDeleted || false,
     traccarDeviceId: raw.traccarDeviceId || "",
     deletedAt: raw.deletedAt || null,
-    maintenanceScheduleAt: raw.maintenanceScheduleStartAt || raw.maintenanceScheduleAt || null,
-    maintenanceScheduleStartAt: raw.maintenanceScheduleStartAt || raw.maintenanceScheduleAt || null,
-    maintenanceScheduleEndAt: raw.maintenanceScheduleEndAt || raw.maintenanceScheduleAt || null,
+    maintenanceScheduleAt:
+      raw.maintenanceScheduleStartAt || raw.maintenanceScheduleAt || null,
+    maintenanceScheduleStartAt:
+      raw.maintenanceScheduleStartAt || raw.maintenanceScheduleAt || null,
+    maintenanceScheduleEndAt:
+      raw.maintenanceScheduleEndAt || raw.maintenanceScheduleAt || null,
     _rawImage: raw.image ?? raw._rawImage ?? "",
     image: raw.image
       ? makeImageUrl(raw.image)
@@ -272,7 +278,13 @@ const confirmModal = (message, subMessage, confirmLabel, confirmAccent) =>
     );
   });
 
-const ScheduleModal = ({ motorcycle, initialStart, initialEnd, onConfirm, onCancel }) => {
+const ScheduleModal = ({
+  motorcycle,
+  initialStart,
+  initialEnd,
+  onConfirm,
+  onCancel,
+}) => {
   const [start, setStart] = useState(initialStart || "");
   const [end, setEnd] = useState(initialEnd || initialStart || "");
   const todayValue = toDateInputValue(new Date());
@@ -299,8 +311,12 @@ const ScheduleModal = ({ motorcycle, initialStart, initialEnd, onConfirm, onCanc
           <div className="mx-auto w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-[#b50002]/10">
             <FaCalendarAlt className="w-5 h-5 text-[#b50002]" />
           </div>
-          <h3 className="text-lg font-black text-[#171717] mb-2">Reschedule Maintenance</h3>
-          <p className="text-slate-500 text-sm mb-5">{motorcycle.make} {motorcycle.model}</p>
+          <h3 className="text-lg font-black text-[#171717] mb-2">
+            Reschedule Maintenance
+          </h3>
+          <p className="text-slate-500 text-sm mb-5">
+            {motorcycle.make} {motorcycle.model}
+          </p>
 
           <div className="text-left grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -327,11 +343,16 @@ const ScheduleModal = ({ motorcycle, initialStart, initialEnd, onConfirm, onCanc
               />
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Set a start and end date for maintenance. Past dates are blocked.</p>
+          <p className="text-[11px] text-slate-400 mt-2">
+            Set a start and end date for maintenance. Past dates are blocked.
+          </p>
 
           <button
             type="button"
-            onClick={() => { setStart(automaticValue); setEnd(automaticValue); }}
+            onClick={() => {
+              setStart(automaticValue);
+              setEnd(automaticValue);
+            }}
             className="mt-3 w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-colors"
           >
             Use automatic 6-month date
@@ -364,10 +385,18 @@ const scheduleModal = (motorcycle) =>
     document.body.appendChild(el);
     const root = ReactDOM.createRoot(el);
     const todayValue = toDateInputValue(new Date());
-    const currentStart = toDateInputValue(motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt);
-    const currentEnd = toDateInputValue(motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleAt);
-    const initialStart = currentStart && currentStart >= todayValue ? currentStart : getAutomaticMaintenanceDate();
-    const initialEnd = currentEnd && currentEnd >= initialStart ? currentEnd : initialStart;
+    const currentStart = toDateInputValue(
+      motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt,
+    );
+    const currentEnd = toDateInputValue(
+      motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleAt,
+    );
+    const initialStart =
+      currentStart && currentStart >= todayValue
+        ? currentStart
+        : getAutomaticMaintenanceDate();
+    const initialEnd =
+      currentEnd && currentEnd >= initialStart ? currentEnd : initialStart;
 
     const cleanup = (value) => {
       root.unmount();
@@ -573,7 +602,7 @@ const MotorcycleCard = ({
           ))}
         </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 mb-4">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 mb-4">
           <div>
             <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
               Next maintenance
@@ -581,7 +610,10 @@ const MotorcycleCard = ({
             <p
               className={`text-[12px] font-black ${isMaintenanceOverdue(m.maintenanceScheduleStartAt, m.maintenanceScheduleEndAt) ? "text-amber-600" : "text-[#171717]"}`}
             >
-              {formatMaintenanceDate(m.maintenanceScheduleStartAt, m.maintenanceScheduleEndAt)}
+              {formatMaintenanceDate(
+                m.maintenanceScheduleStartAt,
+                m.maintenanceScheduleEndAt,
+              )}
             </p>
           </div>
           <button
@@ -724,7 +756,10 @@ const MotorcycleTable = ({
                     <span
                       className={`text-[13px] font-semibold ${isMaintenanceOverdue(m.maintenanceScheduleStartAt, m.maintenanceScheduleEndAt) ? "text-amber-600" : "text-slate-600"}`}
                     >
-                      {formatMaintenanceDate(m.maintenanceScheduleStartAt, m.maintenanceScheduleEndAt)}
+                      {formatMaintenanceDate(
+                        m.maintenanceScheduleStartAt,
+                        m.maintenanceScheduleEndAt,
+                      )}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
@@ -794,7 +829,6 @@ const EmptyState = ({ onReset }) => (
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const MaintenancePage = () => {
-  const navigate = useNavigate();
   const [motorcycles, setMotorcycles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null); // id of unit being updated
@@ -1009,10 +1043,14 @@ const MaintenancePage = () => {
         maintenanceScheduleEndAt: end,
       });
       await api.put(`/api/motorcycles/${motorcycle._id}`, fd);
-      toast.success(`${motorcycle.make} ${motorcycle.model} maintenance rescheduled`);
+      toast.success(
+        `${motorcycle.make} ${motorcycle.model} maintenance rescheduled`,
+      );
       fetchMotorcycles(true);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to reschedule maintenance");
+      toast.error(
+        err.response?.data?.message || "Failed to reschedule maintenance",
+      );
     } finally {
       setUpdating(null);
     }

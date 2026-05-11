@@ -141,12 +141,16 @@ const PriceSlider = ({ min, max, value, onChange }) => {
   const [low, setLow] = useState(value[0]);
   const [high, setHigh] = useState(value[1]);
 
+  // Extract values to avoid complex expressions in dependency array
+  const valueLow = value[0];
+  const valueHigh = value[1];
+
   useEffect(() => {
-    setLow(value[0]);
-  }, [value[0]]);
+    setLow(valueLow);
+  }, [valueLow]);
   useEffect(() => {
-    setHigh(value[1]);
-  }, [value[1]]);
+    setHigh(valueHigh);
+  }, [valueHigh]);
 
   const pct = (v) => ((v - min) / (max - min)) * 100;
 

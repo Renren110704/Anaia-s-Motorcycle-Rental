@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import img1 from "../assets/scooter.png";
 import img2 from "../assets/naked.png";
 import img3 from "../assets/underbone.png";
@@ -117,15 +117,7 @@ export default function HeroBanner() {
     restartCycle(tab);
   };
 
-  const restartCycle = (currentTab) => {
-    clearInterval(intervalRef.current);
-    cancelAnimationFrame(progressRef.current);
-    setProgress(0);
-    startTimeRef.current = performance.now();
-    if (!paused) startAutoPlay(currentTab ?? activeTab);
-  };
-
-  const startAutoPlay = (fromTab) => {
+  const startAutoPlay = useCallback((fromTab) => {
     startTimeRef.current = performance.now();
 
     const tick = (now) => {
@@ -148,6 +140,14 @@ export default function HeroBanner() {
         return next;
       });
     }, AUTO_INTERVAL);
+  }, []);
+
+  const restartCycle = (currentTab) => {
+    clearInterval(intervalRef.current);
+    cancelAnimationFrame(progressRef.current);
+    setProgress(0);
+    startTimeRef.current = performance.now();
+    if (!paused) startAutoPlay(currentTab ?? activeTab);
   };
 
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function HeroBanner() {
       clearInterval(intervalRef.current);
       cancelAnimationFrame(progressRef.current);
     };
-  }, [paused]);
+  }, [paused, activeTab, startAutoPlay]);
 
   useEffect(() => {
     const el = wrapRef.current;

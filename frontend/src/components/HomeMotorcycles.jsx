@@ -10,7 +10,6 @@ import {
 } from "./DiscountBadge";
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);

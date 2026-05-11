@@ -81,7 +81,7 @@ const Navbar = () => {
         setUser(null);
       }
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -129,7 +129,7 @@ const Navbar = () => {
     setUser(null);
     setIsOpen(false);
     navigate("/", { replace: true });
-  }, [navigate]);
+  }, [navigate, api]);
 
   useEffect(() => {
     setIsOpen(false);
@@ -209,7 +209,7 @@ const Navbar = () => {
     } catch {
       setReuploadBadgeCount(0);
     }
-  }, [location.pathname]);
+  }, [location.pathname, api]);
 
   useEffect(() => {
     fetchBadge();

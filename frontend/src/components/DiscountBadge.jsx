@@ -148,46 +148,78 @@ export const DiscountedPrice = ({
 }) => {
   const discountedPrice = computeDiscountedPrice(originalPrice, discount);
   const savings = originalPrice - discountedPrice;
+  const pct =
+    discount?.discountType === "percentage"
+      ? `−${discount.discountValue}%`
+      : null;
 
   if (!discount) {
     return (
-      <span className={className}>
-        ₱{originalPrice}
-        {!compact && <span className="text-white/50 text-sm">/day</span>}
-      </span>
+      <div
+        className={`inline-flex flex-col items-center bg-white border border-black/8 rounded-lg px-3 py-1.5 ${className}`}
+      >
+        <span className="text-[10px] font-medium text-[#171717]/50 uppercase tracking-wider leading-none mb-0.5">
+          Daily rate
+        </span>
+        <div className="flex items-baseline gap-0.5">
+          <span className="text-[11px] text-[#171717]/50 font-medium">₱</span>
+          <span className="text-lg font-medium text-[#171717] leading-tight">
+            {originalPrice.toLocaleString()}
+          </span>
+        </div>
+        <span className="text-[10px] text-[#171717]/40 leading-none mt-0.5">
+          per day
+        </span>
+      </div>
     );
   }
 
   if (compact) {
     return (
-      <span className={`flex items-baseline gap-1.5 flex-wrap ${className}`}>
-        <span className="line-through opacity-50 text-base">
-          ₱{originalPrice}
+      <div
+        className={`inline-flex flex-col items-center bg-white border border-black/8 rounded-lg px-3 py-1.5 gap-0.5 ${className}`}
+      >
+        <span className="text-[10px] font-medium text-[#171717]/50 uppercase tracking-wider leading-none">
+          Daily rate
         </span>
-        <span className="text-white font-black text-xl">
-          ₱{Math.round(discountedPrice)}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xs text-[#171717]/40 line-through">
+            ₱{originalPrice.toLocaleString()}
+          </span>
+          <span className="text-lg font-medium text-green-700 leading-tight">
+            ₱{Math.round(discountedPrice).toLocaleString()}
+          </span>
+        </div>
+        <span className="text-[10px] font-medium bg-green-50 text-green-800 border border-green-200 px-1.5 py-px rounded leading-none">
+          {pct ?? `Save ₱${Math.round(savings).toLocaleString()}`}
         </span>
-        <span className="text-white/50 text-sm">/day</span>
-      </span>
+      </div>
     );
   }
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="line-through opacity-50 text-lg">
-          ₱{originalPrice}
-        </span>
-        <span className="font-black text-3xl">
-          ₱{Math.round(discountedPrice)}
-        </span>
-        <span className="opacity-50 text-sm mb-0.5">/day</span>
-      </div>
-      <span className="text-green-400 text-xs font-bold mt-0.5">
-        Save ₱{Math.round(savings)}
-        {discount.discountType === "percentage" &&
-          ` (${discount.discountValue}% off)`}
+    <div
+      className={`inline-flex flex-col bg-white border border-black/8 rounded-xl px-4 py-3 gap-1.5 ${className}`}
+    >
+      <span className="text-[10px] font-medium text-[#171717]/50 uppercase tracking-wider leading-none">
+        Daily rate
       </span>
+      <div className="flex items-baseline gap-2">
+        <span className="text-sm text-[#171717]/40 line-through">
+          ₱{originalPrice.toLocaleString()}
+        </span>
+        <span className="text-2xl font-medium text-[#171717] leading-tight">
+          ₱{Math.round(discountedPrice).toLocaleString()}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-medium bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded">
+          {pct ? `${pct} off` : `−₱${Math.round(savings).toLocaleString()}`}
+        </span>
+        <span className="text-[10px] text-[#171717]/40">
+          Save ₱{Math.round(savings).toLocaleString()}/day
+        </span>
+      </div>
     </div>
   );
 };
@@ -200,16 +232,34 @@ export const PromoBanner = ({ discount, className = "" }) => {
   if (!discount) return null;
 
   const label = discount.code
-    ? `${discount.code} — ${discount.discountType === "percentage" ? `${discount.discountValue}% Off` : `₱${discount.discountValue} Off`}`
+    ? `${discount.name} — ${
+        discount.discountType === "percentage"
+          ? `${discount.discountValue}% off`
+          : `₱${discount.discountValue} off`
+      }`
     : discount.name;
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide
-        bg-gradient-to-r from-[#b50002] to-[#ff3333] text-white shadow-lg shadow-[#b50002]/40 animate-pulse ${className}`}
+      className={`inline-flex items-center gap-1 bg-red-50 border border-red-200 rounded px-2 py-1 ${className}`}
     >
-      <span>🏷️</span>
-      {label}
+      <svg
+        width="11"
+        height="11"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#A32D2D"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <line x1="7" y1="7" x2="7.01" y2="7" />
+      </svg>
+      <span className="text-[10px] font-medium text-red-800 tracking-wide">
+        {label}
+      </span>
     </div>
   );
 };
@@ -444,6 +494,48 @@ export const ActivePromoBanner = () => {
           {current + 1}/{promos.length}
         </span>
       )}
+    </div>
+  );
+};
+
+export const PriceBadge = ({ originalPrice, discount, className = "" }) => {
+  const discountedPrice = Math.round(
+    computeDiscountedPrice(originalPrice, discount),
+  );
+  const savings = originalPrice - discountedPrice;
+
+  if (!discount) {
+    return (
+      <div className={`flex flex-col items-end ${className}`}>
+        <span className="text-[9px] font-semibold text-[#171717]/40 uppercase tracking-widest leading-none mb-0.5">
+          Daily rate
+        </span>
+        <span className="text-lg font-bold text-[#171717] leading-tight">
+          ₱{originalPrice.toLocaleString()}
+        </span>
+        <span className="text-[9px] text-[#171717]/40 leading-none">/ day</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col items-end ${className}`}>
+      <span className="text-[9px] font-semibold text-[#171717]/40 uppercase tracking-widest leading-none mb-0.5">
+        Daily rate
+      </span>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-xs text-[#171717]/40 line-through leading-none">
+          ₱{originalPrice.toLocaleString()}
+        </span>
+        <span className="text-lg font-bold text-[#171717] leading-tight">
+          ₱{discountedPrice.toLocaleString()}
+        </span>
+      </div>
+      <span className="text-[9px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-px leading-none mt-0.5">
+        {discount.discountType === "percentage"
+          ? `−${discount.discountValue}% · save ₱${Math.round(savings)}`
+          : `save ₱${Math.round(savings)}`}
+      </span>
     </div>
   );
 };

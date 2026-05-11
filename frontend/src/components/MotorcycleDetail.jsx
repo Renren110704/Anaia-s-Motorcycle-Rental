@@ -29,7 +29,11 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
-import { computeDiscountedPrice, useApplicableDiscount } from "./DiscountBadge";
+import {
+  computeDiscountedPrice,
+  useApplicableDiscount,
+  DiscountedPrice,
+} from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
@@ -961,7 +965,9 @@ const PriceSummary = ({
         value={
           discount ? (
             <span className="flex items-baseline gap-1.5 justify-end flex-wrap">
-              <span className="line-through opacity-40 text-xs">₱{baseRental}</span>
+              <span className="line-through opacity-40 text-xs">
+                ₱{baseRental}
+              </span>
               <span>₱{Math.round(discountedBaseRental)}</span>
             </span>
           ) : (
@@ -1165,7 +1171,8 @@ const MotorcycleDetail = () => {
     }
 
     const tick = async () => {
-      const remainingMs = new Date(checkoutLock.expiresAt).getTime() - Date.now();
+      const remainingMs =
+        new Date(checkoutLock.expiresAt).getTime() - Date.now();
       const remaining = Math.max(0, Math.floor(remainingMs / 1000));
       setLockSecondsLeft(remaining);
 
@@ -1184,7 +1191,9 @@ const MotorcycleDetail = () => {
           paymentSentAmount: String(DOWNPAYMENT),
           paymentProofImage: null,
         }));
-        toast.error("Checkout session expired. Please start again from Step 1.");
+        toast.error(
+          "Checkout session expired. Please start again from Step 1.",
+        );
       }
     };
 
@@ -1192,7 +1201,12 @@ const MotorcycleDetail = () => {
     lockTimerRef.current = setInterval(tick, 1000);
 
     return () => clearLockTimer();
-  }, [bookingStep, checkoutLock.expiresAt, clearLockTimer, releaseCheckoutLock]);
+  }, [
+    bookingStep,
+    checkoutLock.expiresAt,
+    clearLockTimer,
+    releaseCheckoutLock,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1290,12 +1304,16 @@ const MotorcycleDetail = () => {
           params: { limit: 6 },
         });
         const data = res.data || {};
-        const rows = Array.isArray(data.reviews) ? data.reviews : data.reviews || [];
+        const rows = Array.isArray(data.reviews)
+          ? data.reviews
+          : data.reviews || [];
         if (!mounted) return;
         setReviews(rows);
       } catch (err) {
         if (!mounted) return;
-        setReviewsError(err.response?.data?.message || "Failed to load reviews");
+        setReviewsError(
+          err.response?.data?.message || "Failed to load reviews",
+        );
       } finally {
         if (mounted) setReviewsLoading(false);
       }
@@ -1308,39 +1326,36 @@ const MotorcycleDetail = () => {
     };
   }, [motorcycle, id]);
 
-  const voteOnReview = useCallback(
-    async (reviewId, vote) => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast.error("Please log in to vote on a review.");
-        return;
-      }
+  const voteOnReview = useCallback(async (reviewId, vote) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please log in to vote on a review.");
+      return;
+    }
 
-      try {
-        setVotingReviewId(reviewId);
-        const res = await api.patch(
-          `/api/reviews/${reviewId}/vote`,
-          { vote },
-          { headers: { Authorization: `Bearer ${token}` } },
+    try {
+      setVotingReviewId(reviewId);
+      const res = await api.patch(
+        `/api/reviews/${reviewId}/vote`,
+        { vote },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const updated = res.data?.review || null;
+      if (updated) {
+        setReviews((prev) =>
+          prev.map((review) =>
+            String(review._id || review.id) === String(reviewId)
+              ? { ...review, ...updated }
+              : review,
+          ),
         );
-        const updated = res.data?.review || null;
-        if (updated) {
-          setReviews((prev) =>
-            prev.map((review) =>
-              String(review._id || review.id) === String(reviewId)
-                ? { ...review, ...updated }
-                : review,
-            ),
-          );
-        }
-      } catch (err) {
-        toast.error(err.response?.data?.message || "Failed to save vote.");
-      } finally {
-        setVotingReviewId("");
       }
-    },
-    [],
-  );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save vote.");
+    } finally {
+      setVotingReviewId("");
+    }
+  }, []);
 
   if (!motorcycle && loadingMotorcycle)
     return (
@@ -1565,7 +1580,10 @@ const MotorcycleDetail = () => {
       formData.pickupDate,
       formData.pickupTime,
     );
-    const returnAt = parseLocalDateTime(formData.returnDate, formData.returnTime);
+    const returnAt = parseLocalDateTime(
+      formData.returnDate,
+      formData.returnTime,
+    );
     if (!pickupAt || !returnAt) {
       toast.error("Please select valid pickup and return schedule.");
       return;
@@ -1575,6 +1593,31 @@ const MotorcycleDetail = () => {
     if (returnAt.getTime() - pickupAt.getTime() < minDurationMs) {
       toast.error("Minimum rental duration is 24 hours.");
       return;
+    }
+
+    // ── Check for scheduled maintenance conflicts ──────────────────────
+    if (motorcycle) {
+      const rawStart = motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt || null;
+      const rawEnd = motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleAt || null;
+      if (rawStart && rawEnd) {
+        const maintenanceStart = new Date(rawStart);
+        maintenanceStart.setHours(0, 0, 0, 0);
+        const maintenanceEnd = new Date(rawEnd);
+        maintenanceEnd.setHours(23, 59, 59, 999);
+
+        const pickupDay = new Date(pickupAt);
+        pickupDay.setHours(0, 0, 0, 0);
+        const returnDay = new Date(returnAt);
+        returnDay.setHours(0, 0, 0, 0);
+
+        if (!(returnDay < maintenanceStart || pickupDay > maintenanceEnd)) {
+          const startLabel = maintenanceStart.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+          const endLabel = maintenanceEnd.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+          const label = startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
+          toast.error(`This motorcycle is scheduled for maintenance on ${label}. Please select different dates.`);
+          return;
+        }
+      }
     }
 
     setBookingStep(2);
@@ -1727,11 +1770,13 @@ const MotorcycleDetail = () => {
         signal: controller.signal,
       });
       if (applicableDiscount?._id) {
-        api.patch(
-          `/api/discounts/${applicableDiscount._id}/increment-usage`,
-          {},
-          { headers },
-        ).catch(() => {});
+        api
+          .patch(
+            `/api/discounts/${applicableDiscount._id}/increment-usage`,
+            {},
+            { headers },
+          )
+          .catch(() => {});
       }
       clearLockTimer();
       setCheckoutLock({
@@ -1882,11 +1927,78 @@ const MotorcycleDetail = () => {
                 <p className="text-white/60 text-sm mt-0.5">
                   {motorcycle.year}
                 </p>
-                <div className="mt-2 flex items-end gap-1">
-                  <span className="text-white font-bold text-3xl">
-                    ₱{price}
-                  </span>
-                  <span className="text-white/50 text-sm mb-0.5">/ day</span>
+
+                {/* ── Maintenance warning banner ── */}
+                {(() => {
+                  const rawStart = motorcycle?.maintenanceScheduleStartAt || motorcycle?.maintenanceScheduleAt || null;
+                  const rawEnd = motorcycle?.maintenanceScheduleEndAt || motorcycle?.maintenanceScheduleAt || null;
+                  if (!rawStart || !rawEnd) return null;
+                  const s = new Date(rawStart);
+                  const e = new Date(rawEnd);
+                  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+                  const startLabel = s.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+                  const endLabel = e.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+                  const label = startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
+                  return (
+                    <div className="mt-3 p-3 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-start gap-2">
+                      <FaExclamationTriangle className="text-amber-400 text-sm flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-amber-100/90">
+                        <p className="font-semibold">Maintenance Scheduled</p>
+                        <p className="text-xs text-amber-100/70 mt-0.5">
+                          This bike will be under maintenance on <strong>{label}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="mt-3">
+                  {/* Inside the dark card, below motorcycle name/year */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-1">
+                      Daily rate
+                    </p>
+                    {applicableDiscount ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm text-white/40 line-through">
+                            ₱{price.toLocaleString()}
+                          </span>
+                          <span className="text-2xl font-bold text-white leading-tight">
+                            ₱
+                            {Math.round(
+                              computeDiscountedPrice(price, applicableDiscount),
+                            ).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-semibold bg-green-500/20 text-green-300 border border-green-500/30 rounded px-2 py-px">
+                            {applicableDiscount.discountType === "percentage"
+                              ? `−${applicableDiscount.discountValue}% off`
+                              : `₱${applicableDiscount.discountValue} off`}
+                          </span>
+                          <span className="text-[10px] text-white/40">
+                            Save ₱
+                            {Math.round(
+                              price -
+                                computeDiscountedPrice(
+                                  price,
+                                  applicableDiscount,
+                                ),
+                            ).toLocaleString()}
+                            /day
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-white leading-tight">
+                          ₱{price.toLocaleString()}
+                        </span>
+                        <span className="text-sm text-white/40">/day</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1943,9 +2055,13 @@ const MotorcycleDetail = () => {
               )}
               {/* ── Customer Reviews ── */}
               <div className="mt-6">
-                <h4 className="text-sm font-bold text-[#171717] mb-3">Customer Reviews</h4>
+                <h4 className="text-sm font-bold text-[#171717] mb-3">
+                  Customer Reviews
+                </h4>
                 {reviewsLoading ? (
-                  <p className="text-xs text-[#171717]/60">Loading reviews...</p>
+                  <p className="text-xs text-[#171717]/60">
+                    Loading reviews...
+                  </p>
                 ) : reviewsError ? (
                   <p className="text-xs text-red-700">{reviewsError}</p>
                 ) : reviews.length === 0 ? (
@@ -1953,21 +2069,41 @@ const MotorcycleDetail = () => {
                 ) : (
                   <div className="space-y-3">
                     {reviews.slice(0, 6).map((r) => (
-                      <div key={r._id || r.id} className="bg-white rounded-xl border border-black/10 p-3">
+                      <div
+                        key={r._id || r.id}
+                        className="bg-white rounded-xl border border-black/10 p-3"
+                      >
                         <div className="flex items-start justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-[#171717]">{r.renterName || r.name || 'Anonymous'}</div>
-                            <div className="text-xs text-[#171717]/50">{r.rating || 0} / 5</div>
+                            <div className="text-sm font-semibold text-[#171717]">
+                              {r.renterName || r.name || "Anonymous"}
+                            </div>
+                            <div className="text-xs text-[#171717]/50">
+                              {r.rating || 0} / 5
+                            </div>
                           </div>
-                          <div className="text-xs text-[#171717]/50">{new Date(r.createdAt || r.created_at || Date.now()).toLocaleDateString()}</div>
+                          <div className="text-xs text-[#171717]/50">
+                            {new Date(
+                              r.createdAt || r.created_at || Date.now(),
+                            ).toLocaleDateString()}
+                          </div>
                         </div>
-                        <p className="text-sm text-[#171717]/80 mt-2">{r.feedbackDescription || r.comment || ''}</p>
+                        <p className="text-sm text-[#171717]/80 mt-2">
+                          {r.feedbackDescription || r.comment || ""}
+                        </p>
                         {r.adminReplyMessage && (
                           <div className="mt-2 p-2 bg-[#f4f4f4] rounded-md border border-[#b50002]/10">
-                            <div className="text-xs font-semibold text-[#b50002]">Admin Reply</div>
-                            <div className="text-sm text-[#171717] mt-1">{r.adminReplyMessage}</div>
+                            <div className="text-xs font-semibold text-[#b50002]">
+                              Admin Reply
+                            </div>
+                            <div className="text-sm text-[#171717] mt-1">
+                              {r.adminReplyMessage}
+                            </div>
                             {r.adminRepliedAt && (
-                              <div className="text-xs text-[#171717]/50 mt-1">Replied: {new Date(r.adminRepliedAt).toLocaleString()}</div>
+                              <div className="text-xs text-[#171717]/50 mt-1">
+                                Replied:{" "}
+                                {new Date(r.adminRepliedAt).toLocaleString()}
+                              </div>
                             )}
                           </div>
                         )}
@@ -1983,7 +2119,9 @@ const MotorcycleDetail = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => voteOnReview(r._id || r.id, "dislike")}
+                            onClick={() =>
+                              voteOnReview(r._id || r.id, "dislike")
+                            }
                             disabled={votingReviewId === (r._id || r.id)}
                             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-red-200 bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-60"
                           >

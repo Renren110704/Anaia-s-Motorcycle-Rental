@@ -52,6 +52,10 @@ const motorcycleSchema = new Schema({
   fuelType: { type: String, default: "Unleaded" }, // Unleaded, Premium
   mileage: { type: Number, default: 0 },
   dailyRate: { type: Number, required: true },
+  // Maintenance schedule (start and end). Keep single-date field for backwards compatibility.
+  maintenanceScheduleAt: { type: Date, default: null },
+  maintenanceScheduleStartAt: { type: Date, default: null },
+  maintenanceScheduleEndAt: { type: Date, default: null },
   hasABS: { type: Boolean, default: false },
   hasHelmet: { type: Boolean, default: true },
   status: {
@@ -112,6 +116,17 @@ motorcycleSchema.methods.isAvailableForRange = function (
     if (rangesOverlap(start, end, bStart, bEnd)) return false;
   }
 
+  // Check maintenance schedule range (supporting new start/end fields and legacy single-date)
+  const mStart = this.maintenanceScheduleStartAt || this.maintenanceScheduleAt || null;
+  const mEnd = this.maintenanceScheduleEndAt || this.maintenanceScheduleAt || null;
+  if (mStart && mEnd) {
+    const ms = new Date(mStart);
+    const me = new Date(mEnd);
+    ms.setHours(0, 0, 0, 0);
+    me.setHours(23, 59, 59, 999);
+    if (rangesOverlap(start, end, ms, me)) return false;
+  }
+
   return true;
 };
 
@@ -162,6 +177,18 @@ motorcycleSchema.methods.getAvailabilitySummary = function (nowDate = new Date()
   }
 
   return { state: "fully_available" };
+};
+
+// Helper: return maintenance range normalized or null
+motorcycleSchema.methods.getMaintenanceRange = function () {
+  const start = this.maintenanceScheduleStartAt || this.maintenanceScheduleAt || null;
+  const end = this.maintenanceScheduleEndAt || this.maintenanceScheduleAt || null;
+  if (!start || !end) return null;
+  const s = new Date(start);
+  const e = new Date(end);
+  s.setHours(0, 0, 0, 0);
+  e.setHours(23, 59, 59, 999);
+  return { start: s, end: e };
 };
 
 // Soft delete method
@@ -229,6 +256,35 @@ motorcycleSchema.statics.computeAvailabilityForMotorcycles = function (
         bookingId: next.bookingId,
       };
       return motorcycle;
+    }
+
+    // Check maintenance schedule and mark as maintenance if it is currently ongoing
+    const mStart = motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt || null;
+    const mEnd = motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleAt || null;
+    if (mStart && mEnd) {
+      const ms = new Date(mStart);
+      const me = new Date(mEnd);
+      ms.setHours(0, 0, 0, 0);
+      me.setHours(23, 59, 59, 999);
+      if (ms <= now && now <= me) {
+        const msLeft = me - now;
+        const daysRemaining = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+        motorcycle.availability = {
+          state: "maintenance",
+          daysRemaining: Math.max(daysRemaining, 0),
+          until: me,
+        };
+        return motorcycle;
+      }
+      // If maintenance is scheduled in the future, expose that info
+      if (ms > now) {
+        motorcycle.availability = {
+          state: "maintenance_scheduled",
+          nextMaintenanceStarts: ms,
+          nextMaintenanceEnds: me,
+        };
+        return motorcycle;
+      }
     }
 
     motorcycle.availability = { state: "fully_available" };

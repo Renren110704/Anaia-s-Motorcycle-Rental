@@ -280,11 +280,11 @@ const Dashboard = () => {
             </p>
           </div>
           <Link
-            to="/bookings"
+            to="/calendar"
             className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
           >
             <CalendarCheck className="w-4 h-4" />
-            Bookings
+            Calendar
             {pending > 0 && (
               <span className="ml-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-white text-[#b50002] text-[10px] font-black">
                 {pending}

@@ -13,6 +13,8 @@ import systemLogRouter from "./routes/systemLogRoutes.js";
 import trackingRouter from "./routes/trackingRoutes.js";
 import reviewRouter from "./routes/reviewRoutes.js";
 import discountRoutes from "./routes/discountRoutes.js";
+import { startMaintenanceScheduler } from "./utils/maintenanceScheduler.js";
+import contactMessageRouter from "./routes/contactMessageRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -97,6 +99,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 connectDB();
+startMaintenanceScheduler();
 
 // MIDDLEWARES
 const corsOptions = isDev
@@ -159,6 +162,7 @@ app.use("/api/system-logs", systemLogRouter);
 app.use("/api/tracking", trackingRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/discounts", discountRoutes);
+app.use("/api/contact-messages", contactMessageRouter);
 
 app.get("/api/ping", (req, res) =>
   res.json({

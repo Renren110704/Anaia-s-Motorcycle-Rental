@@ -730,6 +730,35 @@ export const createMotorcycleBooking = async (req, res) => {
       });
     }
 
+    // ── Check for scheduled maintenance conflicts ────────────────────────
+    const motorcycleWithMaintenance = await Motorcycle.findById(motorcycleId)
+      .select("maintenanceScheduleAt maintenanceScheduleStartAt maintenanceScheduleEndAt status")
+      .lean();
+
+    if (motorcycleWithMaintenance && motorcycleWithMaintenance.status !== "maintenance") {
+      const rawStart = motorcycleWithMaintenance.maintenanceScheduleStartAt || motorcycleWithMaintenance.maintenanceScheduleAt || null;
+      const rawEnd = motorcycleWithMaintenance.maintenanceScheduleEndAt || motorcycleWithMaintenance.maintenanceScheduleAt || null;
+      if (rawStart && rawEnd) {
+        const maintenanceStart = new Date(rawStart);
+        maintenanceStart.setHours(0, 0, 0, 0);
+        const maintenanceEnd = new Date(rawEnd);
+        maintenanceEnd.setHours(23, 59, 59, 999);
+
+        const pickupDay = new Date(pickup);
+        pickupDay.setHours(0, 0, 0, 0);
+        const returnDay = new Date(ret);
+        returnDay.setHours(0, 0, 0, 0);
+
+        // Overlap if maintenance window intersects booking range
+        if (!(returnDay < maintenanceStart || pickupDay > maintenanceEnd)) {
+          return res.status(409).json({
+            success: false,
+            message: `Motorcycle is scheduled for maintenance between ${maintenanceStart.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })} and ${maintenanceEnd.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}. Please select different dates.`,
+          });
+        }
+      }
+    }
+
     // ── Upload payment proof image ────────────────────────────────────────
     const paymentProofUrl = await getUploadedPaymentProofUrl(req.file);
     if (!paymentProofUrl) {

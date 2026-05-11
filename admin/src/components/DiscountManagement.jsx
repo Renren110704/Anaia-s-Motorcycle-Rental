@@ -276,7 +276,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
   };
 
   const inputCls = (field) =>
-    `w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#171717] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#b50002]/30 transition-all
+    `w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#171717] placeholder-slate-400 focus:outline-none 
     ${errors[field] ? "border-red-300 bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`;
 
   return createPortal(
@@ -1056,7 +1056,7 @@ const DiscountManagement = () => {
               placeholder="Search by name, code, or description..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#171717] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#b50002]/20 focus:border-[#b50002]/30 shadow-sm"
+              className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#171717] placeholder-slate-400 focus:outline-none focus:border-[#b50002]/30 shadow-sm"
             />
             {search && (
               <button

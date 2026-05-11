@@ -1,46 +1,40 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowRight,
-  Fuel,
-  Gauge,
-  CheckCircle,
-  Settings,
-} from "lucide-react";
+import { ArrowRight, Fuel, Gauge, CheckCircle, Settings } from "lucide-react";
 import axios from "axios";
-import { homeCarsStyles as styles } from "../assets/dummyStyles";
+import API_BASE_URL from "../apiBase";
+import {
+  getBestDiscount,
+  computeDiscountedPrice,
+  PromoBanner,
+  PromoTag,
+  DiscountedPrice,
+  PriceBadge,
+} from "./DiscountBadge";
 
+/* ─── helpers ─────────────────────────────────────────────────────── */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 };
-
 const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
 const computeEffectiveAvailability = (motorcycle) => {
   const today = new Date();
-
   if (Array.isArray(motorcycle.bookings) && motorcycle.bookings.length) {
-    const blockingBookings = motorcycle.bookings
+    const blocking = motorcycle.bookings
       .filter((b) => {
-        const blockingStatuses = ["pending", "active", "inspection", "upcoming"];
-        const nonBlockingStatuses = ["completed", "cancelled", "canceled"];
-
-        const status = (b.status || "").toLowerCase();
-        return (
-          blockingStatuses.includes(status) &&
-          !nonBlockingStatuses.includes(status)
-        );
+        const s = (b.status || "").toLowerCase();
+        return ["pending", "active", "inspection", "upcoming"].includes(s);
       })
       .map((b) => {
         const pickup = b.pickupDate ?? b.startDate ?? b.start ?? b.from;
         const ret = b.returnDate ?? b.endDate ?? b.end ?? b.to;
         if (!pickup || !ret) return null;
-        return { pickup: new Date(pickup), return: new Date(ret), raw: b };
+        return { pickup: new Date(pickup), return: new Date(ret) };
       })
       .filter(Boolean)
       .filter(
@@ -48,69 +42,98 @@ const computeEffectiveAvailability = (motorcycle) => {
           startOfDay(b.pickup) <= startOfDay(today) &&
           startOfDay(today) <= startOfDay(b.return),
       );
-
-    if (blockingBookings.length) {
-      blockingBookings.sort((a, b) => b.return - a.return);
+    if (blocking.length) {
+      blocking.sort((a, b) => b.return - a.return);
       return {
         state: "booked",
-        until: blockingBookings[0].return.toISOString(),
+        until: blocking[0].return.toISOString(),
         source: "bookings",
       };
     }
   }
-
   if (motorcycle.availability) {
     if (
       motorcycle.availability.state === "booked" &&
       motorcycle.availability.until
-    ) {
+    )
       return {
         state: "booked",
         until: motorcycle.availability.until,
         source: "availability",
       };
-    }
     if (
       motorcycle.availability.state === "available_until_reservation" &&
       Number(motorcycle.availability.daysAvailable ?? -1) === 0
-    ) {
+    )
       return {
         state: "booked",
         until: motorcycle.availability.until ?? null,
         source: "availability-res-starts-today",
         nextBookingStarts: motorcycle.availability.nextBookingStarts,
       };
-    }
     return { ...motorcycle.availability, source: "availability" };
   }
-
   return { state: "fully_available", source: "none" };
 };
 
 const isMotorcycleUnavailable = (motorcycle) => {
   if (motorcycle?.status && motorcycle.status !== "available") return true;
-  const effective = computeEffectiveAvailability(motorcycle);
+  const eff = computeEffectiveAvailability(motorcycle);
   return (
-    effective?.state === "booked" ||
-    effective?.state === "available_until_reservation"
+    eff?.state === "booked" || eff?.state === "available_until_reservation"
   );
 };
+
+/* ─── constants ────────────────────────────────────────────────────── */
+const CATEGORY_TABS = [
+  "All",
+  "New",
+  "Scooters",
+  "Naked",
+  "Underbone",
+  "Top Rated",
+];
+const BASE = "https://anaias-motorcycle-rental.onrender.com";
+const LIMIT = 6;
+const FALLBACK_IMG = `${BASE}/uploads/default-motorcycle.png`;
+
+/* ─── component ────────────────────────────────────────────────────── */
+/* ─── scroll-reveal hook ──────────────────────────────────────────── */
+function useScrollReveal(options = {}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.12, ...options },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
 
 const HomeMotorcycles = () => {
   const navigate = useNavigate();
   const [motorcycles, setMotorcycles] = useState([]);
-  const [filteredMotorcycles, setFilteredMotorcycles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [animateCards, setAnimateCards] = useState(false);
+  const [activeTab, setActiveTab] = useState("All");
+  const [activePromos, setActivePromos] = useState([]);
   const [hoveredCard, setHoveredCard] = useState(null);
   const abortRef = useRef(null);
+  const [headerRef, headerVisible] = useScrollReveal();
+  const [tabsRef, tabsVisible] = useScrollReveal();
+  const [gridRef, gridVisible] = useScrollReveal({ threshold: 0.05 });
 
-  const base = 'https://anaias-motorcycle-rental.onrender.com';
-
-  const limit = 6;
-  const fallbackImage = `${base}/uploads/default-motorcycle.png`;
-
+  /* fetch motorcycles */
   const fetchMotorcycles = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -120,8 +143,8 @@ const HomeMotorcycles = () => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
-      const res = await axios.get(`${base}/api/motorcycles`, {
-        params: { limit },
+      const res = await axios.get(`${BASE}/api/motorcycles`, {
+        params: { limit: LIMIT },
         headers: { Accept: "application/json" },
         signal: ctrl.signal,
       });
@@ -131,38 +154,70 @@ const HomeMotorcycles = () => {
         err?.code === "ERR_CANCELED" ||
         err?.name === "CanceledError" ||
         err?.message === "canceled";
-      if (!isCanceled) {
-        console.error("Error fetching motorcycles:", err);
+      if (!isCanceled)
         setError(
           err?.response?.data?.message ||
             err.message ||
             "Failed to load motorcycles",
         );
-      }
     } finally {
       setLoading(false);
     }
-  }, [base, limit]);
+  }, []);
 
+  /* fetch promos */
   useEffect(() => {
-    const t = setTimeout(() => setAnimateCards(true), 300);
+    const fetchPromos = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/discounts/active`);
+        const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
+        setActivePromos(
+          raw.map((p) => ({
+            ...p,
+            discountType: p.discountType || p.type || "percentage",
+            discountValue: Number(p.discountValue ?? p.value ?? 0),
+            startDate: p.startDate || p.validFrom || null,
+            endDate: p.endDate || p.validTo || null,
+            maxUses:
+              (p.maxUses ?? p.usageLimit) != null
+                ? Number(p.maxUses ?? p.usageLimit)
+                : null,
+            usedCount: Number(p.usedCount ?? p.usageCount ?? 0),
+            minRentalDays: Number(p.minRentalDays ?? p.minimumRentalDays ?? 0),
+            applicableVehicleIds:
+              p.applicableVehicleIds || p.applicableVehicleUnits || [],
+            applicableCategories: p.applicableCategories || [],
+            isActive: p.isActive !== false,
+          })),
+        );
+      } catch {
+        setActivePromos([]);
+      }
+    };
     fetchMotorcycles();
+    fetchPromos();
     return () => {
-      clearTimeout(t);
       try {
         abortRef.current?.abort();
       } catch {}
     };
   }, [fetchMotorcycles]);
 
-  useEffect(() => {
-    const filtered = motorcycles.filter((m) => !isMotorcycleUnavailable(m));
-    setFilteredMotorcycles(filtered);
-  }, [motorcycles]);
+  /* filter by tab */
+  const displayed = motorcycles.filter((m) => {
+    if (activeTab === "All") return true;
+    if (activeTab === "New")
+      return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
+    if (activeTab === "Top Rated") return (m.rating ?? 0) >= 4.5;
+    const cat = (m.category || "").toLowerCase();
+    const tab = activeTab.toLowerCase();
+    if (tab === "scooters") return cat.includes("scooter");
+    if (tab === "naked") return cat.includes("naked");
+    if (tab === "underbone") return cat.includes("underbone");
+    return true;
+  });
 
-  const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
-  const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-
+  /* image helper */
   const buildImageSrc = (image) => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];
@@ -170,183 +225,54 @@ const HomeMotorcycles = () => {
     const t = image.trim();
     if (!t) return "";
     if (/^data:image\//i.test(t)) return t;
-    if (/^https?:\/\//i.test(t)) {
-      // If it's already a full URL, use as is
-      return t;
-    }
-    // Check if it's a Cloudinary path without https
-    if (t.startsWith("res.cloudinary.com/")) {
-      return "https://" + t;
-    }
-    // Check if it's a Cloudinary path starting with cloud name
-    if (t.startsWith("dxta0nmdy/")) {
-      return "https://res.cloudinary.com/" + t;
-    }
-    // Check if it's a Cloudinary path starting with /
-    if (t.startsWith("/")) {
-      return "https://res.cloudinary.com" + t;
-    }
-    // If already starts with https for local uploads, return as-is
-    if (t.startsWith("https://anaias-motorcycle-rental.onrender.com/uploads/")) {
-      return t;
-    }
-    // Handle local uploads path
-    if (t.startsWith("local/")) {
-      const filename = t.replace("local/", "");
-      return `https://anaias-motorcycle-rental.onrender.com/uploads/${filename}`;
-    }
-    // Assume it's a Cloudinary public ID
-    if (CLOUDINARY_CLOUD_NAME && t) {
-      return `${CLOUDINARY_BASE}${CLOUDINARY_CLOUD_NAME}/image/upload/${t}`;
-    }
-    // Fallback: treat as filename from backend uploads
-    return 'https://anaias-motorcycle-rental.onrender.com/uploads/' + t;
+    if (/^https?:\/\//i.test(t)) return t;
+    if (t.startsWith("res.cloudinary.com/")) return "https://" + t;
+    if (t.startsWith("/")) return "https://res.cloudinary.com" + t;
+    return `${BASE}/uploads/` + t;
   };
 
   const handleImageError = (e) => {
     const img = e?.target;
     if (!img) return;
     img.onerror = null;
-    img.src = fallbackImage;
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = "https://via.placeholder.com/400x250.png?text=No+Image";
-    };
-    img.alt = img.alt || "Image not available";
-    img.style.objectFit = img.style.objectFit || "cover";
+    img.src = FALLBACK_IMG;
   };
 
+  /* availability */
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
     try {
       const d = new Date(dateStr);
-      const now = new Date();
-      const opts =
-        d.getFullYear() === now.getFullYear()
-          ? { day: "numeric", month: "short" }
-          : { day: "numeric", month: "short", year: "numeric" };
-      return new Intl.DateTimeFormat("en-IN", opts).format(d);
+      return new Intl.DateTimeFormat("en-PH", {
+        day: "numeric",
+        month: "short",
+      }).format(d);
     } catch {
       return dateStr;
     }
   };
 
-  const plural = (n, singular, pluralForm) =>
-    n === 1 ? `1 ${singular}` : `${n} ${pluralForm ?? singular + "s"}`;
-
-  const computeAvailableMeta = (untilIso) => {
-    if (!untilIso) return null;
-    try {
-      const until = new Date(untilIso);
-      const available = new Date(until);
-      available.setDate(available.getDate() + 1);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return {
-        availableIso: available.toISOString(),
-        daysUntilAvailable: daysBetween(today, available),
-      };
-    } catch {
-      return null;
-    }
-  };
-
-  const renderAvailabilityBadge = (rawAvailability, motorcycle) => {
-    if (motorcycle?.status && motorcycle.status !== "available") {
-      return (
-        <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-          Unavailable
-        </span>
-      );
-    }
-
-    const effective = computeEffectiveAvailability(motorcycle);
-    if (!effective)
-      return (
-        <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
-          Available
-        </span>
-      );
-
-    if (effective.state === "booked") {
-      if (effective.until) {
-        const meta = computeAvailableMeta(effective.until);
-        if (meta?.availableIso) {
-          return (
-            <div className="flex flex-col items-end">
-              <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-                Booked — available on {formatDate(meta.availableIso)}
-              </span>
-              <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
-              </small>
-            </div>
-          );
-        }
-        return (
-          <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-              Booked
-            </span>
-            {effective.until && (
-              <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
-              </small>
-            )}
-          </div>
-        );
+  const getAvailabilityInfo = (motorcycle) => {
+    if (motorcycle?.status && motorcycle.status !== "available")
+      return { label: "Unavailable", color: "booked" };
+    const eff = computeEffectiveAvailability(motorcycle);
+    if (!eff || eff.state === "fully_available")
+      return { label: "Available", color: "available" };
+    if (eff.state === "booked") {
+      if (eff.until) {
+        const avail = new Date(eff.until);
+        avail.setDate(avail.getDate() + 1);
+        return { label: `Available ${formatDate(avail)}`, color: "booked" };
       }
-      return (
-        <div className="flex flex-col items-end">
-          <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-            Booked
-          </span>
-        </div>
-      );
+      return { label: "Booked", color: "booked" };
     }
-
-    if (effective.state === "available_until_reservation") {
-      const days = Number(effective.daysAvailable ?? -1);
-      if (!Number.isFinite(days) || days < 0) {
-        return (
-          <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-800 font-semibold">
-              Available
-            </span>
-            {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
-              </small>
-            )}
-          </div>
-        );
-      }
-      return (
-        <div className="flex flex-col items-end">
-          <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-800 font-semibold">
-            Available — reserved in {plural(days, "day")}
-          </span>
-          {effective.nextBookingStarts && (
-            <small className="text-xs text-gray-400 mt-1">
-              from {formatDate(effective.nextBookingStarts)}
-            </small>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-900/30 text-green-800">
-        Available
-      </span>
-    );
+    return { label: "Available", color: "available" };
   };
 
   const isBookDisabled = (motorcycle) => {
-    const effective = computeEffectiveAvailability(motorcycle);
+    const eff = computeEffectiveAvailability(motorcycle);
     if (motorcycle?.status && motorcycle.status !== "available") return true;
-    if (!effective) return false;
-    return effective.state === "booked";
+    return eff?.state === "booked";
   };
 
   const handleBook = (motorcycle) => {
@@ -356,220 +282,564 @@ const HomeMotorcycles = () => {
     });
   };
 
-  const displayMotorcycles =
-    filteredMotorcycles.length > 0 ? filteredMotorcycles : motorcycles;
-
+  /* ── render ─────────────────────────────────────────────────────── */
   return (
-    <div className={styles.container}>
-      <div className={styles.headerContainer}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
-          <div className="w-full text-center">
-            <h1 className={styles.title}>Recently Added Motorcycle</h1>
-          </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+        .hm-root {
+          padding: 64px 48px 80px;
+          width: 100%;
+          box-sizing: border-box;
+          font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* ── Header ── */
+        .hm-header {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          margin-bottom: 28px;
+        }
+        .hm-title {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: clamp(28px, 4vw, 42px);
+          font-weight: 800;
+          color: #0E0E0E;
+          letter-spacing: -0.5px;
+        }
+        .hm-viewall {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          color: #b50002;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          transition: gap 0.2s;
+        }
+        .hm-viewall:hover { gap: 8px; }
+
+        /* ── Category tabs ── */
+        .hm-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 32px;
+        }
+        .hm-tab {
+          padding: 8px 18px;
+          border-radius: 999px;
+          border: 1.5px solid rgba(0,0,0,0.12);
+          background: #fff;
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.2px;
+          color: rgba(14,14,14,0.5);
+          cursor: pointer;
+          transition: all 0.18s;
+          white-space: nowrap;
+        }
+        .hm-tab:hover { border-color: rgba(0,0,0,0.25); color: #0E0E0E; }
+        .hm-tab.active {
+          background: #0E0E0E;
+          border-color: #0E0E0E;
+          color: #fff;
+        }
+
+        /* ── Grid ── */
+        .hm-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+        @media(max-width: 1024px) {
+          .hm-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Card ── */
+        .hm-card {
+          background: #fff;
+          border-radius: 18px;
+          border: 1.5px solid rgba(0,0,0,0.07);
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s;
+          position: relative;
+          cursor: pointer;
+        }
+        .hm-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 36px rgba(0,0,0,0.10);
+        }
+
+        /* ── Card image ── */
+        .hm-img-wrap {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 16 / 9;
+          background: #F4F4F2;
+          overflow: hidden;
+        }
+        .hm-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+        .hm-card:hover .hm-img { transform: scale(1.04); }
+
+        /* availability badge top-right */
+        .hm-avail {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+        .hm-avail.available {
+          background: rgba(220,252,231,0.9);
+          color: #15803d;
+        }
+        .hm-avail.booked {
+          background: rgba(255,241,241,0.9);
+          color: #b50002;
+        }
+
+        /* promo badge top-left */
+        .hm-promo {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+        }
+
+        /* ── Card body ── */
+        .hm-body {
+          padding: 16px 18px 18px;
+        }
+
+        .hm-name-row {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        .hm-name {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 18px;
+          font-weight: 800;
+          color: #0E0E0E;
+          letter-spacing: -0.3px;
+          line-height: 1.2;
+        }
+
+        /* price block */
+        .hm-price-block {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 2px;
+          flex-shrink: 0;
+        }
+
+        .hm-price-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .hm-price-main {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 20px;
+          font-weight: 800;
+          color: #0E0E0E;
+          line-height: 1;
+        }
+
+        .hm-price-main .currency { font-size: 13px; font-weight: 700; }
+        .hm-price-orig {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13px;
+          color: rgba(0,0,0,0.4);
+          text-decoration: line-through;
+          white-space: nowrap;
+        }
+        .hm-price-day {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 11px;
+          color: rgba(0,0,0,0.35);
+          text-align: right;
+        }
+
+        /* meta row */
+        .hm-meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .hm-cat-badge {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(0,0,0,0.5);
+          background: rgba(0,0,0,0.05);
+          padding: 4px 9px;
+          border-radius: 5px;
+        }
+        .hm-year {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 11px;
+          color: rgba(0,0,0,0.4);
+        }
+
+        /* specs strip */
+        .hm-specs {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
+          margin-bottom: 14px;
+        }
+        .hm-spec {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 3px;
+          background: #F7F7F5;
+          border-radius: 9px;
+          padding: 7px 4px;
+        }
+        .hm-spec-val {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          color: #0E0E0E;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 100%;
+        }
+        .hm-spec-lbl {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 10px;
+          color: rgba(0,0,0,0.4);
+          text-align: center;
+        }
+
+        /* book button */
+        .hm-btn {
+          width: 100%;
+          padding: 13px;
+          border-radius: 12px;
+          border: none;
+          background: #0E0E0E;
+          color: #fff;
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: background 0.18s, transform 0.15s;
+        }
+        .hm-btn:hover:not(:disabled) { background: #b50002; }
+        .hm-btn:active:not(:disabled) { transform: scale(0.98); }
+        .hm-btn:disabled {
+          background: #E8E8E8;
+          color: rgba(0,0,0,0.35);
+          cursor: not-allowed;
+        }
+
+        /* skeleton */
+        .hm-skeleton {
+          background: linear-gradient(90deg, #F4F4F2 25%, #EAEAE8 50%, #F4F4F2 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 10px;
+        }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        /* empty / error */
+        .hm-empty {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 48px 0;
+          font-family: 'Space Grotesk', sans-serif;
+          color: rgba(0,0,0,0.4);
+          font-size: 14px;
+        }
+
+        /* ── Scroll reveal ── */
+        @keyframes hm-fadeUp {
+          from { opacity: 0; transform: translateY(32px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes hm-slideIn {
+          from { opacity: 0; transform: translateX(-20px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        .hm-reveal { opacity: 0; }
+        .hm-reveal.visible { animation: hm-fadeUp 0.6s cubic-bezier(.2,.8,.2,1) forwards; }
+        .hm-card-reveal { opacity: 0; }
+        .hm-card-reveal.visible { animation: hm-fadeUp 0.6s cubic-bezier(.2,.8,.2,1) forwards; }
+
+        @media(max-width: 640px) {
+          .hm-root { padding: 40px 16px 60px; }
+          .hm-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="hm-root">
+        {/* Header */}
+        <div
+          ref={headerRef}
+          className={`hm-header hm-reveal ${headerVisible ? "visible" : ""}`}
+        >
+          <h2 className="hm-title">Featured Motorcycles</h2>
+          <a href="/motorcycles" className="hm-viewall">
+            View all <ArrowRight size={13} />
+          </a>
         </div>
-      </div>
 
-      <div className={styles.grid}>
-        {loading &&
-          Array.from({ length: limit }).map((_, idx) => (
-            <div
-              key={`s-${idx}`}
-              className={`${styles.card} border ${
-                styles.borderGradients?.[
-                  idx % (styles.borderGradients?.length || 1)
-                ] || ""
-              } opacity-50 animate-pulse`}
-              style={{
-                clipPath:
-                  "polygon(0% 15%, 15% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%)",
-              }}
+        {/* Category tabs */}
+        <div
+          ref={tabsRef}
+          className={`hm-tabs hm-reveal ${tabsVisible ? "visible" : ""}`}
+          style={{ animationDelay: "0.08s" }}
+        >
+          {CATEGORY_TABS.map((tab) => (
+            <button
+              key={tab}
+              className={`hm-tab ${activeTab === tab ? "active" : ""}`}
+              onClick={() => setActiveTab(tab)}
             >
-              <div className={styles.borderOverlay}></div>
-              <div className={styles.imageContainer}>
-                <div className="w-full h-full bg-[#c7c5c5]" />
-              </div>
-              <div className={styles.content}>
-                <div className="h-6 bg-#c7c5c5 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-gray-200 rounded w-1/4 mb-4" />
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="h-8 bg-gray-200 rounded" />
-                  <div className="h-8 bg-gray-200 rounded" />
-                  <div className="h-8 bg-gray-200 rounded" />
-                  <div className="h-8 bg-gray-200 rounded" />
-                </div>
-                <div className="h-10 bg-gray-200 rounded mt-4" />
-              </div>
-              <div className={styles.accentBlur}></div>
-            </div>
+              {tab}
+            </button>
           ))}
+        </div>
 
-        {!loading && error && (
-          <div className="col-span-full text-center text-red-600">{error}</div>
-        )}
-        {!loading && !error && displayMotorcycles.length === 0 && (
-          <div className="col-span-full text-center text-[#171717]">
-            {motorcycles.length === 0
-              ? "No motorcycles found."
-              : "No available motorcycles found."}
-          </div>
-        )}
-
-        {!loading &&
-          displayMotorcycles.map((motorcycle, idx) => {
-            const motorcycleName =
-              `${motorcycle.make || ""} ${motorcycle.model || ""}`.trim() ||
-              motorcycle.name ||
-              "Unnamed";
-            const patternStyle =
-              styles.cardPatterns && styles.cardPatterns.length
-                ? styles.cardPatterns[idx % styles.cardPatterns.length]
-                : "";
-            const borderStyle =
-              styles.borderGradients && styles.borderGradients.length
-                ? styles.borderGradients[idx % styles.borderGradients.length]
-                : "";
-            const imageSrc = buildImageSrc(motorcycle.image) || fallbackImage;
-            const transitionDelay = `${idx * 100}ms`;
-            const initialTranslateY = "40px";
-            const transformWhenHovered =
-              hoveredCard === (motorcycle._id || motorcycle.id)
-                ? "rotate(0.5deg)"
-                : "none";
-            const disabled = isBookDisabled(motorcycle);
-
-            return (
+        {/* Grid */}
+        <div ref={gridRef} className="hm-grid">
+          {/* Skeletons */}
+          {loading &&
+            Array.from({ length: LIMIT }).map((_, i) => (
               <div
-                key={motorcycle._id || motorcycle.id || idx}
-                onMouseEnter={() =>
-                  setHoveredCard(motorcycle._id || motorcycle.id)
-                }
-                onMouseLeave={() => setHoveredCard(null)}
-                className={`${styles.card} ${patternStyle} border ${borderStyle} hover:shadow-2xl hover:-translate-y-3`}
+                key={`sk-${i}`}
                 style={{
-                  clipPath:
-                    "polygon(0% 15%, 15% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%)",
-                  transformStyle: "preserve-3d",
-                  transform: animateCards
-                    ? transformWhenHovered
-                    : `translateY(${initialTranslateY})`,
-                  opacity: animateCards ? 1 : 0,
-                  transition: `transform 420ms cubic-bezier(.2,.8,.2,1), opacity 420ms ease`,
-                  transitionDelay,
+                  background: "#fff",
+                  borderRadius: 18,
+                  border: "1.5px solid rgba(0,0,0,0.07)",
+                  overflow: "hidden",
                 }}
               >
-                <div className={styles.borderOverlay}></div>
-
-                <div className={styles.priceBadge}>
-                  <span className={styles.priceText}>
-                    ₱{motorcycle.dailyRate ?? motorcycle.price ?? 0}/day
-                  </span>
-                </div>
-
-                <div className="absolute right-4 top-4 z-20">
-                  {renderAvailabilityBadge(motorcycle.availability, motorcycle)}
-                </div>
-
-                <div className={styles.imageContainer}>
-                  <img
-                    src={imageSrc}
-                    alt={motorcycleName}
-                    onError={handleImageError}
-                    className="w-full h-full object-cover transition-transform duration-500"
-                    style={{
-                      transform:
-                        hoveredCard === (motorcycle._id || motorcycle.id)
-                          ? "rotate(0.5deg)"
-                          : "scale(1) rotate(0)",
-                    }}
+                <div className="hm-skeleton" style={{ aspectRatio: "16/10" }} />
+                <div
+                  style={{
+                    padding: "16px 18px 18px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    className="hm-skeleton"
+                    style={{ height: 18, width: "60%", borderRadius: 6 }}
                   />
-                </div>
-
-                <div className={styles.content}>
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className={styles.carName}>{motorcycleName}</h3>
-                      <p className={styles.carInfoContainer}>
-                        <span className={styles.carTypeBadge}>
-                          {motorcycle.category || "Standard"}
-                        </span>
-                        <span className={styles.carYear}>
-                          {motorcycle.year || "—"}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className={styles.specsGrid}>
-                    {[
-                      {
-                        icon: Settings,
-                        value: motorcycle.engineSize
-                          ? `${motorcycle.engineSize}cc`
-                          : "—",
-                        label: "Engine",
-                      },
-                      {
-                        icon: Fuel,
-                        value: motorcycle.fuelType || "Unleaded",
-                        label: "Fuel",
-                      },
-                      {
-                        icon: Gauge,
-                        value: motorcycle.transmission || "Manual",
-                        label: "Trans",
-                      },
-                      {
-                        icon: CheckCircle,
-                        value: motorcycle.hasABS ? "ABS" : "Standard",
-                        label: "Brakes",
-                      },
-                    ].map((spec, i) => (
-                      <div key={i} className={styles.specItem}>
-                        <div
-                          className={styles.specIconContainer(
-                            hoveredCard === (motorcycle._id || motorcycle.id),
-                          )}
-                        >
-                          <spec.icon
-                            className={styles.specIcon(
-                              hoveredCard === (motorcycle._id || motorcycle.id),
-                            )}
-                          />
-                        </div>
-                        <span className={styles.specValue}>{spec.value}</span>
-                        <span className={styles.specLabel}>{spec.label}</span>
-                      </div>
+                  <div
+                    className="hm-skeleton"
+                    style={{ height: 12, width: "35%", borderRadius: 6 }}
+                  />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4,1fr)",
+                      gap: 6,
+                    }}
+                  >
+                    {[1, 2, 3, 4].map((x) => (
+                      <div
+                        key={x}
+                        className="hm-skeleton"
+                        style={{ height: 44, borderRadius: 9 }}
+                      />
                     ))}
                   </div>
-
-                  <button
-                    onClick={() => handleBook(motorcycle)}
-                    className={`${styles.bookButton} ${
-                      disabled
-                        ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md"
-                    }`}
-                    disabled={disabled}
-                    aria-disabled={disabled}
-                    title={
-                      disabled
-                        ? "This motorcycle is currently booked or unavailable"
-                        : "Book this motorcycle"
-                    }
-                  >
-                    <span className={styles.buttonText}>
-                      {disabled ? "Unavailable" : "Rent Now"}
-                      <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                  </button>
+                  <div
+                    className="hm-skeleton"
+                    style={{ height: 40, borderRadius: 12 }}
+                  />
                 </div>
-
-                <div className={styles.accentBlur}></div>
               </div>
-            );
-          })}
+            ))}
+
+          {/* Error */}
+          {!loading && error && (
+            <div className="hm-empty" style={{ color: "#b50002" }}>
+              {error}
+            </div>
+          )}
+
+          {/* Empty */}
+          {!loading && !error && displayed.length === 0 && (
+            <div className="hm-empty">
+              No motorcycles found for this category.
+            </div>
+          )}
+
+          {/* Cards */}
+          {!loading &&
+            displayed.map((m, idx) => {
+              const id = m._id || m.id;
+              const name =
+                `${m.make || ""} ${m.model || ""}`.trim() ||
+                m.name ||
+                "Unnamed";
+              const imgSrc = buildImageSrc(m.image) || FALLBACK_IMG;
+              const avail = getAvailabilityInfo(m);
+              const disabled = isBookDisabled(m);
+              const originalPrice = Math.round(m.dailyRate ?? m.price ?? 0);
+              const bestDiscount = getBestDiscount(m, activePromos, 1);
+              const discountedPrice = bestDiscount
+                ? Math.round(
+                    computeDiscountedPrice(originalPrice, bestDiscount),
+                  )
+                : null;
+
+              const specs = [
+                {
+                  value: m.engineSize ? `${m.engineSize}cc` : "—",
+                  label: "Engine",
+                },
+                { value: m.fuelType || "Unleaded", label: "Fuel" },
+                { value: m.transmission || "Manual", label: "Trans" },
+                { value: m.hasABS ? "ABS" : "Std", label: "Brakes" },
+              ];
+
+              return (
+                <div
+                  key={id}
+                  className={`hm-card hm-card-reveal ${gridVisible ? "visible" : ""}`}
+                  style={{ animationDelay: `${idx * 0.08}s` }}
+                  onMouseEnter={() => setHoveredCard(id)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  onClick={() => handleBook(m)}
+                >
+                  {/* Image */}
+                  <div className="hm-img-wrap">
+                    <img
+                      src={imgSrc}
+                      alt={name}
+                      className="hm-img"
+                      onError={handleImageError}
+                    />
+
+                    {/* Availability badge */}
+                    <span className={`hm-avail ${avail.color}`}>
+                      {avail.label}
+                    </span>
+
+                    {/* Promo badge */}
+                    {bestDiscount && (
+                      <div className="hm-promo">
+                        <PromoBanner discount={bestDiscount} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Body */}
+                  <div className="hm-body">
+                    <div className="hm-name-row">
+                      <div className="hm-name">{name}</div>
+
+                      {/* Price */}
+                      <div className="hm-price-block">
+                        {discountedPrice && discountedPrice < originalPrice ? (
+                          <>
+                            <div className="hm-price-row">
+                              <span className="hm-price-main">
+                                <span className="currency">₱</span>
+                                {discountedPrice.toLocaleString()}
+                              </span>
+
+                              <span className="hm-price-orig">
+                                ₱{originalPrice.toLocaleString()}
+                              </span>
+                            </div>
+
+                            <span className="hm-price-day">/day</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="hm-price-main">
+                              <span className="currency">₱</span>
+                              {originalPrice.toLocaleString()}
+                            </span>
+
+                            <span className="hm-price-day">/day</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Category + Year */}
+                    <div className="hm-meta">
+                      <span className="hm-cat-badge">
+                        {m.category || "Standard"}
+                      </span>
+                      <span className="hm-year">{m.year || "—"}</span>
+                    </div>
+
+                    {/* Specs */}
+                    <div className="hm-specs">
+                      {specs.map((s, i) => (
+                        <div key={i} className="hm-spec">
+                          <span className="hm-spec-val">{s.value}</span>
+                          <span className="hm-spec-lbl">{s.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* CTA */}
+                    <button
+                      className="hm-btn"
+                      disabled={disabled}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBook(m);
+                      }}
+                    >
+                      {disabled ? (
+                        "Unavailable"
+                      ) : (
+                        <>
+                          Rent Now <ArrowRight size={13} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

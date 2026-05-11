@@ -4,6 +4,10 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { v2 as cloudinary } from "cloudinary";
 import { createSystemLog } from "../utils/systemLogService.js";
+import {
+  getDefaultMaintenanceScheduleAt,
+  normalizeMaintenanceScheduleAt,
+} from "../utils/maintenanceScheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -256,6 +260,9 @@ export const createMotorcycle = async (req, res, next) => {
       hasABS,
       hasHelmet,
       status,
+      maintenanceScheduleAt,
+      maintenanceScheduleStartAt,
+      maintenanceScheduleEndAt,
     } = req.body;
 
     console.error("===== [MOTORCYCLE CREATE] =====");
@@ -316,6 +323,19 @@ export const createMotorcycle = async (req, res, next) => {
       hasABS: hasABS === true || hasABS === "true",
       hasHelmet: hasHelmet === false || hasHelmet === "false" ? false : true,
       status: status || "available",
+      // Prefer explicit start/end when provided. Fall back to legacy single date.
+      maintenanceScheduleAt:
+        normalizeMaintenanceScheduleAt(maintenanceScheduleAt) ||
+        getDefaultMaintenanceScheduleAt(new Date()),
+      maintenanceScheduleStartAt:
+        normalizeMaintenanceScheduleAt(maintenanceScheduleStartAt) ||
+        normalizeMaintenanceScheduleAt(maintenanceScheduleAt) ||
+        getDefaultMaintenanceScheduleAt(new Date()),
+      maintenanceScheduleEndAt:
+        normalizeMaintenanceScheduleAt(maintenanceScheduleEndAt) ||
+        normalizeMaintenanceScheduleAt(maintenanceScheduleAt) ||
+        normalizeMaintenanceScheduleAt(maintenanceScheduleStartAt) ||
+        getDefaultMaintenanceScheduleAt(new Date()),
       image: imageFilename || "",
       description: description || "",
       traccarDeviceId: req.body.traccarDeviceId || "",
@@ -514,6 +534,7 @@ export const updateMotorcycle = async (req, res, next) => {
     }
 
     const oldImagePath = motorcycle.image;
+    const previousStatus = motorcycle.status;
 
     const uploadedUrl = await getUploadedUrl(req.file);
     if (uploadedUrl) {
@@ -544,6 +565,9 @@ export const updateMotorcycle = async (req, res, next) => {
       "hasABS",
       "hasHelmet",
       "status",
+      "maintenanceScheduleAt",
+      "maintenanceScheduleStartAt",
+      "maintenanceScheduleEndAt",
       "description",
       "traccarDeviceId",
 
@@ -555,11 +579,29 @@ export const updateMotorcycle = async (req, res, next) => {
           motorcycle[f] = Number(req.body[f]);
         } else if (["hasABS", "hasHelmet"].includes(f)) {
           motorcycle[f] = req.body[f] === true || req.body[f] === "true";
+        } else if (f === "maintenanceScheduleAt") {
+          motorcycle[f] = normalizeMaintenanceScheduleAt(req.body[f]);
+        } else if (f === "maintenanceScheduleStartAt") {
+          motorcycle.maintenanceScheduleStartAt = normalizeMaintenanceScheduleAt(req.body[f]);
+        } else if (f === "maintenanceScheduleEndAt") {
+          motorcycle.maintenanceScheduleEndAt = normalizeMaintenanceScheduleAt(req.body[f]);
         } else {
           motorcycle[f] = req.body[f];
         }
       }
     });
+
+    if (
+      req.body.status === "available" &&
+      previousStatus === "maintenance" &&
+      req.body.maintenanceScheduleStartAt === undefined &&
+      req.body.maintenanceScheduleAt === undefined
+    ) {
+      const defaultDate = getDefaultMaintenanceScheduleAt(new Date());
+      motorcycle.maintenanceScheduleAt = motorcycle.maintenanceScheduleAt || defaultDate;
+      motorcycle.maintenanceScheduleStartAt = motorcycle.maintenanceScheduleStartAt || defaultDate;
+      motorcycle.maintenanceScheduleEndAt = motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleStartAt || defaultDate;
+    }
 
     const updated = await motorcycle.save();
 

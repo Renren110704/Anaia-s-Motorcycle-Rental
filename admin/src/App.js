@@ -13,6 +13,9 @@ import ReturnInspection from "./components/ReturnInspection";
 import ReviewManagement from "./components/ReviewManagement";
 import Dashboard from "./components/Dashboard";
 import DiscountManagement from "./components/DiscountManagement";
+import MaintenancePage from "./components/MaintenancePage";
+import CalendarView from "./components/CalendarView";
+import AdminContact from "./components/AdminContact";
 import {
   ADMIN_AUTH_STORAGE_KEY,
   ADMIN_DEFAULT_EMAIL,
@@ -183,7 +186,30 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/maintenance"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <MaintenancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <CalendarView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contact"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <AdminContact />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="*"
             element={

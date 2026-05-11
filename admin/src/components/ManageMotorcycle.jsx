@@ -1190,14 +1190,14 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
               name="category"
               options={["Scooter", "Naked", "Underbone"]}
             />
-            <SF
+            {/* <SF
               label="Status *"
               name="status"
               options={[
                 { value: "available", label: "Available" },
                 { value: "maintenance", label: "Maintenance" },
               ]}
-            />
+            /> */}
             <TF
               label="Engine Size (cc) *"
               name="engineSize"

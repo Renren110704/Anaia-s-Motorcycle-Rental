@@ -11,6 +11,7 @@ import MotorcycleDetailPage from "./pages/MotorcycleDetailPage";
 import CalendarPage from "./pages/CalendarPage";
 import { FaArrowUp } from "react-icons/fa";
 import MyBooking from "./pages/MyBooking";
+import FAQPage from "./pages/FAQPage";
 
 // PROTECTED ROUTE
 const ProtectedRoute = ({ children }) => {
@@ -98,6 +99,15 @@ const App = () => {
           element={
             <RedirectIfAuthenticated>
               <SignUp />
+            </RedirectIfAuthenticated>
+          }
+        />
+
+        <Route
+          path="/faq"
+          element={
+            <RedirectIfAuthenticated>
+              <FAQPage />
             </RedirectIfAuthenticated>
           }
         />

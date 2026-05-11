@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import img1 from "../assets/scooter.png";
 import img2 from "../assets/naked.png";
 import img3 from "../assets/underbone.png";
-import logo from "../assets/logo.png";
 import hondaLogo from "../assets/logos/honda.svg";
 import yamahaLogo from "../assets/logos/yamaha.svg";
 import suzukiLogo from "../assets/logos/suzuki.svg";

@@ -1,15 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Fuel, Gauge, CheckCircle, Settings } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import {
   getBestDiscount,
   computeDiscountedPrice,
   PromoBanner,
-  PromoTag,
-  DiscountedPrice,
-  PriceBadge,
 } from "./DiscountBadge";
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
@@ -19,8 +16,6 @@ const startOfDay = (d) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
-const daysBetween = (from, to) =>
-  Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
 const computeEffectiveAvailability = (motorcycle) => {
   const today = new Date();
@@ -76,14 +71,6 @@ const computeEffectiveAvailability = (motorcycle) => {
   return { state: "fully_available", source: "none" };
 };
 
-const isMotorcycleUnavailable = (motorcycle) => {
-  if (motorcycle?.status && motorcycle.status !== "available") return true;
-  const eff = computeEffectiveAvailability(motorcycle);
-  return (
-    eff?.state === "booked" || eff?.state === "available_until_reservation"
-  );
-};
-
 /* ─── constants ────────────────────────────────────────────────────── */
 const CATEGORY_TABS = [
   "All",
@@ -116,7 +103,7 @@ function useScrollReveal(options = {}) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [options]);
   return [ref, visible];
 }
 
@@ -127,7 +114,7 @@ const HomeMotorcycles = () => {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("All");
   const [activePromos, setActivePromos] = useState([]);
-  const [hoveredCard, setHoveredCard] = useState(null);
+  const [, setHoveredCard] = useState(null);
   const abortRef = useRef(null);
   const [headerRef, headerVisible] = useScrollReveal();
   const [tabsRef, tabsVisible] = useScrollReveal();

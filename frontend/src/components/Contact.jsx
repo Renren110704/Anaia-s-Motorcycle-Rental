@@ -32,7 +32,7 @@ function useScrollReveal(options = {}) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [options]);
   return [ref, visible];
 }
 

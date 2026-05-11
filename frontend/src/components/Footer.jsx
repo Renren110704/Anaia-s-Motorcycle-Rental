@@ -305,13 +305,9 @@ const Footer = () => {
             </p>
             <p>
               Designed by{" "}
-              <a
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ft-designer"
-              >
+              <span className="ft-designer">
                 QUADCORE
-              </a>
+              </span>
             </p>
           </div>
         </div>

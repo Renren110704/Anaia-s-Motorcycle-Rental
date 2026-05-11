@@ -32,7 +32,6 @@ import API_BASE_URL from "../apiBase";
 import {
   computeDiscountedPrice,
   useApplicableDiscount,
-  DiscountedPrice,
 } from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;

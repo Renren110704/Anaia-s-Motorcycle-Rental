@@ -12,6 +12,7 @@ import CalendarPage from "./pages/CalendarPage";
 import { FaArrowUp } from "react-icons/fa";
 import MyBooking from "./pages/MyBooking";
 import FAQPage from "./pages/FAQPage";
+import AboutPage from "./pages/AboutPage";
 
 // PROTECTED ROUTE
 const ProtectedRoute = ({ children }) => {
@@ -108,6 +109,15 @@ const App = () => {
           element={
             <RedirectIfAuthenticated>
               <FAQPage />
+            </RedirectIfAuthenticated>
+          }
+        />
+
+        <Route
+          path="/about"
+          element={
+            <RedirectIfAuthenticated>
+              <AboutPage />
             </RedirectIfAuthenticated>
           }
         />

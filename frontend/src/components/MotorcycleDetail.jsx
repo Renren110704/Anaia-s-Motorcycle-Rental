@@ -18,25 +18,23 @@ import {
   FaReceipt,
   FaCheckCircle,
   FaChevronDown,
+  FaChevronUp,
   FaInfoCircle,
   FaExclamationTriangle,
   FaMotorcycle,
   FaThumbsUp,
   FaThumbsDown,
+  FaStar,
 } from "react-icons/fa";
 import { GiFullMotorcycleHelmet } from "react-icons/gi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
-import {
-  computeDiscountedPrice,
-  useApplicableDiscount,
-} from "./DiscountBadge";
+import { computeDiscountedPrice, useApplicableDiscount } from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
-
 const api = axios.create({
   baseURL: API_BASE,
   headers: { Accept: "application/json" },
@@ -154,7 +152,6 @@ const normalizeCity = (raw = "") =>
     .replace(/\bMUNICIPALITY\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
-
 const getDistanceFee = (cityName) => {
   if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0 };
   const upper = cityName.toUpperCase().trim();
@@ -183,6 +180,34 @@ const ALL_TIME_SLOTS = [
   { value: "20:00", label: "8:00 PM" },
 ];
 
+const formatLocalDate = (date) => {
+  const y = date.getFullYear(),
+    m = String(date.getMonth() + 1).padStart(2, "0"),
+    d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+const todayISO = () => formatLocalDate(new Date());
+const getTodayStart = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const formatDate = (date) => formatLocalDate(date);
+const sixMonthsFromToday = () => {
+  const d = getTodayStart();
+  d.setMonth(d.getMonth() + 6);
+  return d;
+};
+const sevenDaysFromToday = () => {
+  const d = getTodayStart();
+  d.setDate(d.getDate() + 7);
+  return d;
+};
+const addDaysToISODate = (dateISO, days) => {
+  const d = new Date(dateISO || todayISO());
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
+};
 const getAvailablePickupSlots = (forDate = todayISO()) => {
   if (forDate !== todayISO()) return ALL_TIME_SLOTS;
   const now = new Date();
@@ -192,46 +217,11 @@ const getAvailablePickupSlots = (forDate = todayISO()) => {
     return h * 60 > cutoff;
   });
 };
-
-const formatLocalDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const todayISO = () => formatLocalDate(new Date());
-const getTodayStart = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-const formatDate = (date) => formatLocalDate(date);
-
-const sixMonthsFromToday = () => {
-  const d = getTodayStart();
-  d.setMonth(d.getMonth() + 6);
-  return d;
-};
-
-const sevenDaysFromToday = () => {
-  const d = getTodayStart();
-  d.setDate(d.getDate() + 7);
-  return d;
-};
-
-const addDaysToISODate = (dateISO, days) => {
-  const d = new Date(dateISO || todayISO());
-  d.setDate(d.getDate() + days);
-  return formatLocalDate(d);
-};
-
 const getValidReturnSlots = (pickupDate, returnDate, pickupTime) => {
   if (!returnDate || !pickupDate || returnDate !== pickupDate)
     return ALL_TIME_SLOTS;
   return ALL_TIME_SLOTS.filter((s) => s.value > pickupTime);
 };
-
 const calculateDays = (from, to) => {
   if (!from || !to) return 1;
   return Math.max(
@@ -239,14 +229,12 @@ const calculateDays = (from, to) => {
     Math.ceil((new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)),
   );
 };
-
 const parseLocalDateTime = (dateStr, timeStr) => {
   if (!dateStr || !timeStr) return null;
   const dt = new Date(`${dateStr}T${timeStr}:00`);
   return Number.isNaN(dt.getTime()) ? null : dt;
 };
 
-const CLOUDINARY_BASE = "https://res.cloudinary.com/"; // Adjust if you have a specific Cloudinary subdomain
 const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
 const buildImageSrc = (image) => {
   if (!image) return `${API_BASE}/uploads/default-motorcycle.png`;
@@ -255,34 +243,18 @@ const buildImageSrc = (image) => {
     return `${API_BASE}/uploads/default-motorcycle.png`;
   const t = image.trim();
   if (!t) return `${API_BASE}/uploads/default-motorcycle.png`;
-  if (/^data:image\//i.test(t)) return t;
-  // If it's already a full URL (including Cloudinary), return it as-is
-  if (/^https?:\/\//i.test(t)) return t;
-  // Check if it's a Cloudinary path without https (with or without leading slash)
-  if (t.startsWith("res.cloudinary.com/")) {
-    return "https://" + t;
-  }
-  // Check if it's a Cloudinary path (starts with /dxta0nmdy/ or dxta0nmdy/)
-  if (t.startsWith("/dxta0nmdy/") || t.startsWith("dxta0nmdy/")) {
+  if (/^data:image\//i.test(t) || /^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("res.cloudinary.com/")) return "https://" + t;
+  if (t.startsWith("/dxta0nmdy/") || t.startsWith("dxta0nmdy/"))
     return "https://res.cloudinary.com/" + t.replace(/^\/+/, "");
-  }
-  // If already starts with https for local uploads, return as-is
-  if (t.startsWith("https://anaias-motorcycle-rental.onrender.com/uploads/")) {
+  if (t.startsWith("https://anaias-motorcycle-rental.onrender.com/uploads/"))
     return t;
-  }
-  // Handle local uploads path
-  if (t.startsWith("local/")) {
-    const filename = t.replace("local/", "");
-    return `https://anaias-motorcycle-rental.onrender.com/uploads/${filename}`;
-  }
-  // Assume it's a Cloudinary public ID
-  if (CLOUDINARY_CLOUD_NAME && t) {
-    return `${CLOUDINARY_BASE}${CLOUDINARY_CLOUD_NAME}/image/upload/${t}`;
-  }
-  // Fallback: treat as filename from backend uploads
+  if (t.startsWith("local/"))
+    return `https://anaias-motorcycle-rental.onrender.com/uploads/${t.replace("local/", "")}`;
+  if (CLOUDINARY_CLOUD_NAME && t)
+    return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${t}`;
   return `https://anaias-motorcycle-rental.onrender.com/uploads/${t}`;
 };
-
 const handleImageError = (e) => {
   const img = e?.target;
   if (!img) return;
@@ -294,53 +266,213 @@ const handleImageError = (e) => {
   };
 };
 
-const inputCls =
-  "w-full pl-10 pr-4 py-2.5 bg-transparent text-[#171717] text-sm placeholder-[#171717]/40 focus:outline-none rounded-xl";
-const selectCls =
-  "w-full pl-10 pr-8 py-2.5 bg-transparent text-[#171717] text-sm focus:outline-none rounded-xl appearance-none disabled:opacity-50";
+/* ── Shared styles ─────────────────────────────────────────────── */
+const S = {
+  card: {
+    background: "#fff",
+    borderRadius: 18,
+    border: "1.5px solid rgba(0,0,0,0.07)",
+    padding: "22px",
+  },
+  label: {
+    display: "block",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "2px",
+    textTransform: "uppercase",
+    color: "rgba(0,0,0,0.35)",
+    marginBottom: 6,
+    fontFamily: "'Space Grotesk',sans-serif",
+  },
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "10px 12px 10px 38px",
+    borderRadius: 10,
+    border: "1.5px solid rgba(0,0,0,0.09)",
+    background: "#F5F5F3",
+    fontSize: 13,
+    fontFamily: "'Space Grotesk',sans-serif",
+    color: "#0E0E0E",
+    outline: "none",
+  },
+  select: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "10px 32px 10px 38px",
+    borderRadius: 10,
+    border: "1.5px solid rgba(0,0,0,0.09)",
+    background: "#F5F5F3",
+    fontSize: 13,
+    fontFamily: "'Space Grotesk',sans-serif",
+    color: "#0E0E0E",
+    outline: "none",
+    appearance: "none",
+  },
+  fieldWrap: { position: "relative", display: "flex", alignItems: "center" },
+  fieldIcon: {
+    position: "absolute",
+    left: 12,
+    color: "#b50002",
+    fontSize: 13,
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  chevron: {
+    position: "absolute",
+    right: 10,
+    color: "rgba(0,0,0,0.3)",
+    fontSize: 11,
+    pointerEvents: "none",
+  },
+  btnPrimary: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "11px 22px",
+    borderRadius: 12,
+    background: "#b50002",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "'Space Grotesk',sans-serif",
+    border: "none",
+    cursor: "pointer",
+  },
+  btnSecondary: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "rgba(0,0,0,0.4)",
+    fontFamily: "'Space Grotesk',sans-serif",
+  },
+  btnDark: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "11px 22px",
+    borderRadius: 12,
+    background: "#0E0E0E",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "'Space Grotesk',sans-serif",
+    border: "none",
+    cursor: "pointer",
+  },
+};
 
-const Field = ({ icon: Icon, children, label, hint }) => (
-  <div className="flex flex-col gap-1">
-    {label && (
-      <label className="text-[#171717]/70 text-xs font-semibold uppercase tracking-wider">
-        {label}
-      </label>
-    )}
-    <div className="relative flex items-center bg-white/60 border border-[#171717]/10 rounded-xl shadow-sm focus-within:border-black transition-all hover:bg-white/90">
+/* ── Field wrapper ─────────────────────────────────────────────── */
+const Field = ({ icon: Icon, label, hint, children }) => (
+  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    {label && <label style={S.label}>{label}</label>}
+    <div
+      style={{ position: "relative", display: "flex", alignItems: "center" }}
+    >
       {Icon && (
-        <Icon className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none" />
+        <Icon
+          style={{
+            position: "absolute",
+            left: 12,
+            color: "#b50002",
+            fontSize: 13,
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        />
       )}
       {children}
     </div>
-    {hint && <p className="text-xs text-[#171717]/40 mt-0.5">{hint}</p>}
+    {hint && (
+      <p
+        style={{
+          fontSize: 11,
+          color: "rgba(0,0,0,0.35)",
+          marginTop: 2,
+          fontFamily: "'Space Grotesk',sans-serif",
+        }}
+      >
+        {hint}
+      </p>
+    )}
   </div>
 );
 
-// ── Alert Modal ───────────────────────────────────────────────────────────────
+/* ── Alert Modal ───────────────────────────────────────────────── */
 const AlertModal = ({ message, onClose, isError, title }) => (
   <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(4px)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    }}
     onClick={onClose}
   >
     <div
-      className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      style={{
+        background: "#fff",
+        borderRadius: 20,
+        padding: 28,
+        maxWidth: 400,
+        width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+      }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="text-center">
-        <div className="mx-auto flex items-center justify-center h-14 w-14 bg-[#b50002]/10 rounded-2xl mb-3">
+      <div style={{ textAlign: "center" }}>
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(181,0,2,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 14px",
+          }}
+        >
           {isError ? (
-            <FaExclamationTriangle className="h-6 w-6 text-[#b50002]" />
+            <FaExclamationTriangle style={{ color: "#b50002", fontSize: 20 }} />
           ) : (
-            <FaInfoCircle className="h-6 w-6 text-[#171717]" />
+            <FaInfoCircle style={{ color: "#0E0E0E", fontSize: 20 }} />
           )}
         </div>
-        <h3 className="text-lg font-black text-[#171717] mb-2">
+        <h3
+          style={{
+            fontSize: 17,
+            fontWeight: 800,
+            color: "#0E0E0E",
+            marginBottom: 8,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           {title ?? (isError ? "Error" : "Notice")}
         </h3>
-        <p className="text-[#171717]/70 text-sm mb-5">{message}</p>
+        <p
+          style={{
+            fontSize: 13,
+            color: "rgba(0,0,0,0.55)",
+            marginBottom: 20,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          {message}
+        </p>
         <button
           onClick={onClose}
-          className="w-full py-2.5 px-4 bg-[#b50002] hover:brightness-110 active:scale-[0.98] rounded-xl text-white font-bold text-sm transition-all"
+          style={{ ...S.btnPrimary, width: "100%", justifyContent: "center" }}
         >
           OK
         </button>
@@ -369,47 +501,97 @@ const alertModal = (message, { isError = false, title } = {}) =>
     );
   });
 
-// ── Active Booking Block Modal ────────────────────────────────────────────────
+/* ── Active Booking Block Modal ────────────────────────────────── */
 const ActiveBookingBlockModal = ({
   existingBooking,
   onClose,
   onViewBookings,
 }) => (
   <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(4px)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    }}
     onClick={onClose}
   >
     <div
-      className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      style={{
+        background: "#fff",
+        borderRadius: 20,
+        padding: 28,
+        maxWidth: 400,
+        width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+      }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="text-center">
-        <div className="mx-auto flex items-center justify-center h-14 w-14 bg-[#b50002]/10 rounded-2xl mb-3">
-          <FaMotorcycle className="h-6 w-6 text-[#b50002]" />
+      <div style={{ textAlign: "center" }}>
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(181,0,2,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 14px",
+          }}
+        >
+          <FaMotorcycle style={{ color: "#b50002", fontSize: 22 }} />
         </div>
-        <h3 className="text-lg font-black text-[#171717] mb-2">
+        <h3
+          style={{
+            fontSize: 17,
+            fontWeight: 800,
+            color: "#0E0E0E",
+            marginBottom: 8,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           Active Booking Exists
         </h3>
-        <p className="text-[#171717]/70 text-sm mb-2">
+        <p
+          style={{
+            fontSize: 13,
+            color: "rgba(0,0,0,0.55)",
+            marginBottom: 6,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           You already have an active booking for{" "}
-          <span className="font-semibold text-[#b50002]">
+          <strong style={{ color: "#b50002" }}>
             {existingBooking?.motorcycle || "a motorcycle"}
-          </span>
+          </strong>
           .
         </p>
-        <p className="text-xs text-[#171717]/50 mb-5">
+        <p
+          style={{
+            fontSize: 12,
+            color: "rgba(0,0,0,0.38)",
+            marginBottom: 20,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           Only one motorcycle can be rented per account at a time.
         </p>
-        <div className="flex gap-3">
+        <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
-            className="flex-1 items-center gap-2 px-6 py-3 bg-[#b50002] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#b5002]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+            style={{ ...S.btnPrimary, flex: 1, justifyContent: "center" }}
           >
             Close
           </button>
           <button
             onClick={onViewBookings}
-            className="flex-1 items-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+            style={{ ...S.btnDark, flex: 1, justifyContent: "center" }}
           >
             My Bookings
           </button>
@@ -424,10 +606,10 @@ const activeBookingBlockModal = (existingBooking, navigate) =>
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = ReactDOM.createRoot(container);
-    const cleanup = (goToBookings) => {
+    const cleanup = (go) => {
       root.unmount();
       document.body.removeChild(container);
-      if (goToBookings) navigate("/bookings");
+      if (go) navigate("/bookings");
       resolve();
     };
     root.render(
@@ -439,100 +621,179 @@ const activeBookingBlockModal = (existingBooking, navigate) =>
     );
   });
 
-// ── Booking Success Modal ─────────────────────────────────────────────────────
+/* ── Booking Success Modal ─────────────────────────────────────── */
 const BookingSuccessModal = ({ booking, onClose }) => {
   if (!booking) return null;
   const dueAtPickup = booking.totalAmount - DOWNPAYMENT;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-        <div className="bg-gradient-to-br from-[#171717] via-[#171717] to-[#b50002]/80 p-6 text-white text-center">
-          <div className="w-14 h-14 bg-green-600/30 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <FaCheckCircle className="text-3xl text-green-500" />
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 24,
+          maxWidth: 440,
+          width: "100%",
+          overflow: "hidden",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.18)",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            padding: "28px 28px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: "rgba(34,197,94,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 12px",
+            }}
+          >
+            <FaCheckCircle style={{ color: "#22c55e", fontSize: 24 }} />
           </div>
-          <h2 className="text-xl font-black">Reservation Submitted!</h2>
-          <p className="text-white/70 text-sm mt-1">
-            Payment proof uploaded and waiting for admin verification
+          <h2
+            style={{
+              color: "#0E0E0E",
+              fontSize: 18,
+              fontWeight: 800,
+              fontFamily: "'Space Grotesk',sans-serif",
+              marginBottom: 4,
+            }}
+          >
+            Reservation Submitted!
+          </h2>
+          <p
+            style={{
+              color: "rgba(0,0,0,0.45)",
+              fontSize: 12,
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            Payment proof uploaded — awaiting admin verification
           </p>
         </div>
-        <div className="p-5 space-y-3">
-          <div className="bg-[#f4f3f3] rounded-2xl p-4 space-y-2 text-sm">
+        <div style={{ padding: "20px 24px" }}>
+          <div
+            style={{
+              background: "#F5F5F3",
+              borderRadius: 14,
+              padding: "16px",
+              marginBottom: 14,
+            }}
+          >
             {[
               ["Motorcycle", booking.motorcycleName],
               ["Pickup Date", booking.pickupDate],
               ["Return Date", booking.returnDate],
               ["Destination", booking.destination],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between">
-                <span className="text-[#171717]/50">{k}</span>
-                <span className="font-semibold text-[#171717] text-right max-w-[55%]">
+              <div
+                key={k}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "6px 0",
+                  borderBottom: "1px solid rgba(0,0,0,0.05)",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(0,0,0,0.45)",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
+                  {k}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#0E0E0E",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    maxWidth: "55%",
+                    textAlign: "right",
+                  }}
+                >
                   {v}
                 </span>
               </div>
             ))}
-            <div className="border-t border-[#171717]/10 pt-2 mt-1" />
-            <div className="flex justify-between">
-              <span className="text-[#171717]/50">
-                ₱{booking.dailyRate} × {booking.days} day
-                {booking.days !== 1 ? "s" : ""}
-              </span>
-              <span className="font-semibold text-[#171717]">
-                ₱{booking.baseRental}
-              </span>
-            </div>
-            {booking.helmetIncluded && (
-              <div className="flex justify-between">
-                <span className="text-[#171717]/50">Extra Helmet</span>
-                <span className="font-semibold text-[#b50002]">
-                  +₱{HELMET_FEE}
-                </span>
-              </div>
-            )}
-            {booking.distanceFee > 0 && (
-              <div className="flex justify-between">
-                <span className="text-[#171717]/50">Distance Fee</span>
-                <span className="font-semibold text-[#b50002]">
-                  +₱{booking.distanceFee}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-[#171717]/10 pt-2 mt-1">
-              <span className="text-[#171717]/50 font-semibold">Total</span>
-              <span className="font-semibold text-[#171717]">
-                ₱{booking.totalAmount}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#171717]/50 font-semibold">
-                Downpayment Paid
-              </span>
-              <span className="font-bold text-green-600">−₱{DOWNPAYMENT}</span>
-            </div>
-            <div className="border-t border-[#171717]/10 pt-2 mt-1 flex justify-between">
-              <span className="text-[#171717]/50 font-semibold">
+            <div
+              style={{
+                borderTop: "1.5px solid rgba(0,0,0,0.08)",
+                marginTop: 8,
+                paddingTop: 8,
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "rgba(0,0,0,0.5)",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                }}
+              >
                 Due at Pickup
               </span>
-              <span className="font-black text-[#171717] text-base">
+              <span
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: "#0E0E0E",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                }}
+              >
                 ₱{dueAtPickup}
               </span>
             </div>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2 text-xs text-amber-800">
-            <FaInfoCircle className="mt-0.5 flex-shrink-0" />
+          <div
+            style={{
+              background: "#fffbeb",
+              border: "1.5px solid #fde68a",
+              borderRadius: 12,
+              padding: "10px 14px",
+              marginBottom: 12,
+              display: "flex",
+              gap: 8,
+              fontSize: 12,
+              color: "#92400e",
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            <FaInfoCircle style={{ marginTop: 2, flexShrink: 0 }} />
             <span>
               Status is now Pending Reservation. Once approved, you can proceed
-              to pickup and full payment.
+              to pickup.
             </span>
           </div>
-          <div className="bg-[#f4f3f3] rounded-xl p-3 text-xs text-[#171717]/60">
-            <p className="font-semibold mb-0.5">📍 Pickup Location:</p>
-            <p>{PICKUP_LOCATION}</p>
-          </div>
         </div>
-        <div className="px-5 pb-5 flex gap-3">
+        <div style={{ padding: "0 24px 24px", display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
-            className="flex-1 items-center gap-2 px-6 py-3 bg-[#b50002] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#b5002]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+            style={{ ...S.btnPrimary, flex: 1, justifyContent: "center" }}
           >
             Close
           </button>
@@ -541,7 +802,7 @@ const BookingSuccessModal = ({ booking, onClose }) => {
               onClose();
               window.location.href = "/bookings";
             }}
-            className="flex-1 items-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+            style={{ ...S.btnDark, flex: 1, justifyContent: "center" }}
           >
             My Bookings
           </button>
@@ -551,7 +812,7 @@ const BookingSuccessModal = ({ booking, onClose }) => {
   );
 };
 
-// ── Destination Address selector ──────────────────────────────────────────────
+/* ── Destination Select ────────────────────────────────────────── */
 const useDestinationAddress = () => {
   const [regions, setRegions] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -567,7 +828,6 @@ const useDestinationAddress = () => {
         const res = await axios.get(`${PH_API}/regions/`);
         setRegions(res.data.sort((a, b) => a.name.localeCompare(b.name)));
       } catch {
-        /* silent */
       } finally {
         setLoadingState((p) => ({ ...p, regions: false }));
       }
@@ -603,7 +863,6 @@ const useDestinationAddress = () => {
             (r2.data || []).sort((a, b) => a.name.localeCompare(b.name)),
           );
         } catch {
-          /* silent */
         } finally {
           setLoadingState((p) => ({ ...p, cities: false }));
         }
@@ -618,7 +877,6 @@ const useDestinationAddress = () => {
         );
         setCities((r2.data || []).sort((a, b) => a.name.localeCompare(b.name)));
       } catch {
-        /* silent */
       } finally {
         setLoadingState((p) => ({ ...p, cities: false }));
       }
@@ -641,7 +899,6 @@ const useDestinationAddress = () => {
       setCities((res.data || []).sort((a, b) => a.name.localeCompare(b.name)));
       setBarangays([]);
     } catch {
-      /* silent */
     } finally {
       setLoadingState((p) => ({ ...p, cities: false }));
     }
@@ -661,7 +918,6 @@ const useDestinationAddress = () => {
         (res.data || []).sort((a, b) => a.name.localeCompare(b.name)),
       );
     } catch {
-      /* silent */
     } finally {
       setLoadingState((p) => ({ ...p, barangays: false }));
     }
@@ -704,8 +960,8 @@ const DestinationSelect = ({ value, onChange }) => {
   });
 
   const handleRegion = (e) => {
-    const code = e.target.value;
-    const name = regions.find((r) => r.code === code)?.name || "";
+    const code = e.target.value,
+      name = regions.find((r) => r.code === code)?.name || "";
     setSel({
       regionCode: code,
       regionName: name,
@@ -720,8 +976,8 @@ const DestinationSelect = ({ value, onChange }) => {
     onChange("", "");
   };
   const handleProvince = (e) => {
-    const code = e.target.value;
-    const name = provinces.find((p) => p.code === code)?.name || "";
+    const code = e.target.value,
+      name = provinces.find((p) => p.code === code)?.name || "";
     setSel((prev) => ({
       ...prev,
       provinceCode: code,
@@ -735,8 +991,8 @@ const DestinationSelect = ({ value, onChange }) => {
     onChange("", "");
   };
   const handleCity = (e) => {
-    const code = e.target.value;
-    const name = cities.find((c) => c.code === code)?.name || "";
+    const code = e.target.value,
+      name = cities.find((c) => c.code === code)?.name || "";
     setSel((prev) => ({
       ...prev,
       cityCode: code,
@@ -745,124 +1001,127 @@ const DestinationSelect = ({ value, onChange }) => {
       barangayName: "",
     }));
     fetchBarangays(code);
-    const dest = [name, sel.provinceName, sel.regionName]
-      .filter(Boolean)
-      .join(", ");
-    onChange(dest, name);
+    onChange(
+      [name, sel.provinceName, sel.regionName].filter(Boolean).join(", "),
+      name,
+    );
   };
   const handleBarangay = (e) => {
-    const code = e.target.value;
-    const name = barangays.find((b) => b.code === code)?.name || "";
+    const code = e.target.value,
+      name = barangays.find((b) => b.code === code)?.name || "";
     setSel((prev) => ({ ...prev, barangayCode: code, barangayName: name }));
-    const dest = [name, sel.cityName, sel.provinceName, sel.regionName]
-      .filter(Boolean)
-      .join(", ");
-    onChange(dest, sel.cityName);
+    onChange(
+      [name, sel.cityName, sel.provinceName, sel.regionName]
+        .filter(Boolean)
+        .join(", "),
+      sel.cityName,
+    );
   };
 
+  const selStyle = { ...S.select };
+
   return (
-    <div className="space-y-2">
-      <div className="relative flex items-center bg-white/60 border border-[#171717]/10 rounded-xl shadow-sm focus-within:border-black transition-all hover:bg-white/90">
-        <FaMapMarkerAlt className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none" />
-        <select
-          value={sel.regionCode}
-          onChange={handleRegion}
-          disabled={loadingState.regions}
-          required
-          className={selectCls}
-        >
-          <option value="">
-            {loadingState.regions ? "Loading regions…" : "Select Region *"}
-          </option>
-          {regions.map((r) => (
-            <option key={r.code} value={r.code}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-        <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
-      </div>
-
-      {sel.regionCode && hasProvinces && (
-        <div className="relative flex items-center bg-white/60 border border-[#171717]/10 rounded-xl shadow-sm focus-within:border-black transition-all hover:bg-white/90">
-          <FaMapMarkerAlt className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none" />
-          <select
-            value={sel.provinceCode}
-            onChange={handleProvince}
-            disabled={loadingState.provinces}
-            className={selectCls}
-          >
-            <option value="">
-              {loadingState.provinces
-                ? "Loading provinces…"
-                : "Select Province *"}
-            </option>
-            {provinces.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
-        </div>
-      )}
-
-      {sel.regionCode && (
-        <div className="relative flex items-center bg-white/60 border border-[#171717]/10 rounded-xl shadow-sm focus-within:border-black transition-all hover:bg-white/90">
-          <FaMapMarkerAlt className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none" />
-          <select
-            value={sel.cityCode}
-            onChange={handleCity}
-            disabled={
-              loadingState.cities ||
-              (hasProvinces ? !sel.provinceCode : !sel.regionCode)
-            }
-            className={selectCls}
-          >
-            <option value="">
-              {loadingState.cities
-                ? "Loading cities…"
-                : hasProvinces && !sel.provinceCode
-                  ? "Select a province first"
-                  : "Select City / Municipality *"}
-            </option>
-            {cities.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
-        </div>
-      )}
-
-      {sel.cityCode && (
-        <div className="relative flex items-center bg-white/60 border border-[#171717]/10 rounded-xl shadow-sm focus-within:border-black transition-all hover:bg-white/90">
-          <FaMapMarkerAlt className="absolute left-3.5 text-[#b50002] text-sm pointer-events-none" />
-          <select
-            value={sel.barangayCode}
-            onChange={handleBarangay}
-            disabled={loadingState.barangays}
-            className={selectCls}
-          >
-            <option value="">
-              {loadingState.barangays
-                ? "Loading barangays…"
-                : "Select Barangay (optional)"}
-            </option>
-            {barangays.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
-        </div>
-      )}
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {[
+        {
+          show: true,
+          val: sel.regionCode,
+          handler: handleRegion,
+          disabled: loadingState.regions,
+          placeholder: loadingState.regions
+            ? "Loading regions…"
+            : "Select Region *",
+          options: regions,
+        },
+        {
+          show: !!(sel.regionCode && hasProvinces),
+          val: sel.provinceCode,
+          handler: handleProvince,
+          disabled: loadingState.provinces,
+          placeholder: loadingState.provinces
+            ? "Loading provinces…"
+            : "Select Province *",
+          options: provinces,
+        },
+        {
+          show: !!sel.regionCode,
+          val: sel.cityCode,
+          handler: handleCity,
+          disabled:
+            loadingState.cities ||
+            (hasProvinces ? !sel.provinceCode : !sel.regionCode),
+          placeholder: loadingState.cities
+            ? "Loading cities…"
+            : hasProvinces && !sel.provinceCode
+              ? "Select a province first"
+              : "Select City / Municipality *",
+          options: cities,
+        },
+        {
+          show: !!sel.cityCode,
+          val: sel.barangayCode,
+          handler: handleBarangay,
+          disabled: loadingState.barangays,
+          placeholder: loadingState.barangays
+            ? "Loading barangays…"
+            : "Select Barangay (optional)",
+          options: barangays,
+        },
+      ]
+        .filter((x) => x.show)
+        .map((item, i) => (
+          <div key={i} style={{ position: "relative" }}>
+            <FaMapMarkerAlt
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#b50002",
+                fontSize: 13,
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+            <select
+              style={selStyle}
+              value={item.val}
+              onChange={item.handler}
+              disabled={item.disabled}
+              required={i === 0}
+            >
+              <option value="">{item.placeholder}</option>
+              {item.options.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <FaChevronDown
+              style={{
+                position: "absolute",
+                right: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "rgba(0,0,0,0.3)",
+                fontSize: 11,
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        ))}
       {value && (
-        <p className="text-xs text-[#171717] flex items-center gap-1.5 px-4">
-          <FaCheckCircle className="flex-shrink-0 text-[#b50002] mr-2" />{" "}
+        <p
+          style={{
+            fontSize: 12,
+            color: "#0E0E0E",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          <FaCheckCircle style={{ color: "#b50002", flexShrink: 0 }} />
           {value}
         </p>
       )}
@@ -870,32 +1129,72 @@ const DestinationSelect = ({ value, onChange }) => {
   );
 };
 
-// ── Step indicator ────────────────────────────────────────────────────────────
+/* ── Step Indicator ────────────────────────────────────────────── */
 const StepIndicator = ({ step }) => {
   const steps = ["Schedule", "Your Info", "Review & Pay"];
   return (
-    <div className="flex items-center gap-2 mb-6">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 24,
+      }}
+    >
       {steps.map((label, i) => {
-        const s = i + 1;
-        const active = s === step;
-        const done = s < step;
+        const s = i + 1,
+          active = s === step,
+          done = s < step;
         return (
           <React.Fragment key={s}>
-            <div className="flex items-center gap-1.5">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black transition-all duration-300 ${active ? "bg-[#b50002] text-white shadow-md shadow-[#b50002]/30" : done ? "bg-[#171717] text-white" : "bg-[#171717]/10 text-[#171717]/40"}`}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  transition: "all 0.3s",
+                  background: active
+                    ? "#b50002"
+                    : done
+                      ? "#0E0E0E"
+                      : "rgba(0,0,0,0.08)",
+                  color: active || done ? "#fff" : "rgba(0,0,0,0.3)",
+                }}
               >
-                {done ? <FaCheckCircle className="text-xs" /> : s}
+                {done ? <FaCheckCircle style={{ fontSize: 11 }} /> : s}
               </div>
               <span
-                className={`text-xs font-bold transition-all hidden sm:inline ${active ? "text-[#b50002]" : done ? "text-[#171717]" : "text-[#171717]/40"}`}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  display: window.innerWidth < 640 ? "none" : "inline",
+                  color: active
+                    ? "#b50002"
+                    : done
+                      ? "#0E0E0E"
+                      : "rgba(0,0,0,0.3)",
+                }}
               >
                 {label}
               </span>
             </div>
             {i < steps.length - 1 && (
               <div
-                className={`flex-1 h-0.5 rounded-full transition-all duration-300 ${done ? "bg-[#171717]" : "bg-[#171717]/10"}`}
+                style={{
+                  flex: 1,
+                  height: 1.5,
+                  borderRadius: 999,
+                  background: done ? "#0E0E0E" : "rgba(0,0,0,0.08)",
+                  transition: "background 0.3s",
+                }}
               />
             )}
           </React.Fragment>
@@ -905,21 +1204,46 @@ const StepIndicator = ({ step }) => {
   );
 };
 
-// ── Review row ────────────────────────────────────────────────────────────────
+/* ── Review Row ────────────────────────────────────────────────── */
 const ReviewRow = ({ label, value, accent, deduct }) => (
-  <div className="flex items-start justify-between py-2.5 border-b border-[#171717]/8 last:border-0 gap-4">
-    <span className="text-xs text-[#171717]/50 font-semibold uppercase tracking-wider flex-shrink-0">
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      padding: "8px 0",
+      borderBottom: "1px solid rgba(0,0,0,0.05)",
+      gap: 12,
+    }}
+  >
+    <span
+      style={{
+        fontSize: 11,
+        color: "rgba(0,0,0,0.4)",
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+        fontFamily: "'Space Grotesk',sans-serif",
+        flexShrink: 0,
+      }}
+    >
       {label}
     </span>
     <span
-      className={`text-sm font-bold text-right ${deduct ? "text-green-600" : accent ? "text-[#b50002]" : "text-[#171717]"}`}
+      style={{
+        fontSize: 13,
+        fontWeight: 700,
+        textAlign: "right",
+        fontFamily: "'Space Grotesk',sans-serif",
+        color: deduct ? "#16a34a" : accent ? "#b50002" : "#0E0E0E",
+      }}
     >
       {value}
     </span>
   </div>
 );
 
-// ── Price Summary component ───────────────────────────────────────────────────
+/* ── Price Summary ─────────────────────────────────────────────── */
 const PriceSummary = ({
   price,
   days,
@@ -941,17 +1265,31 @@ const PriceSummary = ({
   const discountedTotal = discountedBaseRental + distanceFee + helmetFee;
   const dueAtPickup = Math.max(0, discountedTotal - DOWNPAYMENT);
   return (
-    <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
-      <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-2">
-        Price Summary
-      </p>
+    <div style={{ ...S.card, background: "#F5F5F3" }}>
+      <p style={{ ...S.label, marginBottom: 12 }}>Price Summary</p>
       <ReviewRow
         label="Rate / day"
         value={
           discount ? (
-            <span className="flex items-baseline gap-1.5 justify-end flex-wrap">
-              <span className="line-through opacity-40 text-xs">₱{price}</span>
-              <span className="text-[#b50002]">₱{discountedDailyRate}</span>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 6,
+                justifyContent: "flex-end",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  textDecoration: "line-through",
+                  opacity: 0.4,
+                  fontSize: 11,
+                }}
+              >
+                ₱{price}
+              </span>
+              <span style={{ color: "#b50002" }}>₱{discountedDailyRate}</span>
             </span>
           ) : (
             `₱${price}`
@@ -963,8 +1301,22 @@ const PriceSummary = ({
         label="Rental Subtotal"
         value={
           discount ? (
-            <span className="flex items-baseline gap-1.5 justify-end flex-wrap">
-              <span className="line-through opacity-40 text-xs">
+            <span
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 6,
+                justifyContent: "flex-end",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  textDecoration: "line-through",
+                  opacity: 0.4,
+                  fontSize: 11,
+                }}
+              >
                 ₱{baseRental}
               </span>
               <span>₱{Math.round(discountedBaseRental)}</span>
@@ -987,27 +1339,95 @@ const PriceSummary = ({
       {helmetFee > 0 && (
         <ReviewRow label="Extra Helmet" value={`+₱${HELMET_FEE}`} accent />
       )}
-      <div className="pt-2 mt-1 border-t border-[#171717]/10 flex items-center justify-between">
-        <span className="text-xs font-black text-[#171717] uppercase tracking-wider">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: "1.5px solid rgba(0,0,0,0.08)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+            color: "#0E0E0E",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           Total
         </span>
-        <span className="text-base font-black text-[#171717]">
+        <span
+          style={{
+            fontSize: 16,
+            fontWeight: 800,
+            color: "#0E0E0E",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           ₱{totalAmount}
         </span>
       </div>
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-xs font-semibold text-[#171717]/50 uppercase tracking-wider">
-          Downpayment (Reservation Fee)
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 4,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: "rgba(0,0,0,0.4)",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          Downpayment (now)
         </span>
-        <span className="text-sm font-bold text-green-600">
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#16a34a",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           −₱{DOWNPAYMENT}
         </span>
       </div>
-      <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#171717]/10">
-        <span className="text-xs font-black text-[#171717] uppercase tracking-wider">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 4,
+          paddingTop: 8,
+          borderTop: "1.5px solid rgba(0,0,0,0.08)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+            color: "#0E0E0E",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           Due at Pickup
         </span>
-        <span className="text-lg font-black text-[#b50002]">
+        <span
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color: "#b50002",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
           ₱{dueAtPickup}
         </span>
       </div>
@@ -1015,7 +1435,9 @@ const PriceSummary = ({
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// collapsed states for booking form sections (moved inside component)
+
+/* ── Main Component ────────────────────────────────────────────── */
 const MotorcycleDetail = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -1031,11 +1453,18 @@ const MotorcycleDetail = () => {
   const [loadingUserProfile, setLoadingUserProfile] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [bookingStep, setBookingStep] = useState(1);
+  const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(true);
+  const [isRenterCollapsed, setIsRenterCollapsed] = useState(true);
+  const [isPricingCollapsed, setIsPricingCollapsed] = useState(true);
   const [checkoutLock, setCheckoutLock] = useState({
     expiresAt: "",
     lockMinutes: CHECKOUT_LOCK_FALLBACK_MINUTES,
   });
   const [lockSecondsLeft, setLockSecondsLeft] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [votingReviewId, setVotingReviewId] = useState("");
 
   const initialPickupSlots = getAvailablePickupSlots(todayISO());
   const defaultPickupTime =
@@ -1065,28 +1494,21 @@ const MotorcycleDetail = () => {
     paymentSentAmount: String(DOWNPAYMENT),
     paymentProofImage: null,
   });
-  const [reviews, setReviews] = useState([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewsError, setReviewsError] = useState("");
-  const [votingReviewId, setVotingReviewId] = useState("");
 
   const availablePickupSlots = getAvailablePickupSlots(formData.pickupDate);
   const noSlotsAvailable = availablePickupSlots.length === 0;
   const selectedQrPath =
     PAYMENT_QR_PATHS[formData.reservationPaymentMethod] ||
     PAYMENT_QR_PATHS.GCash;
-
   const fetchControllerRef = useRef(null);
   const submitControllerRef = useRef(null);
   const hasSubmittedRef = useRef(false);
   const lockTimerRef = useRef(null);
-
   const validReturnSlots = getValidReturnSlots(
     formData.pickupDate,
     formData.returnDate,
     formData.pickupTime,
   );
-
   const days = calculateDays(formData.pickupDate, formData.returnDate);
   const applicableDiscount = useApplicableDiscount(motorcycle, days);
 
@@ -1108,7 +1530,6 @@ const MotorcycleDetail = () => {
       const motorcycleId = motorcycle?._id ?? motorcycle?.id;
       const token = localStorage.getItem("token");
       if (!motorcycleId || !token) return;
-
       try {
         await api.post(
           "/api/motorcycle-bookings/checkout-lock/release",
@@ -1116,9 +1537,8 @@ const MotorcycleDetail = () => {
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch {
-        if (!silent) {
+        if (!silent)
           toast.error("Failed to release checkout session. Please retry.");
-        }
       }
     },
     [motorcycle],
@@ -1127,54 +1547,50 @@ const MotorcycleDetail = () => {
   const acquireCheckoutLock = useCallback(async () => {
     const motorcycleId = motorcycle?._id ?? motorcycle?.id;
     const token = localStorage.getItem("token");
-
     if (!motorcycleId || !token) {
       toast.error("Please login before continuing to payment.");
       return false;
     }
-
     try {
       const res = await api.post(
         "/api/motorcycle-bookings/checkout-lock/acquire",
         { motorcycleId },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      const lockExpiresAt = res.data?.lockExpiresAt || "";
-      const lockMinutes =
-        Number(res.data?.lockMinutes) || CHECKOUT_LOCK_FALLBACK_MINUTES;
-      setCheckoutLock({ expiresAt: lockExpiresAt, lockMinutes });
+      setCheckoutLock({
+        expiresAt: res.data?.lockExpiresAt || "",
+        lockMinutes:
+          Number(res.data?.lockMinutes) || CHECKOUT_LOCK_FALLBACK_MINUTES,
+      });
       return true;
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
         "This motorcycle is currently being rented by someone else.";
-      const code = err?.response?.data?.code;
-      if (code === "MOTORCYCLE_LOCKED") {
+      if (err?.response?.data?.code === "MOTORCYCLE_LOCKED") {
         await alertModal(msg, {
           isError: true,
           title: "Motorcycle Unavailable",
         });
-      } else {
-        toast.error(msg);
-      }
+      } else toast.error(msg);
       return false;
     }
   }, [motorcycle]);
 
   useEffect(() => {
     clearLockTimer();
-
     if (bookingStep !== 3 || !checkoutLock.expiresAt) {
       setLockSecondsLeft(null);
       return;
     }
-
     const tick = async () => {
-      const remainingMs =
-        new Date(checkoutLock.expiresAt).getTime() - Date.now();
-      const remaining = Math.max(0, Math.floor(remainingMs / 1000));
+      const remaining = Math.max(
+        0,
+        Math.floor(
+          (new Date(checkoutLock.expiresAt).getTime() - Date.now()) / 1000,
+        ),
+      );
       setLockSecondsLeft(remaining);
-
       if (remaining <= 0) {
         clearLockTimer();
         await releaseCheckoutLock(true);
@@ -1195,10 +1611,8 @@ const MotorcycleDetail = () => {
         );
       }
     };
-
     tick();
     lockTimerRef.current = setInterval(tick, 1000);
-
     return () => clearLockTimer();
   }, [
     bookingStep,
@@ -1210,9 +1624,7 @@ const MotorcycleDetail = () => {
   useEffect(() => {
     return () => {
       clearLockTimer();
-      if (checkoutLock.expiresAt) {
-        releaseCheckoutLock(true);
-      }
+      if (checkoutLock.expiresAt) releaseCheckoutLock(true);
     };
   }, [checkoutLock.expiresAt, clearLockTimer, releaseCheckoutLock]);
 
@@ -1226,8 +1638,8 @@ const MotorcycleDetail = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.data.success && res.data.user) {
-          const u = res.data.user;
-          const addr = u.address || {};
+          const u = res.data.user,
+            addr = u.address || {};
           const addrParts = [
             addr.barangay,
             addr.city,
@@ -1249,7 +1661,6 @@ const MotorcycleDetail = () => {
           }));
         }
       } catch {
-        /* silent */
       } finally {
         setLoadingUserProfile(false);
       }
@@ -1303,23 +1714,20 @@ const MotorcycleDetail = () => {
           params: { limit: 6 },
         });
         const data = res.data || {};
-        const rows = Array.isArray(data.reviews)
-          ? data.reviews
-          : data.reviews || [];
-        if (!mounted) return;
-        setReviews(rows);
+        if (mounted)
+          setReviews(
+            Array.isArray(data.reviews) ? data.reviews : data.reviews || [],
+          );
       } catch (err) {
-        if (!mounted) return;
-        setReviewsError(
-          err.response?.data?.message || "Failed to load reviews",
-        );
+        if (mounted)
+          setReviewsError(
+            err.response?.data?.message || "Failed to load reviews",
+          );
       } finally {
         if (mounted) setReviewsLoading(false);
       }
     };
-
     fetchReviews();
-
     return () => {
       mounted = false;
     };
@@ -1331,7 +1739,6 @@ const MotorcycleDetail = () => {
       toast.error("Please log in to vote on a review.");
       return;
     }
-
     try {
       setVotingReviewId(reviewId);
       const res = await api.patch(
@@ -1340,15 +1747,14 @@ const MotorcycleDetail = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const updated = res.data?.review || null;
-      if (updated) {
+      if (updated)
         setReviews((prev) =>
-          prev.map((review) =>
-            String(review._id || review.id) === String(reviewId)
-              ? { ...review, ...updated }
-              : review,
+          prev.map((r) =>
+            String(r._id || r.id) === String(reviewId)
+              ? { ...r, ...updated }
+              : r,
           ),
         );
-      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save vote.");
     } finally {
@@ -1358,23 +1764,80 @@ const MotorcycleDetail = () => {
 
   if (!motorcycle && loadingMotorcycle)
     return (
-      <div className="min-h-screen bg-[#e8e8e8] flex items-center justify-center">
-        <div className="flex items-center gap-3 text-[#171717]">
-          <div className="w-5 h-5 border-2 border-[#b50002] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Loading motorcycle…</span>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F5F5F3",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            fontFamily: "'Space Grotesk',sans-serif",
+            color: "#0E0E0E",
+          }}
+        >
+          <div
+            style={{
+              width: 20,
+              height: 20,
+              border: "2px solid #b50002",
+              borderTopColor: "transparent",
+              borderRadius: "50%",
+              animation: "spin 0.7s linear infinite",
+            }}
+          />
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          Loading motorcycle…
         </div>
       </div>
     );
   if (!motorcycle && motorcycleError)
     return (
-      <div className="min-h-screen bg-[#e8e8e8] flex items-center justify-center">
-        <p className="text-[#b50002] font-semibold">{motorcycleError}</p>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F5F5F3",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p
+          style={{
+            color: "#b50002",
+            fontFamily: "'Space Grotesk',sans-serif",
+            fontWeight: 700,
+          }}
+        >
+          {motorcycleError}
+        </p>
       </div>
     );
   if (!motorcycle)
     return (
-      <div className="min-h-screen bg-[#e8e8e8] flex items-center justify-center">
-        <p className="text-[#171717]/50">Motorcycle not found.</p>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F5F5F3",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p
+          style={{
+            color: "rgba(0,0,0,0.4)",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          Motorcycle not found.
+        </p>
       </div>
     );
 
@@ -1406,18 +1869,16 @@ const MotorcycleDetail = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-
     if (name === "zipCode") {
       const n = value.replace(/\D/g, "");
       if (n.length > 4) return;
       setFormData((p) => ({ ...p, zipCode: n }));
       return;
     }
-
     if (name === "pickupDate") {
-      const selected = new Date(value);
-      const todayStart = getTodayStart();
-      const maxDate = sevenDaysFromToday();
+      const selected = new Date(value),
+        todayStart = getTodayStart(),
+        maxDate = sevenDaysFromToday();
       if (isNaN(selected.getTime())) return;
       if (selected < todayStart) {
         toast.error("Pickup date cannot be in the past");
@@ -1432,31 +1893,26 @@ const MotorcycleDetail = () => {
           ? ""
           : formData.returnDate;
       const freshSlots = getAvailablePickupSlots(value);
-      const newPickupTime =
-        freshSlots.length > 0 ? freshSlots[0].value : "08:00";
       setFormData((p) => ({
         ...p,
         pickupDate: value,
-        pickupTime: newPickupTime,
+        pickupTime: freshSlots.length > 0 ? freshSlots[0].value : "08:00",
         returnDate: newReturnDate,
       }));
       return;
     }
-
     if (name === "returnDate") {
       if (value === "") {
         setFormData((p) => ({ ...p, returnDate: "" }));
         return;
       }
       const selected = new Date(value);
-      const todayStart = getTodayStart();
-      const maxDate = sixMonthsFromToday();
       if (isNaN(selected.getTime())) return;
-      if (selected < todayStart) {
+      if (selected < getTodayStart()) {
         toast.error("Return date cannot be in the past");
         return;
       }
-      if (selected > maxDate) {
+      if (selected > sixMonthsFromToday()) {
         toast.error("Date must be within 6 months from today");
         return;
       }
@@ -1467,33 +1923,25 @@ const MotorcycleDetail = () => {
       setFormData((p) => ({ ...p, returnDate: value }));
       return;
     }
-
-    if (name === "returnTime") {
-      setFormData((p) => ({ ...p, returnTime: value }));
+    if (name === "returnTime" || name === "pickupTime") {
+      setFormData((p) => ({ ...p, [name]: value }));
       return;
     }
-
-    if (name === "pickupTime") {
-      setFormData((p) => ({ ...p, pickupTime: value }));
-      return;
-    }
-
     if (name === "wantsHelmet") {
       setFormData((p) => ({ ...p, wantsHelmet: e.target.checked }));
       return;
     }
-
     if (name === "paymentSentAmount") {
       setFormData((p) => ({ ...p, paymentSentAmount: String(DOWNPAYMENT) }));
       return;
     }
-
     if (name === "paymentProofImage") {
-      const file = e.target.files?.[0] || null;
-      setFormData((p) => ({ ...p, paymentProofImage: file }));
+      setFormData((p) => ({
+        ...p,
+        paymentProofImage: e.target.files?.[0] || null,
+      }));
       return;
     }
-
     setFormData((p) => ({ ...p, [name]: value }));
   };
 
@@ -1507,8 +1955,8 @@ const MotorcycleDetail = () => {
 
   const checkExistingActiveBooking = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user") || "null");
+      const token = localStorage.getItem("token"),
+        user = JSON.parse(localStorage.getItem("user") || "null");
       if (!token || !user?.id) return null;
       const res = await api.get("/api/motorcycle-bookings/mybooking", {
         headers: { Authorization: `Bearer ${token}` },
@@ -1548,7 +1996,6 @@ const MotorcycleDetail = () => {
     }
   };
 
-  // ── Step 1 validation ─────────────────────────────────────────────────────
   const handleStep1Next = (e) => {
     e.preventDefault();
     if (!formData.returnDate) {
@@ -1574,7 +2021,6 @@ const MotorcycleDetail = () => {
       );
       return;
     }
-
     const pickupAt = parseLocalDateTime(
       formData.pickupDate,
       formData.pickupTime,
@@ -1587,38 +2033,46 @@ const MotorcycleDetail = () => {
       toast.error("Please select valid pickup and return schedule.");
       return;
     }
-
-    const minDurationMs = 24 * 60 * 60 * 1000;
-    if (returnAt.getTime() - pickupAt.getTime() < minDurationMs) {
+    if (returnAt.getTime() - pickupAt.getTime() < 24 * 60 * 60 * 1000) {
       toast.error("Minimum rental duration is 24 hours.");
       return;
     }
-
-    // ── Check for scheduled maintenance conflicts ──────────────────────
     if (motorcycle) {
-      const rawStart = motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt || null;
-      const rawEnd = motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleAt || null;
+      const rawStart =
+        motorcycle.maintenanceScheduleStartAt ||
+        motorcycle.maintenanceScheduleAt ||
+        null;
+      const rawEnd =
+        motorcycle.maintenanceScheduleEndAt ||
+        motorcycle.maintenanceScheduleAt ||
+        null;
       if (rawStart && rawEnd) {
-        const maintenanceStart = new Date(rawStart);
-        maintenanceStart.setHours(0, 0, 0, 0);
-        const maintenanceEnd = new Date(rawEnd);
-        maintenanceEnd.setHours(23, 59, 59, 999);
-
-        const pickupDay = new Date(pickupAt);
-        pickupDay.setHours(0, 0, 0, 0);
-        const returnDay = new Date(returnAt);
-        returnDay.setHours(0, 0, 0, 0);
-
-        if (!(returnDay < maintenanceStart || pickupDay > maintenanceEnd)) {
-          const startLabel = maintenanceStart.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-          const endLabel = maintenanceEnd.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-          const label = startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
-          toast.error(`This motorcycle is scheduled for maintenance on ${label}. Please select different dates.`);
+        const ms = new Date(rawStart),
+          me = new Date(rawEnd);
+        ms.setHours(0, 0, 0, 0);
+        me.setHours(23, 59, 59, 999);
+        const pd = new Date(pickupAt),
+          rd = new Date(returnAt);
+        pd.setHours(0, 0, 0, 0);
+        rd.setHours(0, 0, 0, 0);
+        if (!(rd < ms || pd > me)) {
+          const sl = ms.toLocaleDateString("en-PH", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+          const el = me.toLocaleDateString("en-PH", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+          toast.error(
+            `This motorcycle is scheduled for maintenance on ${sl === el ? sl : `${sl} — ${el}`}. Please select different dates.`,
+          );
           return;
         }
       }
     }
-
     setBookingStep(2);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1635,22 +2089,18 @@ const MotorcycleDetail = () => {
   };
 
   const formatLockCountdown = (seconds) => {
-    const safe = Math.max(0, Number(seconds) || 0);
-    const mins = Math.floor(safe / 60)
-      .toString()
-      .padStart(2, "0");
-    const secs = (safe % 60).toString().padStart(2, "0");
+    const safe = Math.max(0, Number(seconds) || 0),
+      mins = Math.floor(safe / 60)
+        .toString()
+        .padStart(2, "0"),
+      secs = (safe % 60).toString().padStart(2, "0");
     return `${mins}:${secs}`;
   };
 
-  // ── Final submit ──────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (hasSubmittedRef.current || submitting) return;
     hasSubmittedRef.current = true;
-
-    // Validate payment fields (now on Step 3)
     if (!formData.paymentReferenceId.trim()) {
       toast.error("Please enter your payment reference ID.");
       hasSubmittedRef.current = false;
@@ -1671,14 +2121,12 @@ const MotorcycleDetail = () => {
       hasSubmittedRef.current = false;
       return;
     }
-
     const existingBooking = await checkExistingActiveBooking();
     if (existingBooking) {
       hasSubmittedRef.current = false;
       await activeBookingBlockModal(existingBooking, navigate);
       return;
     }
-
     setSubmitting(true);
     if (submitControllerRef.current) {
       try {
@@ -1688,8 +2136,8 @@ const MotorcycleDetail = () => {
     const controller = new AbortController();
     submitControllerRef.current = controller;
     try {
-      const user = JSON.parse(localStorage.getItem("user"));
-      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user")),
+        token = localStorage.getItem("token");
       const form = new FormData();
       const payload = {
         userId: user?.id,
@@ -1748,7 +2196,6 @@ const MotorcycleDetail = () => {
             )
           : undefined,
       };
-
       Object.entries(payload).forEach(([key, value]) => {
         if (value === undefined || value === null) return;
         if (typeof value === "object") {
@@ -1757,18 +2204,15 @@ const MotorcycleDetail = () => {
         }
         form.append(key, String(value));
       });
-
-      if (formData.paymentProofImage) {
+      if (formData.paymentProofImage)
         form.append("paymentProofImage", formData.paymentProofImage);
-      }
-
       const headers = {};
       if (token) headers.Authorization = `Bearer ${token}`;
       await api.post(`/api/motorcycle-bookings`, form, {
         headers,
         signal: controller.signal,
       });
-      if (applicableDiscount?._id) {
+      if (applicableDiscount?._id)
         api
           .patch(
             `/api/discounts/${applicableDiscount._id}/increment-usage`,
@@ -1776,7 +2220,6 @@ const MotorcycleDetail = () => {
             { headers },
           )
           .catch(() => {});
-      }
       clearLockTimer();
       setCheckoutLock({
         expiresAt: "",
@@ -1814,8 +2257,11 @@ const MotorcycleDetail = () => {
       const canceled =
         err?.code === "ERR_CANCELED" || err?.name === "CanceledError";
       if (canceled) return;
-      const lockCode = err?.response?.data?.code;
-      if (lockCode === "LOCK_REQUIRED" || lockCode === "MOTORCYCLE_LOCKED") {
+      if (
+        ["LOCK_REQUIRED", "MOTORCYCLE_LOCKED"].includes(
+          err?.response?.data?.code,
+        )
+      ) {
         clearLockTimer();
         setCheckoutLock({
           expiresAt: "",
@@ -1840,15 +2286,62 @@ const MotorcycleDetail = () => {
   const slotLabel = (v) =>
     ALL_TIME_SLOTS.find((s) => s.value === v)?.label || v;
 
+  /* ── RENDER ─────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#e3e3e3] ">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+        /* INCREASED BOTTOM PADDING TO AVOID FLOATING ACTION BUTTON OVERLAP */
+        .md-page { background:#F5F5F3; min-height:100vh; padding:40px 24px 100px; font-family:'Space Grotesk',sans-serif; box-sizing:border-box; }
+        @media(max-width:640px){ .md-page{padding:24px 14px 120px;} } 
+
+        .md-layout { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:380px 1fr; gap:28px; align-items:start; }
+        @media(max-width:1024px){ .md-layout{grid-template-columns:1fr;} }
+
+        /* NEW CSS CLASS FOR RESPONSIVE FORM COLUMNS */
+        .md-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media(max-width: 640px) { .md-grid-2 { grid-template-columns: 1fr; } }
+
+        /* image gallery */
+        .md-gallery { border-radius:20px; overflow:hidden; position:relative; background:#EEEDE9; aspect-ratio:4/3; }
+        .md-gallery img { width:100%; height:100%; object-fit:cover; display:block; }
+        .md-gallery-btn { position:absolute; top:50%; transform:translateY(-50%); width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.9); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#0E0E0E; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:background 0.18s; }
+        .md-gallery-btn:hover { background:#fff; }
+        .md-gallery-dots { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); display:flex; gap:5px; }
+        .md-gallery-dot { width:6px; height:6px; border-radius:999px; background:rgba(255,255,255,0.5); border:none; cursor:pointer; padding:0; transition:all 0.2s; }
+        .md-gallery-dot.active { width:18px; background:#fff; }
+
+        /* specs grid */
+        .md-specs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+        .md-spec { background:#F5F5F3; border-radius:12px; padding:12px 14px; }
+        .md-spec-label { font-size:10px; fontWeight:600; color:rgba(0,0,0,0.35); textTransform:uppercase; letterSpacing:1px; marginBottom:4px; }
+        .md-spec-val { font-size:14px; font-weight:700; color:#0E0E0E; }
+
+        /* form card */
+        .md-form-card { background:#fff; border-radius:22px; border:1.5px solid rgba(0,0,0,0.07); overflow:hidden; animation:fadeUp 0.4s ease; }
+        .md-form-header { background:#171717; padding:20px 24px; display:flex; align-items:center; justify-content:space-between; }
+        .md-form-body { padding:24px; }
+
+        /* review card */
+        .md-review { background:#F5F5F3; border-radius:14px; padding:14px; border:1.5px solid rgba(0,0,0,0.06); }
+        .md-vote-btn { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:11px; font-weight:700; font-family:'Space Grotesk',sans-serif; cursor:pointer; border:1.5px solid; transition:all 0.15s; }
+
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:opacity(0.4); cursor:pointer; }
+
+        /* focus states */
+        input:focus, select:focus, textarea:focus { border-color:#b50002 !important; outline:none; }
+      `}</style>
+
       <ToastContainer
         position="top-right"
         autoClose={3000}
-        theme="colored"
+        theme="light"
         icon={false}
       />
-
       {bookingSuccess && (
         <BookingSuccessModal
           booking={bookingSuccess}
@@ -1859,154 +2352,251 @@ const MotorcycleDetail = () => {
         />
       )}
 
-      <div className="max-w-7xl mx-auto px-4 pt-12 pb-16">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-[#171717]/50 hover:text-[#b50002] text-sm font-medium transition-colors mb-6"
-        >
-          <FaArrowLeft className="text-xs" /> Back
-        </button>
+      <div className="md-page">
+        {/* Back button */}
+        <div style={{ maxWidth: 1200, margin: "0 auto 20px" }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ ...S.btnSecondary, color: "rgba(0,0,0,0.45)" }}
+          >
+            <FaArrowLeft style={{ fontSize: 11 }} /> Back to motorcycles
+          </button>
+        </div>
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* ── LEFT — Motorcycle info ── */}
-          <div className="w-full lg:w-[420px] flex-shrink-0 space-y-4 lg:top-24">
-            <div className="bg-gradient-to-br from-[#171717] via-[#171717] to-[#b50002]/80 rounded-3xl overflow-hidden shadow-2xl shadow-black/30 relative">
-              <div className="relative z-10 p-5">
-                <div className="flex items-center gap-2 mb-3"></div>
-              </div>
-
-              <div className="relative">
-                <img
-                  src={buildImageSrc(
-                    motorcycleImages[currentImage] ?? motorcycle.image,
-                  )}
-                  alt={motorcycle.name}
-                  className="w-full h-64 object-cover"
-                  onError={handleImageError}
-                />
-                {motorcycleImages.length > 1 && (
-                  <>
-                    <button
-                      onClick={() =>
-                        setCurrentImage((prev) =>
-                          prev === 0 ? motorcycleImages.length - 1 : prev - 1,
-                        )
-                      }
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all"
-                    >
-                      <FaArrowLeft className="text-xs" />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setCurrentImage((prev) =>
-                          prev === motorcycleImages.length - 1 ? 0 : prev + 1,
-                        )
-                      }
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all"
-                    >
-                      <FaArrowRight className="text-xs" />
-                    </button>
-                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                      {motorcycleImages.map((_, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setCurrentImage(idx)}
-                          className={`rounded-full transition-all duration-200 ${idx === currentImage ? "w-5 h-2 bg-white" : "w-2 h-2 bg-white/40"}`}
-                        />
-                      ))}
-                    </div>
-                  </>
+        <div className="md-layout">
+          {/* ── LEFT COLUMN ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Gallery */}
+            <div className="md-gallery">
+              <img
+                src={buildImageSrc(
+                  motorcycleImages[currentImage] ?? motorcycle.image,
                 )}
-              </div>
-
-              <div className="p-5 pt-4">
-                <h2 className="text-white font-black text-xl leading-tight">
-                  {motorcycle.make} {motorcycle.model}
-                </h2>
-                <p className="text-white/60 text-sm mt-0.5">
-                  {motorcycle.year}
-                </p>
-
-                {/* ── Maintenance warning banner ── */}
-                {(() => {
-                  const rawStart = motorcycle?.maintenanceScheduleStartAt || motorcycle?.maintenanceScheduleAt || null;
-                  const rawEnd = motorcycle?.maintenanceScheduleEndAt || motorcycle?.maintenanceScheduleAt || null;
-                  if (!rawStart || !rawEnd) return null;
-                  const s = new Date(rawStart);
-                  const e = new Date(rawEnd);
-                  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
-                  const startLabel = s.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-                  const endLabel = e.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-                  const label = startLabel === endLabel ? startLabel : `${startLabel} — ${endLabel}`;
-                  return (
-                    <div className="mt-3 p-3 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-start gap-2">
-                      <FaExclamationTriangle className="text-amber-400 text-sm flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-amber-100/90">
-                        <p className="font-semibold">Maintenance Scheduled</p>
-                        <p className="text-xs text-amber-100/70 mt-0.5">
-                          This bike will be under maintenance on <strong>{label}</strong>
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="mt-3">
-                  {/* Inside the dark card, below motorcycle name/year */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-1">
-                      Daily rate
-                    </p>
-                    {applicableDiscount ? (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm text-white/40 line-through">
-                            ₱{price.toLocaleString()}
-                          </span>
-                          <span className="text-2xl font-bold text-white leading-tight">
-                            ₱
-                            {Math.round(
-                              computeDiscountedPrice(price, applicableDiscount),
-                            ).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-semibold bg-green-500/20 text-green-300 border border-green-500/30 rounded px-2 py-px">
-                            {applicableDiscount.discountType === "percentage"
-                              ? `−${applicableDiscount.discountValue}% off`
-                              : `₱${applicableDiscount.discountValue} off`}
-                          </span>
-                          <span className="text-[10px] text-white/40">
-                            Save ₱
-                            {Math.round(
-                              price -
-                                computeDiscountedPrice(
-                                  price,
-                                  applicableDiscount,
-                                ),
-                            ).toLocaleString()}
-                            /day
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-bold text-white leading-tight">
-                          ₱{price.toLocaleString()}
-                        </span>
-                        <span className="text-sm text-white/40">/day</span>
-                      </div>
-                    )}
+                alt={motorcycle.name}
+                onError={handleImageError}
+              />
+              {motorcycleImages.length > 1 && (
+                <>
+                  <button
+                    className="md-gallery-btn"
+                    style={{ left: 10 }}
+                    onClick={() =>
+                      setCurrentImage((p) =>
+                        p === 0 ? motorcycleImages.length - 1 : p - 1,
+                      )
+                    }
+                  >
+                    <FaArrowLeft size={11} />
+                  </button>
+                  <button
+                    className="md-gallery-btn"
+                    style={{ right: 10 }}
+                    onClick={() =>
+                      setCurrentImage((p) =>
+                        p === motorcycleImages.length - 1 ? 0 : p + 1,
+                      )
+                    }
+                  >
+                    <FaArrowRight size={11} />
+                  </button>
+                  <div className="md-gallery-dots">
+                    {motorcycleImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        className={`md-gallery-dot ${idx === currentImage ? "active" : ""}`}
+                        onClick={() => setCurrentImage(idx)}
+                      />
+                    ))}
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-lg shadow-black/10">
-              <h3 className="text-xs font-bold text-[#171717]/50 uppercase tracking-widest mb-4">
-                Specifications
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
+            {/* Motorcycle info card */}
+            <div style={S.card}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 4,
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: "#0E0E0E",
+                      letterSpacing: "-0.5px",
+                      lineHeight: 1.2,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    {motorcycle.make} {motorcycle.model}
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(0,0,0,0.4)",
+                      marginTop: 2,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    {motorcycle.year}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  {applicableDiscount ? (
+                    <>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(0,0,0,0.35)",
+                          textDecoration: "line-through",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        ₱{price}/day
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 800,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        ₱
+                        {Math.round(
+                          computeDiscountedPrice(price, applicableDiscount),
+                        )}
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "rgba(0,0,0,0.4)",
+                          }}
+                        >
+                          /day
+                        </span>
+                      </p>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          background: "rgba(22,163,74,0.1)",
+                          color: "#16a34a",
+                          border: "1px solid rgba(22,163,74,0.2)",
+                          borderRadius: 999,
+                          padding: "2px 8px",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        {applicableDiscount.discountType === "percentage"
+                          ? `−${applicableDiscount.discountValue}% off`
+                          : `₱${applicableDiscount.discountValue} off`}
+                      </span>
+                    </>
+                  ) : (
+                    <p
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      ₱{price}
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "rgba(0,0,0,0.4)",
+                        }}
+                      >
+                        /day
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Maintenance warning */}
+              {(() => {
+                const rawStart =
+                  motorcycle?.maintenanceScheduleStartAt ||
+                  motorcycle?.maintenanceScheduleAt ||
+                  null;
+                const rawEnd =
+                  motorcycle?.maintenanceScheduleEndAt ||
+                  motorcycle?.maintenanceScheduleAt ||
+                  null;
+                if (!rawStart || !rawEnd) return null;
+                const s = new Date(rawStart),
+                  e = new Date(rawEnd);
+                if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+                const sl = s.toLocaleDateString("en-PH", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                const el = e.toLocaleDateString("en-PH", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                return (
+                  <div
+                    style={{
+                      background: "#fffbeb",
+                      border: "1.5px solid #fde68a",
+                      borderRadius: 12,
+                      padding: "10px 14px",
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "flex-start",
+                      marginTop: 12,
+                    }}
+                  >
+                    <FaExclamationTriangle
+                      style={{
+                        color: "#f59e0b",
+                        fontSize: 13,
+                        marginTop: 2,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#78350f",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        Maintenance Scheduled
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "#92400e",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                          marginTop: 2,
+                        }}
+                      >
+                        Under maintenance:{" "}
+                        <strong>{sl === el ? sl : `${sl} — ${el}`}</strong>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Specs */}
+              <div className="md-specs">
                 {[
                   {
                     icon: FaCogs,
@@ -2031,156 +2621,301 @@ const MotorcycleDetail = () => {
                     value: motorcycle.hasABS ? "Yes" : "No",
                   },
                 ].map(({ icon: Icon, label, value }) => (
-                  <div
-                    key={label}
-                    className="bg-[#f4f3f3] rounded-xl p-3.5 flex flex-col gap-1.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className="text-[#b50002] text-sm" />
-                      <span className="text-[#171717]/50 text-xs font-semibold uppercase tracking-wider">
+                  <div className="md-spec" key={label}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Icon style={{ color: "#b50002", fontSize: 12 }} />
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "rgba(0,0,0,0.35)",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
                         {label}
                       </span>
                     </div>
-                    <span className="text-[#171717] font-bold text-base">
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
                       {value}
                     </span>
                   </div>
                 ))}
               </div>
+
               {motorcycle.description && (
-                <p className="text-sm text-[#171717]/60 mt-4 leading-relaxed">
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(0,0,0,0.55)",
+                    lineHeight: 1.75,
+                    marginTop: 14,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
                   {motorcycle.description}
                 </p>
               )}
-              {/* ── Customer Reviews ── */}
-              <div className="mt-6">
-                <h4 className="text-sm font-bold text-[#171717] mb-3">
-                  Customer Reviews
-                </h4>
-                {reviewsLoading ? (
-                  <p className="text-xs text-[#171717]/60">
-                    Loading reviews...
-                  </p>
-                ) : reviewsError ? (
-                  <p className="text-xs text-red-700">{reviewsError}</p>
-                ) : reviews.length === 0 ? (
-                  <p className="text-xs text-[#171717]/60">No reviews yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {reviews.slice(0, 6).map((r) => (
-                      <div
-                        key={r._id || r.id}
-                        className="bg-white rounded-xl border border-black/10 p-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="text-sm font-semibold text-[#171717]">
-                              {r.renterName || r.name || "Anonymous"}
-                            </div>
-                            <div className="text-xs text-[#171717]/50">
-                              {r.rating || 0} / 5
-                            </div>
-                          </div>
-                          <div className="text-xs text-[#171717]/50">
-                            {new Date(
-                              r.createdAt || r.created_at || Date.now(),
-                            ).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <p className="text-sm text-[#171717]/80 mt-2">
-                          {r.feedbackDescription || r.comment || ""}
+            </div>
+
+            {/* Reviews card */}
+            <div style={S.card}>
+              <p style={{ ...S.label, marginBottom: 14 }}>Customer Reviews</p>
+              {reviewsLoading && (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(0,0,0,0.4)",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
+                  Loading reviews…
+                </p>
+              )}
+              {reviewsError && (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#b50002",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
+                  {reviewsError}
+                </p>
+              )}
+              {!reviewsLoading && !reviewsError && reviews.length === 0 && (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(0,0,0,0.4)",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
+                  No reviews yet.
+                </p>
+              )}
+              {!reviewsLoading &&
+                reviews.slice(0, 6).map((r) => (
+                  <div
+                    key={r._id || r.id}
+                    className="md-review"
+                    style={{ marginBottom: 10 }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {r.renterName || r.name || "Anonymous"}
                         </p>
-                        {r.adminReplyMessage && (
-                          <div className="mt-2 p-2 bg-[#f4f4f4] rounded-md border border-[#b50002]/10">
-                            <div className="text-xs font-semibold text-[#b50002]">
-                              Admin Reply
-                            </div>
-                            <div className="text-sm text-[#171717] mt-1">
-                              {r.adminReplyMessage}
-                            </div>
-                            {r.adminRepliedAt && (
-                              <div className="text-xs text-[#171717]/50 mt-1">
-                                Replied:{" "}
-                                {new Date(r.adminRepliedAt).toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => voteOnReview(r._id || r.id, "like")}
-                            disabled={votingReviewId === (r._id || r.id)}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-60"
-                          >
-                            <FaThumbsUp className="text-[10px]" />
-                            Helpful ({r.helpfulLikeCount ?? 0})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              voteOnReview(r._id || r.id, "dislike")
-                            }
-                            disabled={votingReviewId === (r._id || r.id)}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-red-200 bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-60"
-                          >
-                            <FaThumbsDown className="text-[10px]" />
-                            Not Helpful ({r.helpfulDislikeCount ?? 0})
-                          </button>
+                        <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <FaStar
+                              key={i}
+                              style={{
+                                fontSize: 10,
+                                color:
+                                  i <= (r.rating || 0)
+                                    ? "#f59e0b"
+                                    : "rgba(0,0,0,0.12)",
+                              }}
+                            />
+                          ))}
                         </div>
                       </div>
-                    ))}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(0,0,0,0.35)",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        {new Date(
+                          r.createdAt || r.created_at || Date.now(),
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "rgba(0,0,0,0.65)",
+                        lineHeight: 1.65,
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      {r.feedbackDescription || r.comment || ""}
+                    </p>
+                    {r.adminReplyMessage && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          background: "rgba(181,0,2,0.04)",
+                          border: "1px solid rgba(181,0,2,0.1)",
+                          borderRadius: 10,
+                          padding: "8px 12px",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#b50002",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Admin Reply
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {r.adminReplyMessage}
+                        </p>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                      <button
+                        className="md-vote-btn"
+                        disabled={votingReviewId === (r._id || r.id)}
+                        onClick={() => voteOnReview(r._id || r.id, "like")}
+                        style={{
+                          borderColor: "rgba(22,163,74,0.25)",
+                          background: "rgba(22,163,74,0.06)",
+                          color: "#16a34a",
+                        }}
+                      >
+                        <FaThumbsUp size={10} /> Helpful (
+                        {r.helpfulLikeCount ?? 0})
+                      </button>
+                      <button
+                        className="md-vote-btn"
+                        disabled={votingReviewId === (r._id || r.id)}
+                        onClick={() => voteOnReview(r._id || r.id, "dislike")}
+                        style={{
+                          borderColor: "rgba(181,0,2,0.2)",
+                          background: "rgba(181,0,2,0.05)",
+                          color: "#b50002",
+                        }}
+                      >
+                        <FaThumbsDown size={10} /> Not Helpful (
+                        {r.helpfulDislikeCount ?? 0})
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+                ))}
             </div>
           </div>
 
-          {/* ── RIGHT — Booking form panel ── */}
-          <div className="flex-1 bg-[#f4f3f3] rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#171717] to-[#2a2a2a] px-6 py-4">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <h1 className="text-white font-black text-base tracking-tight">
-                    Reserve Your Ride
-                  </h1>
-                  <p className="text-white/50 text-xs mt-0.5">
-                    Pay ₱{DOWNPAYMENT} downpayment to secure your booking
-                  </p>
-                </div>
-                <div className="bg-[#b50002] text-white text-xs font-black px-3 py-1.5 rounded-xl">
-                  Step {bookingStep} / 3
-                </div>
+          {/* ── RIGHT COLUMN — Booking Form ── */}
+          <div className="md-form-card">
+            <div className="md-form-header">
+              <div>
+                <h1
+                  style={{
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    marginBottom: 2,
+                  }}
+                >
+                  Reserve Your Ride
+                </h1>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.5)",
+                    fontSize: 12,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                  }}
+                >
+                  Pay ₱{DOWNPAYMENT} downpayment to secure your booking
+                </p>
+              </div>
+              <div
+                style={{
+                  background: "#b50002",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: "6px 12px",
+                  borderRadius: 10,
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Step {bookingStep} / 3
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="md-form-body">
               <StepIndicator step={bookingStep} />
 
-              {/* ── STEP 1 — Schedule & Destination ── */}
+              {/* ── STEP 1 ── */}
               {bookingStep === 1 && (
                 <form
                   onSubmit={handleStep1Next}
-                  className="flex flex-col gap-4"
+                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
                 >
-                  <p className="text-xs font-bold text-[#171717]/50 uppercase tracking-widest">
-                    Schedule
-                  </p>
+                  <p style={S.label}>Schedule</p>
 
                   {noSlotsAvailable && formData.pickupDate === todayISO() && (
-                    <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700">
-                      <FaExclamationTriangle className="flex-shrink-0" />
-                      No pickup hours are available for today. Please select a
-                      future date or note that pickups are only available until
-                      8:00 PM.
+                    <div
+                      style={{
+                        background: "#fef2f2",
+                        border: "1.5px solid rgba(181,0,2,0.2)",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                        display: "flex",
+                        gap: 8,
+                        fontSize: 12,
+                        color: "#b50002",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      <FaExclamationTriangle
+                        style={{ flexShrink: 0, marginTop: 1 }}
+                      />
+                      No pickup hours available for today. Please select a
+                      future date.
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="md-grid-2">
                     <Field
                       icon={FaCalendarAlt}
                       label="Pickup Date"
-                      hint="* Today up to 7 days from now"
+                      hint="Today up to 7 days from now"
                     >
                       <input
                         type="date"
@@ -2189,24 +2924,16 @@ const MotorcycleDetail = () => {
                         max={formatDate(sevenDaysFromToday())}
                         value={formData.pickupDate}
                         onChange={handleInputChange}
-                        className={inputCls}
+                        style={S.input}
                         required
                       />
                     </Field>
-                    <Field
-                      icon={FaClock}
-                      label="Pickup Time"
-                      hint={
-                        formData.pickupDate === todayISO() && !noSlotsAvailable
-                          ? "* Shows available hours from now"
-                          : undefined
-                      }
-                    >
+                    <Field icon={FaClock} label="Pickup Time">
                       <select
                         name="pickupTime"
                         value={formData.pickupTime}
                         onChange={handleInputChange}
-                        className={selectCls}
+                        style={S.select}
                         required
                         disabled={noSlotsAvailable}
                       >
@@ -2220,11 +2947,19 @@ const MotorcycleDetail = () => {
                           ))
                         )}
                       </select>
-                      <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
+                      <FaChevronDown
+                        style={{
+                          position: "absolute",
+                          right: 10,
+                          color: "rgba(0,0,0,0.3)",
+                          fontSize: 11,
+                          pointerEvents: "none",
+                        }}
+                      />
                     </Field>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="md-grid-2">
                     <Field icon={FaCalendarAlt} label="Return Date">
                       <input
                         type="date"
@@ -2233,19 +2968,16 @@ const MotorcycleDetail = () => {
                         max={formatDate(sixMonthsFromToday())}
                         value={formData.returnDate}
                         onChange={handleInputChange}
-                        className={inputCls}
+                        style={S.input}
                         required
                       />
                     </Field>
-                    <Field
-                      icon={FaClock}
-                      label={`Return Time${formData.returnDate === formData.pickupDate ? " (after " + slotLabel(formData.pickupTime) + ")" : ""}`}
-                    >
+                    <Field icon={FaClock} label="Return Time">
                       <select
                         name="returnTime"
                         value={formData.returnTime}
                         onChange={handleInputChange}
-                        className={selectCls}
+                        style={S.select}
                         required
                       >
                         {validReturnSlots.length > 0 ? (
@@ -2260,7 +2992,15 @@ const MotorcycleDetail = () => {
                           </option>
                         )}
                       </select>
-                      <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
+                      <FaChevronDown
+                        style={{
+                          position: "absolute",
+                          right: 10,
+                          color: "rgba(0,0,0,0.3)",
+                          fontSize: 11,
+                          pointerEvents: "none",
+                        }}
+                      />
                     </Field>
                   </div>
 
@@ -2269,12 +3009,12 @@ const MotorcycleDetail = () => {
                       type="text"
                       value={formData.pickupLocation}
                       readOnly
-                      className={`${inputCls} opacity-60`}
+                      style={{ ...S.input, opacity: 0.55 }}
                     />
                   </Field>
 
                   <div>
-                    <p className="text-xs font-bold text-[#171717]/50 uppercase tracking-widest mb-2">
+                    <p style={{ ...S.label, marginBottom: 8 }}>
                       Primary Destination
                     </p>
                     <DestinationSelect
@@ -2283,50 +3023,108 @@ const MotorcycleDetail = () => {
                     />
                     {formData.destinationCity && (
                       <div
-                        className={`mt-2 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 ${distanceFee === 0 ? "bg-green-50 text-green-700 border border-green-200" : "bg-orange-50 text-orange-700 border border-orange-200"}`}
+                        style={{
+                          marginTop: 8,
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          fontFamily: "'Space Grotesk',sans-serif",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          background:
+                            distanceFee === 0
+                              ? "rgba(22,163,74,0.06)"
+                              : "rgba(251,146,60,0.07)",
+                          color: distanceFee === 0 ? "#16a34a" : "#ea580c",
+                          border: `1.5px solid ${distanceFee === 0 ? "rgba(22,163,74,0.2)" : "rgba(251,146,60,0.2)"}`,
+                        }}
                       >
-                        <FaMapMarkerAlt className="flex-shrink-0" />~
-                        {distanceKm} km from Bacoor — {distanceTier?.label}
-                        {distanceFee === 0
-                          ? " — No extra charge"
-                          : ` — +₱${distanceFee} distance fee`}
-                        {isEstimate && (
-                          <span className="opacity-70 ml-1">(estimated)</span>
-                        )}
+                        <FaMapMarkerAlt style={{ flexShrink: 0 }} />~
+                        {distanceKm} km — {distanceTier?.label}
+                        {distanceFee === 0 ? " — Free" : `  — +₱${distanceFee}`}
+                        {isEstimate && " (est.)"}
                       </div>
                     )}
                   </div>
 
-                  {/* Helmet add-on */}
-                  <div className="flex items-start gap-3 bg-white/50 border border-[#171717]/10 rounded-2xl p-4">
+                  {/* Helmet */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      background: "#F5F5F3",
+                      border: "1.5px solid rgba(0,0,0,0.07)",
+                      borderRadius: 14,
+                      padding: 16,
+                    }}
+                  >
                     <input
                       type="checkbox"
                       id="wantsHelmet"
                       name="wantsHelmet"
                       checked={formData.wantsHelmet}
                       onChange={handleInputChange}
-                      className="w-5 h-5 rounded accent-[#b50002] cursor-pointer mt-0.5"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        accentColor: "#b50002",
+                        cursor: "pointer",
+                        marginTop: 2,
+                        flexShrink: 0,
+                      }}
                     />
                     <label
                       htmlFor="wantsHelmet"
-                      className="flex-1 cursor-pointer"
+                      style={{ flex: 1, cursor: "pointer" }}
                     >
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <GiFullMotorcycleHelmet className="text-[#b50002] text-sm" />
-                        <span className="font-bold text-[#171717] text-sm">
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 3,
+                        }}
+                      >
+                        <GiFullMotorcycleHelmet
+                          style={{ color: "#b50002", fontSize: 15 }}
+                        />
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: 13,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
                           Additional Helmet
                         </span>
-                        <span className="ml-auto text-[#b50002] font-black text-sm">
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            color: "#b50002",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
                           +₱{HELMET_FEE}
                         </span>
                       </div>
-                      <p className="text-xs text-[#171717]/50">
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(0,0,0,0.4)",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
                         Add an extra helmet for your passenger.
                       </p>
                     </label>
                   </div>
 
-                  {/* Price Summary (Step 1) */}
                   {formData.returnDate && (
                     <PriceSummary
                       price={price}
@@ -2339,33 +3137,56 @@ const MotorcycleDetail = () => {
                     />
                   )}
 
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-[#171717]/40">
-                      All hours are in Philippine Standard Time
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: 24, // ADDED PROPER SPACING
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "rgba(0,0,0,0.35)",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      All times in Philippine Standard Time
                     </p>
                     <button
                       type="submit"
                       disabled={noSlotsAvailable}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+                      style={{
+                        ...S.btnDark,
+                        opacity: noSlotsAvailable ? 0.5 : 1,
+                      }}
                     >
-                      Next <FaArrowRight className="text-xs" />
+                      Next <FaArrowRight size={10} />
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* ── STEP 2 — Renter Info only ── */}
+              {/* ── STEP 2 ── */}
               {bookingStep === 2 && (
                 <form
                   onSubmit={handleStep2Next}
-                  className="flex flex-col gap-4"
+                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
                 >
-                  <p className="text-xs font-bold text-[#171717]/50 uppercase tracking-widest">
-                    Renter Information
-                  </p>
-                  <p className="text-xs text-[#171717]/40 -mt-2">
-                    Update your profile to change these details.
-                  </p>
+                  <div>
+                    <p style={S.label}>Renter Information</p>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(0,0,0,0.38)",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                        marginTop: 2,
+                      }}
+                    >
+                      Update your profile to change these details.
+                    </p>
+                  </div>
 
                   <Field icon={FaUser} label="Full Name">
                     <input
@@ -2375,11 +3196,11 @@ const MotorcycleDetail = () => {
                       placeholder={
                         loadingUserProfile ? "Loading…" : "Your full name"
                       }
-                      className={`${inputCls} opacity-60`}
+                      style={{ ...S.input, opacity: 0.6 }}
                     />
                   </Field>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="md-grid-2">
                     <Field icon={FaEnvelope} label="Email Address">
                       <input
                         type="email"
@@ -2388,7 +3209,7 @@ const MotorcycleDetail = () => {
                         placeholder={
                           loadingUserProfile ? "Loading…" : "Your email"
                         }
-                        className={`${inputCls} opacity-60`}
+                        style={{ ...S.input, opacity: 0.6 }}
                       />
                     </Field>
                     <Field icon={FaPhone} label="Phone Number">
@@ -2399,7 +3220,7 @@ const MotorcycleDetail = () => {
                         placeholder={
                           loadingUserProfile ? "Loading…" : "Your phone"
                         }
-                        className={`${inputCls} opacity-60`}
+                        style={{ ...S.input, opacity: 0.6 }}
                       />
                     </Field>
                   </div>
@@ -2410,21 +3231,34 @@ const MotorcycleDetail = () => {
                         type="text"
                         value={formData.fullAddress}
                         readOnly
-                        disabled
                         placeholder={
                           loadingUserProfile
                             ? "Loading address…"
                             : "Address from your profile"
                         }
-                        className={`${inputCls} opacity-60`}
+                        style={{ ...S.input, opacity: 0.6 }}
                       />
                     </Field>
                     {!formData.fullAddress && !loadingUserProfile && (
-                      <p className="text-xs text-[#b50002] mt-1 flex items-center gap-1">
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#b50002",
+                          marginTop: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
                         <FaInfoCircle /> No address found.{" "}
                         <a
                           href="/profile"
-                          className="underline font-semibold hover:text-[#900000]"
+                          style={{
+                            textDecoration: "underline",
+                            fontWeight: 600,
+                            color: "#b50002",
+                          }}
                         >
                           Update your profile
                         </a>
@@ -2432,177 +3266,441 @@ const MotorcycleDetail = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between mt-2">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: 24, // ADDED PROPER SPACING
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => setBookingStep(1)}
-                      className="inline-flex items-center gap-2 text-[#171717]/50 hover:text-[#b50002] text-sm font-medium transition-colors"
+                      style={S.btnSecondary}
                     >
-                      <FaArrowLeft className="text-xs" /> Back
+                      <FaArrowLeft size={10} /> Back
                     </button>
-                    <button
-                      type="submit"
-                      className="flex items-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-                    >
-                      Next <FaArrowRight className="text-xs" />
+                    <button type="submit" style={S.btnDark}>
+                      Next <FaArrowRight size={10} />
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* ── STEP 3 — Review, Payment & Confirm ── */}
+              {/* ── STEP 3 ── */}
               {bookingStep === 3 && (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                  <p className="text-xs font-bold text-[#171717]/50 uppercase tracking-widest">
-                    Review Your Booking
-                  </p>
+                <form
+                  onSubmit={handleSubmit}
+                  style={{ display: "flex", flexDirection: "column", gap: 14 }}
+                >
+                  <p style={S.label}>Review Your Booking</p>
 
                   {lockSecondsLeft !== null && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
-                      <span className="text-red-700 font-semibold">
-                        This motorcycle is temporarily held for your checkout.
+                    <div
+                      style={{
+                        background: "#fef2f2",
+                        border: "1.5px solid rgba(181,0,2,0.2)",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#b50002",
+                          fontWeight: 600,
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        Motorcycle held for checkout
                       </span>
-                      <span className="text-red-800 font-black tracking-wide">
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                          letterSpacing: "1px",
+                        }}
+                      >
                         {formatLockCountdown(lockSecondsLeft)}
                       </span>
                     </div>
                   )}
 
                   {/* Schedule summary */}
-                  <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
-                    <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-2">
-                      Schedule
-                    </p>
-                    <ReviewRow
-                      label="Pickup"
-                      value={`${formData.pickupDate} at ${slotLabel(formData.pickupTime)}`}
-                    />
-                    <ReviewRow
-                      label="Return"
-                      value={`${formData.returnDate} at ${slotLabel(formData.returnTime)}`}
-                    />
-                    <ReviewRow
-                      label="Duration"
-                      value={`${days} day${days > 1 ? "s" : ""}`}
-                    />
-                    <ReviewRow
-                      label="Destination"
-                      value={formData.destination}
-                    />
-                    <ReviewRow
-                      label="Pickup Location"
-                      value={formData.pickupLocation}
-                    />
+                  <div
+                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                  >
+                    <div
+                      onClick={() =>
+                        setIsScheduleCollapsed(!isScheduleCollapsed)
+                      }
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <p style={{ ...S.label, marginBottom: 0 }}>Schedule</p>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "transform 0.3s ease",
+                          transform: isScheduleCollapsed
+                            ? "rotate(0deg)"
+                            : "rotate(180deg)",
+                        }}
+                      >
+                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateRows: isScheduleCollapsed ? "0fr" : "1fr",
+                        opacity: isScheduleCollapsed ? 0 : 1,
+                        transition:
+                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                      }}
+                    >
+                      <div style={{ overflow: "hidden" }}>
+                        <div style={{ paddingTop: 10 }}>
+                          <ReviewRow
+                            label="Pickup"
+                            value={`${formData.pickupDate} at ${slotLabel(formData.pickupTime)}`}
+                          />
+                          <ReviewRow
+                            label="Return"
+                            value={`${formData.returnDate} at ${slotLabel(formData.returnTime)}`}
+                          />
+                          <ReviewRow
+                            label="Duration"
+                            value={`${days} day${days > 1 ? "s" : ""}`}
+                          />
+                          <ReviewRow
+                            label="Destination"
+                            value={formData.destination}
+                          />
+                          <ReviewRow
+                            label="Pickup Location"
+                            value={formData.pickupLocation}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Renter summary */}
-                  <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
-                    <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-2">
-                      Renter
-                    </p>
-                    <ReviewRow label="Name" value={formData.name} />
-                    <ReviewRow label="Email" value={formData.email} />
-                    <ReviewRow label="Phone" value={formData.phone} />
+                  <div
+                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                  >
+                    <div
+                      onClick={() => setIsRenterCollapsed(!isRenterCollapsed)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <p style={{ ...S.label, marginBottom: 0 }}>Renter</p>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "transform 0.3s ease",
+                          transform: isRenterCollapsed
+                            ? "rotate(0deg)"
+                            : "rotate(180deg)",
+                        }}
+                      >
+                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateRows: isRenterCollapsed ? "0fr" : "1fr",
+                        opacity: isRenterCollapsed ? 0 : 1,
+                        transition:
+                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                      }}
+                    >
+                      <div style={{ overflow: "hidden" }}>
+                        <div style={{ paddingTop: 10 }}>
+                          <ReviewRow label="Name" value={formData.name} />
+                          <ReviewRow label="Email" value={formData.email} />
+                          <ReviewRow label="Phone" value={formData.phone} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Pricing summary */}
-                  <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
-                    <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-2">
-                      Pricing
-                    </p>
-                    <ReviewRow
-                      label={`₱${price} × ${days} day${days > 1 ? "s" : ""}`}
-                      value={`₱${baseRental}`}
-                    />
-                    {distanceFee > 0 && (
-                      <ReviewRow
-                        label={`Distance (${distanceTier?.label})`}
-                        value={`+₱${distanceFee}`}
-                        accent
-                      />
-                    )}
-                    {formData.wantsHelmet && (
-                      <ReviewRow
-                        label="Extra Helmet"
-                        value={`+₱${HELMET_FEE}`}
-                        accent
-                      />
-                    )}
-                    <div className="pt-2 mt-1 border-t border-[#171717]/10 flex items-center justify-between">
-                      <span className="text-xs font-black text-[#171717]/50 uppercase tracking-wider">
-                        Total
-                      </span>
-                      <span className="text-xl font-black text-[#171717]">
-                        ₱{totalAmount}
-                      </span>
+                  <div
+                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                  >
+                    <div
+                      onClick={() => setIsPricingCollapsed(!isPricingCollapsed)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <p style={{ ...S.label, marginBottom: 0 }}>Pricing</p>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "transform 0.3s ease",
+                          transform: isPricingCollapsed
+                            ? "rotate(0deg)"
+                            : "rotate(180deg)",
+                        }}
+                      >
+                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                      </button>
                     </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs font-semibold text-[#171717]/50 uppercase tracking-wider">
-                        Downpayment (paid now)
-                      </span>
-                      <span className="text-base font-black text-green-600">
-                        −₱{DOWNPAYMENT}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#171717]/10">
-                      <span className="text-xs font-black text-[#171717]/50 uppercase tracking-wider">
-                        Due at Pickup
-                      </span>
-                      <span className="text-base font-black text-[#b50002]">
-                        ₱{dueAtPickup}
-                      </span>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateRows: isPricingCollapsed ? "0fr" : "1fr",
+                        opacity: isPricingCollapsed ? 0 : 1,
+                        transition:
+                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                      }}
+                    >
+                      <div style={{ overflow: "hidden" }}>
+                        <div style={{ paddingTop: 10 }}>
+                          <ReviewRow
+                            label={`₱${price} × ${days} day${days > 1 ? "s" : ""}`}
+                            value={`₱${baseRental}`}
+                          />
+                          {distanceFee > 0 && (
+                            <ReviewRow
+                              label={`Distance (${distanceTier?.label})`}
+                              value={`+₱${distanceFee}`}
+                              accent
+                            />
+                          )}
+                          {formData.wantsHelmet && (
+                            <ReviewRow
+                              label="Extra Helmet"
+                              value={`+₱${HELMET_FEE}`}
+                              accent
+                            />
+                          )}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              marginTop: 10,
+                              paddingTop: 10,
+                              borderTop: "1.5px solid rgba(0,0,0,0.08)",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                color: "#0E0E0E",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              Total
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 18,
+                                fontWeight: 800,
+                                color: "#0E0E0E",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              ₱{totalAmount}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              marginTop: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "rgba(0,0,0,0.4)",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              Downpayment (paid now)
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#16a34a",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              −₱{DOWNPAYMENT}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              marginTop: 4,
+                              paddingTop: 8,
+                              borderTop: "1.5px solid rgba(0,0,0,0.08)",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                color: "#0E0E0E",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              Due at Pickup
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 18,
+                                fontWeight: 800,
+                                color: "#b50002",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              ₱{dueAtPickup}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* ── Payment Section ── */}
-                  <div className="bg-white/60 border border-[#171717]/8 rounded-2xl p-4">
-                    <p className="text-xs font-black text-[#171717]/40 uppercase tracking-widest mb-3">
+                  {/* Payment section */}
+                  <div style={{ ...S.card, padding: 18 }}>
+                    <p style={{ ...S.label, marginBottom: 14 }}>
                       Downpayment — ₱{DOWNPAYMENT}
                     </p>
 
-                    <Field icon={FaCreditCard} label="Payment Method">
-                      <select
-                        name="reservationPaymentMethod"
-                        value={formData.reservationPaymentMethod}
-                        onChange={handleInputChange}
-                        className={selectCls}
-                        required
-                      >
-                        <option value="GCash">GCash</option>
-                        <option value="PayMaya">PayMaya</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                      </select>
-                      <FaChevronDown className="absolute right-3 text-[#171717]/40 text-xs pointer-events-none" />
-                    </Field>
+                    <div style={{ marginBottom: 12 }}>
+                      <Field icon={FaCreditCard} label="Payment Method">
+                        <select
+                          name="reservationPaymentMethod"
+                          value={formData.reservationPaymentMethod}
+                          onChange={handleInputChange}
+                          style={S.select}
+                          required
+                        >
+                          <option value="GCash">GCash</option>
+                          <option value="PayMaya">PayMaya</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                        <FaChevronDown
+                          style={{
+                            position: "absolute",
+                            right: 10,
+                            color: "rgba(0,0,0,0.3)",
+                            fontSize: 11,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      </Field>
+                    </div>
 
-                    <p className="text-xs text-[#171717]/40 mt-1 mb-3">
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(0,0,0,0.4)",
+                        marginBottom: 12,
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
                       Send ₱{DOWNPAYMENT} via{" "}
-                      {formData.reservationPaymentMethod}, then upload the proof
+                      {formData.reservationPaymentMethod}, then upload proof
                       below.
                     </p>
 
-                    <div className="bg-white/70 border border-[#171717]/10 rounded-2xl p-4 mb-3">
-                      <p className="text-xs font-black text-[#171717]/50 uppercase tracking-widest mb-2">
+                    {/* QR */}
+                    <div
+                      style={{
+                        background: "#F5F5F3",
+                        border: "1.5px solid rgba(0,0,0,0.07)",
+                        borderRadius: 14,
+                        padding: 16,
+                        marginBottom: 14,
+                        textAlign: "center",
+                      }}
+                    >
+                      <p
+                        style={{
+                          ...S.label,
+                          marginBottom: 10,
+                          textAlign: "left",
+                        }}
+                      >
                         Scan QR to Pay
                       </p>
                       <img
                         src={selectedQrPath}
-                        alt={`${formData.reservationPaymentMethod} QR payment`}
-                        className="w-56 max-w-full mx-auto rounded-xl border border-[#171717]/10"
+                        alt={`${formData.reservationPaymentMethod} QR`}
+                        style={{
+                          width: 180,
+                          maxWidth: "100%",
+                          borderRadius: 12,
+                          border: "1.5px solid rgba(0,0,0,0.08)",
+                          display: "block",
+                          margin: "0 auto",
+                        }}
                       />
-                      <p className="text-[11px] text-[#171717]/45 mt-2 text-center">
-                        QR shown is for {formData.reservationPaymentMethod}.
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(0,0,0,0.35)",
+                          marginTop: 8,
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        QR shown is for {formData.reservationPaymentMethod}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="md-grid-2" style={{ marginBottom: 12 }}>
                       <Field icon={FaReceipt} label="Reference ID">
                         <input
                           type="text"
                           name="paymentReferenceId"
                           value={formData.paymentReferenceId}
                           onChange={handleInputChange}
-                          className={inputCls}
+                          style={S.input}
                           placeholder="e.g. GCash12345678"
                           required
                         />
@@ -2613,66 +3711,97 @@ const MotorcycleDetail = () => {
                           name="paymentSentAt"
                           value={formData.paymentSentAt}
                           onChange={handleInputChange}
-                          className={inputCls}
+                          style={S.input}
                           required
                         />
                       </Field>
                     </div>
 
-                    <div className="mt-3">
+                    <div style={{ marginBottom: 12 }}>
                       <Field icon={FaCreditCard} label="Amount Sent">
                         <input
                           type="number"
                           name="paymentSentAmount"
                           min={DOWNPAYMENT}
                           max={DOWNPAYMENT}
-                          step="1"
                           value={formData.paymentSentAmount}
                           onChange={handleInputChange}
-                          className={inputCls}
+                          style={{ ...S.input, opacity: 0.7 }}
                           readOnly
                           required
                         />
                       </Field>
                     </div>
 
-                    <div className="flex flex-col gap-1 mt-3">
-                      <label className="text-[#171717]/70 text-xs font-semibold uppercase tracking-wider">
-                        Payment Proof (Image)
-                      </label>
-                      <div className="bg-white/60 border border-[#171717]/10 rounded-xl p-3">
+                    <div>
+                      <p style={S.label}>Payment Proof (Image)</p>
+                      <div
+                        style={{
+                          background: "#F5F5F3",
+                          border: "1.5px solid rgba(0,0,0,0.09)",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                        }}
+                      >
                         <input
                           type="file"
                           name="paymentProofImage"
                           accept="image/*"
                           onChange={handleInputChange}
-                          className="block w-full text-sm text-[#171717]"
+                          style={{
+                            fontSize: 13,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                            width: "100%",
+                          }}
                           required
                         />
-                        <p className="text-[11px] text-[#171717]/45 mt-1">
-                          Upload a screenshot/photo showing the reference ID,
-                          amount, and payment time.
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "rgba(0,0,0,0.35)",
+                            marginTop: 6,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          Upload a screenshot showing the reference ID, amount,
+                          and time.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2 text-xs text-amber-800">
-                    <FaInfoCircle className="mt-0.5 flex-shrink-0" />
+                  {/* Info banners */}
+                  <div
+                    style={{
+                      background: "#fffbeb",
+                      border: "1.5px solid #fde68a",
+                      borderRadius: 12,
+                      padding: "10px 14px",
+                      display: "flex",
+                      gap: 8,
+                      fontSize: 12,
+                      color: "#92400e",
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    <FaInfoCircle style={{ marginTop: 2, flexShrink: 0 }} />
                     <span>
                       Your booking will be marked as Pending Reservation while
                       admin verifies your payment proof.
                     </span>
                   </div>
 
-                  <div className="bg-[#f4f3f3] rounded-xl p-3 text-xs text-[#171717]/60">
-                    <p className="font-semibold mb-0.5">📍 Pickup Location:</p>
-                    <p>{PICKUP_LOCATION}</p>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-2">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: 24, // ADDED PROPER SPACING
+                    }}
+                  >
                     <button
                       type="button"
+                      style={S.btnSecondary}
                       onClick={async () => {
                         clearLockTimer();
                         await releaseCheckoutLock(true);
@@ -2682,9 +3811,8 @@ const MotorcycleDetail = () => {
                         });
                         setBookingStep(2);
                       }}
-                      className="inline-flex items-center gap-2 text-[#171717]/50 hover:text-[#b50002] text-sm font-medium transition-colors"
                     >
-                      <FaArrowLeft className="text-xs" /> Back
+                      <FaArrowLeft size={10} /> Back
                     </button>
                     <button
                       type="submit"
@@ -2693,12 +3821,14 @@ const MotorcycleDetail = () => {
                         loadingUserProfile ||
                         hasSubmittedRef.current
                       }
-                      className="flex items-center gap-2 px-6 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-black/20 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+                      style={{
+                        ...S.btnDark,
+                        opacity: submitting ? 0.6 : 1,
+                        gap: 8,
+                      }}
                     >
-                      <FaCheckCircle className="text-xs" />
-                      {submitting
-                        ? "Submitting…"
-                        : "Submit Payment Proof & Confirm Reservation"}
+                      <FaCheckCircle size={11} />
+                      {submitting ? "Submitting…" : "Submit Proof & Confirm"}
                     </button>
                   </div>
                 </form>
@@ -2707,7 +3837,7 @@ const MotorcycleDetail = () => {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

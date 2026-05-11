@@ -5,6 +5,7 @@ import HomeMotorcycles from "../components/HomeMotorcycles";
 import Testimonial from "../components/Testimonial";
 import Footer from "../components/Footer";
 import FAQPage from "./FAQPage";
+import AboutPage from "./AboutPage";
 
 const Home = () => {
   return (
@@ -13,6 +14,7 @@ const Home = () => {
       <HomeBanner />
       <HomeMotorcycles />
       <FAQPage />
+      <AboutPage />
       <Testimonial />
       <Footer />
     </div>

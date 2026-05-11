@@ -457,6 +457,38 @@ export default function HeroBanner() {
           0%,100% { opacity: 0.35; transform: scaleY(0.82) translateY(0); }
           50%      { opacity: 1;   transform: scaleY(1) translateY(4px); }
         }
+
+        @media(max-width:768px){
+
+        /* Hide motorcycle */
+        .hb-moto-wrap {
+          display: none;
+        }
+
+        /* Hide white gradient overlay */
+        .hb-fade-right {
+          display: none;
+        }
+
+        /* Optional: center content better on mobile */
+        .hb-content {
+          max-width: 100%;
+          align-items: center;
+          text-align: center;
+        }
+
+        .hb-desc {
+          max-width: 100%;
+        }
+
+        .hb-stats {
+          justify-content: center;
+        }
+
+        .hb-card {
+          width: 100%;
+        }
+      }
       `}</style>
 
       <div ref={wrapRef} className="hb-root">

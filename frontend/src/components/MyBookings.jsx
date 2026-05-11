@@ -21,7 +21,6 @@ import {
   FaHourglassHalf,
   FaPlayCircle,
   FaClock,
-  FaHardHat,
   FaTrash,
   FaExclamationTriangle,
   FaInfoCircle,
@@ -59,11 +58,29 @@ const ALL_TIME_SLOTS = [
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 const ModalShell = ({ onBackdropClick, children }) => (
   <div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(14,14,14,0.55)",
+      backdropFilter: "blur(6px)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    }}
     onClick={onBackdropClick}
   >
     <div
-      className="bg-[#f4f3f3] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#171717]/10"
+      style={{
+        background: "#fff",
+        border: "1.5px solid rgba(0,0,0,0.08)",
+        borderRadius: 20,
+        maxWidth: 400,
+        width: "100%",
+        padding: 28,
+        boxShadow: "0 24px 60px rgba(0,0,0,0.14)",
+      }}
       onClick={(e) => e.stopPropagation()}
     >
       {children}
@@ -73,25 +90,48 @@ const ModalShell = ({ onBackdropClick, children }) => (
 
 const ConfirmModal = ({ message, onConfirm, onCancel, confirmLabel }) => (
   <ModalShell onBackdropClick={onCancel}>
-    <div className="text-center">
-      <div className="mx-auto flex items-center justify-center h-16 w-16 mb-2">
-        <FaExclamationTriangle className="h-8 w-8 text-[#b50002]" />
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          background: "rgba(181,0,2,0.08)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 16px",
+        }}
+      >
+        <FaExclamationTriangle style={{ color: "#b50002", fontSize: 20 }} />
       </div>
-      <h3 className="text-xl font-bold text-[#171717] mb-2">Confirm Action</h3>
-      <p className="text-[#171717]/70 mb-6 text-sm">{message}</p>
-      <div className="flex gap-3">
-        <button
-          onClick={onCancel}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#171717] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-        >
+      <h3
+        style={{
+          color: "#0E0E0E",
+          fontSize: 17,
+          fontWeight: 800,
+          marginBottom: 8,
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        Confirm Action
+      </h3>
+      <p
+        style={{
+          color: "rgba(14,14,14,0.5)",
+          fontSize: 13,
+          marginBottom: 24,
+          fontFamily: "'Space Grotesk', sans-serif",
+          lineHeight: 1.6,
+        }}
+      >
+        {message}
+      </p>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={onCancel} style={btnStyle("ghost")}>
           No, Keep It
         </button>
-        <button
-          onClick={onConfirm}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#b50002] text-white font-bold text-sm rounded-xl
-                    shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
-        >
+        <button onClick={onConfirm} style={btnStyle("danger")}>
           {confirmLabel ?? "Confirm"}
         </button>
       </div>
@@ -101,27 +141,90 @@ const ConfirmModal = ({ message, onConfirm, onCancel, confirmLabel }) => (
 
 const AlertModal = ({ message, onClose, isError }) => (
   <ModalShell onBackdropClick={onClose}>
-    <div className="text-center">
-      <div className="mx-auto flex items-center justify-center h-16 w-16 mb-2">
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          background: isError ? "rgba(181,0,2,0.08)" : "rgba(0,0,0,0.05)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 16px",
+        }}
+      >
         {isError ? (
-          <FaExclamationTriangle className="h-8 w-8 text-[#b50002]" />
+          <FaExclamationTriangle style={{ color: "#b50002", fontSize: 20 }} />
         ) : (
-          <FaInfoCircle className="h-8 w-8 text-[#171717]" />
+          <FaInfoCircle style={{ color: "rgba(14,14,14,0.5)", fontSize: 20 }} />
         )}
       </div>
-      <h3 className="text-xl font-bold text-[#171717] mb-2">
+      <h3
+        style={{
+          color: "#0E0E0E",
+          fontSize: 17,
+          fontWeight: 800,
+          marginBottom: 8,
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
         {isError ? "Error" : "Notice"}
       </h3>
-      <p className="text-[#171717]/70 mb-6 text-sm">{message}</p>
+      <p
+        style={{
+          color: "rgba(14,14,14,0.5)",
+          fontSize: 13,
+          marginBottom: 24,
+          fontFamily: "'Space Grotesk', sans-serif",
+          lineHeight: 1.6,
+        }}
+      >
+        {message}
+      </p>
       <button
         onClick={onClose}
-        className="w-full py-2.5 px-4 bg-[#b50002] hover:brightness-110 active:scale-[0.98] rounded-xl text-white text-sm font-bold shadow-lg shadow-[#b50002]/30 transition-all duration-200"
+        style={{
+          ...btnStyle("danger"),
+          width: "100%",
+          justifyContent: "center",
+        }}
       >
         OK
       </button>
     </div>
   </ModalShell>
 );
+
+const btnStyle = (variant) => {
+  const base = {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: "10px 18px",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "'Space Grotesk', sans-serif",
+    border: "none",
+    transition: "all 0.15s",
+  };
+  if (variant === "danger")
+    return { ...base, background: "#b50002", color: "#fff" };
+  if (variant === "ghost")
+    return {
+      ...base,
+      background: "#F5F5F3",
+      color: "rgba(14,14,14,0.7)",
+      border: "1.5px solid rgba(0,0,0,0.1)",
+    };
+  if (variant === "dark")
+    return { ...base, background: "#0E0E0E", color: "#fff" };
+  return base;
+};
 
 const confirmModal = (message, { confirmLabel } = {}) =>
   new Promise((resolve) => {
@@ -167,7 +270,6 @@ const safeAccess = (fn, fallback = "") => {
     return fallback;
   }
 };
-
 const formatDate = (dateString) => {
   if (!dateString) return "—";
   const d = new Date(dateString);
@@ -179,7 +281,6 @@ const formatDate = (dateString) => {
         year: "numeric",
       });
 };
-
 const formatDateTime = (dateString) => {
   if (!dateString) return "—";
   const d = new Date(dateString);
@@ -189,24 +290,22 @@ const formatDateTime = (dateString) => {
     month: "short",
     year: "numeric",
   });
-  const hour = d.getHours();
-  const min = String(d.getMinutes()).padStart(2, "0");
-  const period = hour >= 12 ? "PM" : "AM";
+  const hour = d.getHours(),
+    min = String(d.getMinutes()).padStart(2, "0"),
+    period = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
   return `${datePart} · ${displayHour}:${min} ${period}`;
 };
-
 const formatTime = (timeStr) => {
   if (!timeStr) return "";
   const [hourStr, minStr] = timeStr.split(":");
-  const hour = parseInt(hourStr, 10);
-  const min = minStr || "00";
+  const hour = parseInt(hourStr, 10),
+    min = minStr || "00";
   if (isNaN(hour)) return timeStr;
-  const period = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  const period = hour >= 12 ? "PM" : "AM",
+    displayHour = hour % 12 === 0 ? 12 : hour % 12;
   return `${displayHour}:${min} ${period}`;
 };
-
 const formatPrice = (price) => {
   const num = typeof price === "number" ? price : Number(price) || 0;
   return num.toLocaleString("en-US", {
@@ -215,101 +314,95 @@ const formatPrice = (price) => {
     maximumFractionDigits: 0,
   });
 };
-
 const daysBetween = (start, end) => {
   try {
-    const a = new Date(start);
-    const b = new Date(end);
+    const a = new Date(start),
+      b = new Date(end);
     if (Number.isNaN(a) || Number.isNaN(b)) return 0;
     return Math.ceil((b - a) / (1000 * 60 * 60 * 24));
   } catch {
     return 0;
   }
 };
-
-const daysBetweenWithTime = (pickupDate, pickupTime, returnDate, returnTime) => {
-  const start = combineLocalDateTime(pickupDate, pickupTime);
-  const end = combineLocalDateTime(returnDate, returnTime);
+const daysBetweenWithTime = (
+  pickupDate,
+  pickupTime,
+  returnDate,
+  returnTime,
+) => {
+  const start = combineLocalDateTime(pickupDate, pickupTime),
+    end = combineLocalDateTime(returnDate, returnTime);
   if (!start || !end) return 0;
   const diffMs = end.getTime() - start.getTime();
   if (diffMs <= 0) return 0;
   return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 };
-
 const toDateInput = (value) => {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-
 const parseLocalDateOnly = (dateStr) => {
   if (!dateStr) return null;
   const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-
 const formatDateInput = (dateObj) => {
   if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return "";
   return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
 };
-
 const addDaysToDateInput = (dateStr, days) => {
   const d = parseLocalDateOnly(dateStr) || getTodayStart();
   d.setDate(d.getDate() + days);
   return formatDateInput(d);
 };
-
 const getTodayStart = () => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
 };
-
 const sevenDaysFromToday = () => {
   const d = getTodayStart();
   d.setDate(d.getDate() + 7);
   return d;
 };
-
 const sixMonthsFromToday = () => {
   const d = getTodayStart();
   d.setMonth(d.getMonth() + 6);
   return d;
 };
-
 const combineLocalDateTime = (dateStr, timeStr) => {
   const dateObj = parseLocalDateOnly(dateStr);
   if (!dateObj || !timeStr) return null;
   const [hourStr, minuteStr] = timeStr.split(":");
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr || "0", 10);
+  const hour = parseInt(hourStr, 10),
+    minute = parseInt(minuteStr || "0", 10);
   if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
   dateObj.setHours(hour, minute, 0, 0);
   return dateObj;
 };
-
 const isTimeWithinRentalHours = (timeStr) => {
   if (!timeStr) return false;
   const [hourStr, minuteStr] = timeStr.split(":");
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr || "0", 10);
+  const hour = parseInt(hourStr, 10),
+    minute = parseInt(minuteStr || "0", 10);
   if (Number.isNaN(hour) || Number.isNaN(minute)) return false;
   const minutes = hour * 60 + minute;
   return minutes >= 8 * 60 && minutes <= 20 * 60;
 };
-
 const resolveImageUrl = (imagePath) => {
   if (!imagePath)
     return "https://via.placeholder.com/800x450.png?text=No+Image";
   if (/^data:image\//i.test(imagePath)) return imagePath;
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://"))
     return imagePath;
-  // Handle Cloudinary partial URLs (starting with /dxta0nmdy/ or dxta0nmdy/)
-  if (String(imagePath).startsWith('/dxta0nmdy/') || String(imagePath).startsWith('dxta0nmdy/')) {
-    return `https://res.cloudinary.com/${String(imagePath).replace(/^\/+/, '')}`;
-  }
+  if (
+    String(imagePath).startsWith("/dxta0nmdy/") ||
+    String(imagePath).startsWith("dxta0nmdy/")
+  )
+    return `https://res.cloudinary.com/${String(imagePath).replace(/^\/+/, "")}`;
   const cleanPath = imagePath.replace(/^\/+/, "").replace(/^uploads\//, "");
   return `${API_BASE}/uploads/${cleanPath}`;
 };
@@ -330,33 +423,27 @@ const normalizeBooking = (booking) => {
     }
     return {};
   };
-
   const motorcycleObj = getMotorcycleData();
-  const details = booking.details || {};
-  const address = booking.address || {};
+  const details = booking.details || {},
+    address = booking.address || {};
   const rawImage =
     safeAccess(() => booking.motorcycle?.image) ||
     safeAccess(() => motorcycleObj.image) ||
     safeAccess(() => booking.motorcycleImage) ||
     "";
-  const resolveImageUrl = (image) => {
+  const resolveImg = (image) => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];
     if (typeof image !== "string") return "";
     const t = image.trim();
     if (!t) return "";
     if (/^data:image\//i.test(t)) return t;
-    if (/^https?:\/\//i.test(t)) {
-      // If it's a Cloudinary URL or any external URL, use as is
-      return t;
-    }
+    if (/^https?:\/\//i.test(t)) return t;
     if (t.includes("cloudinary")) return t;
-    // Optionally, if you want to force all uploads to Cloudinary, build the URL here
-    // return `${CLOUDINARY_BASE}/your-cloud-name/image/upload/${t}`;
     if (t.startsWith("/")) return `${API_BASE}${t}`;
     return `${API_BASE}/uploads/${t}`;
   };
-  const image = resolveImageUrl(rawImage);
+  const image = resolveImg(rawImage);
   const pickupDate =
     safeAccess(() => booking.pickupDate) ||
     safeAccess(() => booking.dates?.pickup) ||
@@ -381,7 +468,6 @@ const normalizeBooking = (booking) => {
   const dailyRate = Number(
     motorcycleObj.dailyRate ?? motorcycleObj.price ?? details.dailyRate ?? 0,
   );
-
   return {
     id: booking._id || booking.id || String(Math.random()).slice(2, 8),
     motorcycle: {
@@ -438,7 +524,6 @@ const normalizeBooking = (booking) => {
       motorcycleObj.location ||
       "Pickup location",
     destination: booking.destination || "",
-    // price = gross total (full amount before downpayment deduction)
     price: Number(booking.amount || booking.price || booking.total || 0),
     distanceFee: details.distanceFee ?? 0,
     helmetFee: details.helmetFee ?? 0,
@@ -446,7 +531,6 @@ const normalizeBooking = (booking) => {
     helmetRequested: details.helmetRequested ?? false,
     destinationCity: details.destinationCity ?? "",
     returnInspection: booking.returnInspection || {},
-    // Downpayment: stored in details.downpayment or fall back to raw.reservationFee
     downpayment: details.downpayment ?? booking.reservationFee ?? DOWNPAYMENT,
     status: rawStatus || "pending_reservation",
     isDeleted: booking.isDeleted || false,
@@ -475,72 +559,140 @@ const normalizeBooking = (booking) => {
 const STATUS_TABS = [
   {
     key: "pending_reservation",
-    label: "Pending Reservation",
+    label: "Pending",
     icon: FaHourglassHalf,
+    color: "#d97706",
+    bg: "rgba(217,119,6,0.08)",
+    pill: "#fef3c7",
+    pillText: "#92400e",
   },
   {
     key: "pending_full_payment",
-    label: "Pending Full Payment",
+    label: "Awaiting Payment",
     icon: FaCreditCard,
+    color: "#ea580c",
+    bg: "rgba(234,88,12,0.08)",
+    pill: "#ffedd5",
+    pillText: "#9a3412",
   },
-  { key: "active", label: "Active", icon: FaPlayCircle },
-  { key: "inspection", label: "Inspection", icon: FaExclamationTriangle },
-  { key: "completed", label: "Completed", icon: FaCheckCircle },
-  { key: "cancelled", label: "Cancelled", icon: FaTimesCircle },
-  { key: "rejected", label: "Rejected", icon: FaTrash },
+  {
+    key: "active",
+    label: "Active",
+    icon: FaPlayCircle,
+    color: "#2563eb",
+    bg: "rgba(37,99,235,0.08)",
+    pill: "#dbeafe",
+    pillText: "#1e40af",
+  },
+  {
+    key: "inspection",
+    label: "Inspection",
+    icon: FaExclamationTriangle,
+    color: "#7c3aed",
+    bg: "rgba(124,58,237,0.08)",
+    pill: "#ede9fe",
+    pillText: "#5b21b6",
+  },
+  {
+    key: "completed",
+    label: "Completed",
+    icon: FaCheckCircle,
+    color: "#16a34a",
+    bg: "rgba(22,163,74,0.08)",
+    pill: "#dcfce7",
+    pillText: "#166534",
+  },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    icon: FaTimesCircle,
+    color: "#b50002",
+    bg: "rgba(181,0,2,0.06)",
+    pill: "#fee2e2",
+    pillText: "#991b1b",
+  },
+  {
+    key: "rejected",
+    label: "Rejected",
+    icon: FaTrash,
+    color: "#6b7280",
+    bg: "rgba(107,114,128,0.08)",
+    pill: "#f3f4f6",
+    pillText: "#374151",
+  },
 ];
 
-const STATUS_BADGE = {
+const STATUS_BADGE_CONFIG = {
   pending_reservation: {
-    text: "Pending Reservation",
-    cls: "bg-yellow-100 text-yellow-800 border border-yellow-300",
+    text: "Pending",
+    bg: "#fef3c7",
+    color: "#92400e",
     icon: FaHourglassHalf,
   },
   pending_full_payment: {
-    text: "Pending Full Payment",
-    cls: "bg-orange-100 text-orange-800 border border-orange-300",
+    text: "Awaiting Payment",
+    bg: "#ffedd5",
+    color: "#9a3412",
     icon: FaCreditCard,
   },
   active: {
     text: "Active",
-    cls: "bg-blue-100 text-blue-800 border border-blue-300",
+    bg: "#dbeafe",
+    color: "#1e40af",
     icon: FaPlayCircle,
   },
   inspection: {
     text: "Inspection",
-    cls: "bg-purple-100 text-purple-800 border border-purple-300",
+    bg: "#ede9fe",
+    color: "#5b21b6",
     icon: FaExclamationTriangle,
   },
   completed: {
     text: "Completed",
-    cls: "bg-green-100 text-green-800 border border-green-300",
+    bg: "#dcfce7",
+    color: "#166534",
     icon: FaCheckCircle,
   },
   cancelled: {
     text: "Cancelled",
-    cls: "bg-red-100 text-red-800 border border-red-300",
+    bg: "#fee2e2",
+    color: "#991b1b",
     icon: FaTimesCircle,
   },
   rejected: {
     text: "Rejected",
-    cls: "bg-gray-200 text-gray-700 border border-gray-400",
+    bg: "#f3f4f6",
+    color: "#374151",
     icon: FaTrash,
   },
 };
 
 const StatusBadge = ({ status, isDeleted }) => {
   const key = isDeleted ? "rejected" : status || "pending_reservation";
-  const cfg = STATUS_BADGE[key] || {
+  const cfg = STATUS_BADGE_CONFIG[key] || {
     text: key,
-    cls: "bg-gray-200 text-gray-700 border border-gray-400",
+    bg: "#f3f4f6",
+    color: "#374151",
     icon: null,
   };
   const Icon = cfg.icon;
   return (
     <span
-      className={`${cfg.cls} px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: cfg.bg,
+        color: cfg.color,
+        fontSize: 11,
+        fontWeight: 700,
+        fontFamily: "'Space Grotesk', sans-serif",
+        whiteSpace: "nowrap",
+      }}
     >
-      {Icon && <Icon className="text-xs" />}
+      {Icon && <Icon style={{ fontSize: 9 }} />}
       {cfg.text}
     </span>
   );
@@ -553,32 +705,62 @@ const TabButton = ({ tab, isActive, count, issueCount, onClick }) => {
     <button
       type="button"
       onClick={() => onClick(tab.key)}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200
-        ${
-          isActive
-            ? "bg-[#171717] text-white shadow-lg shadow-black/25 scale-[1.02]"
-            : "bg-white/70 text-[#171717] hover:bg-white/90 border border-[#171717]/10"
-        }`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 7,
+        padding: "9px 16px",
+        borderRadius: 12,
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: "pointer",
+        transition: "all 0.2s cubic-bezier(.2,.8,.2,1)",
+        border: isActive ? "none" : "1.5px solid rgba(0,0,0,0.09)",
+        background: isActive ? tab.color : "#fff",
+        color: isActive ? "#fff" : "rgba(14,14,14,0.55)",
+        boxShadow: isActive
+          ? `0 4px 16px ${tab.color}30`
+          : "0 1px 3px rgba(0,0,0,0.04)",
+        transform: isActive ? "translateY(-1px)" : "none",
+        position: "relative",
+      }}
     >
-      <Icon
-        className={`text-xs ${isActive ? "text-white" : "text-[#b50002]"}`}
-      />
-      <span className="inline-flex items-start">
-        {tab.label}
-        {issueCount > 0 && tab.key === "inspection" && (
-          <sup
-            className={`ml-1 text-[0.65rem] font-black leading-none align-super ${
-              isActive ? "text-white" : "text-[#b50002]"
-            }`}
-            aria-label={`${issueCount} inspection issue${issueCount === 1 ? "" : "s"}`}
-          >
-            {issueCount}
-          </sup>
-        )}
+      <Icon style={{ fontSize: 11 }} />
+      <span className="tab-full-label">{tab.label}</span>
+      <span className="tab-short-label" style={{ display: "none" }}>
+        {tab.label.split(" ")[0]}
       </span>
+      {issueCount > 0 && tab.key === "inspection" && (
+        <span
+          style={{
+            background: "#b50002",
+            color: "#fff",
+            fontSize: 9,
+            fontWeight: 900,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "absolute",
+            top: -5,
+            right: -5,
+          }}
+        >
+          {issueCount}
+        </span>
+      )}
       <span
-        className={`text-xs font-bold px-1.5 py-0.5 rounded-full
-        ${isActive ? "bg-white/20 text-white" : "bg-[#171717]/10 text-[#171717]"}`}
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          padding: "1px 7px",
+          borderRadius: 6,
+          background: isActive ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
+          color: isActive ? "#fff" : "rgba(14,14,14,0.5)",
+        }}
       >
         {count}
       </span>
@@ -589,7 +771,6 @@ const TabButton = ({ tab, isActive, count, issueCount, onClick }) => {
 // ── Pagination ────────────────────────────────────────────────────────────────
 const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
   if (totalPages <= 1) return null;
-
   const pages = [];
   const delta = 2;
   for (let i = 1; i <= totalPages; i++) {
@@ -607,36 +788,47 @@ const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
     withEllipsis.push(page);
     prev = page;
   }
-
   const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-3">
-      <p className="text-sm text-[#171717]/60">
-        Showing{" "}
-        <span className="font-semibold text-[#171717]">{startItem}</span> –{" "}
-        <span className="font-semibold text-[#171717]">{endItem}</span> of{" "}
-        <span className="font-semibold text-[#171717]">{totalItems}</span>{" "}
-        bookings
+    <div
+      style={{
+        marginTop: 32,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <p
+        style={{
+          fontSize: 13,
+          color: "rgba(14,14,14,0.4)",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        Showing <strong style={{ color: "#0E0E0E" }}>{startItem}</strong>–
+        <strong style={{ color: "#0E0E0E" }}>{endItem}</strong> of{" "}
+        <strong style={{ color: "#0E0E0E" }}>{totalItems}</strong>
       </p>
-      <div className="flex items-center gap-2">
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/70 border border-[#171717]/10 text-[#171717]
-            disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/90
-            transition-all shadow-sm text-sm font-medium"
+          style={paginationBtnStyle(false, false)}
         >
-          <FaChevronLeft className="text-xs" />
-          <span className="hidden sm:inline">Prev</span>
+          <FaChevronLeft style={{ fontSize: 10 }} />
         </button>
-
         {withEllipsis.map((item, idx) =>
           item === "..." ? (
             <span
               key={`e-${idx}`}
-              className="px-2 text-[#171717]/50 text-sm select-none"
+              style={{
+                color: "rgba(14,14,14,0.3)",
+                fontSize: 13,
+                padding: "0 4px",
+              }}
             >
               …
             </span>
@@ -644,54 +836,57 @@ const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
             <button
               key={item}
               onClick={() => onPageChange(item)}
-              className={`w-10 h-10 rounded-xl font-semibold text-sm transition-all
-                ${
-                  currentPage === item
-                    ? "bg-[#b50002] text-white shadow-lg shadow-[#b50002]/30 scale-105"
-                    : "bg-white/70 border border-[#171717]/10 text-[#171717] hover:bg-white/90"
-                }`}
+              style={paginationBtnStyle(currentPage === item, true)}
             >
               {item}
             </button>
           ),
         )}
-
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/70 border border-[#171717]/10 text-[#171717]
-            disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/90
-            transition-all shadow-sm text-sm font-medium"
+          style={paginationBtnStyle(false, false)}
         >
-          <span className="hidden sm:inline">Next</span>
-          <FaChevronRight className="text-xs" />
+          <FaChevronRight style={{ fontSize: 10 }} />
         </button>
       </div>
     </div>
   );
 };
 
-// ── Detail mini-card ──────────────────────────────────────────────────────────
-const DetailCard = ({ icon: Icon, title, children }) => (
-  <div className="bg-white/60 border border-[#171717]/10 rounded-xl p-3 shadow-sm">
-    <p className="text-xs font-bold text-[#171717]/50 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-      <Icon className="text-[#b50002]" /> {title}
-    </p>
-    <div className="space-y-1.5 text-xs">{children}</div>
-  </div>
-);
+const paginationBtnStyle = (active, isNum) => ({
+  width: 36,
+  height: 36,
+  borderRadius: 8,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: active ? "none" : "1.5px solid rgba(0,0,0,0.1)",
+  background: active ? "#b50002" : "#fff",
+  color: active ? "#fff" : "rgba(14,14,14,0.5)",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+  fontFamily: "'Space Grotesk', sans-serif",
+  boxShadow: active
+    ? "0 4px 12px rgba(181,0,2,0.25)"
+    : "0 1px 3px rgba(0,0,0,0.05)",
+  transition: "all 0.15s",
+});
 
-const DetailRow = ({ label, value, valueClass = "text-[#171717]" }) => (
-  <div className="flex justify-between gap-2">
-    <span className="text-[#171717]/50 flex-shrink-0">{label}</span>
-    <span className={`font-semibold text-right ${valueClass}`}>{value}</span>
-  </div>
-);
-
-// ── Booking Row ───────────────────────────────────────────────────────────────
-const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onDownloadAgreement }) => {
+// ── Booking Card ───────────────────────────────────────────────────────────────
+const BookingRow = ({
+  booking,
+  onCancel,
+  onReupload,
+  onReschedule,
+  onExtend,
+  onDownloadAgreement,
+}) => {
   const [expanded, setExpanded] = useState(false);
-  const [reuploadRef, setReuploadRef] = useState(booking.paymentReferenceId || "");
+  const [reuploadRef, setReuploadRef] = useState(
+    booking.paymentReferenceId || "",
+  );
   const [reuploadSentAt, setReuploadSentAt] = useState(
     booking.paymentSentAt
       ? new Date(booking.paymentSentAt).toISOString().slice(0, 16)
@@ -707,20 +902,22 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [bookingReview, setBookingReview] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+
   const days = daysBetween(booking.dates.pickup, booking.dates.return);
   const motorcycleName =
     `${booking.motorcycle.make} ${booking.motorcycle.model}`.trim();
   const dailyRate = booking.motorcycle.dailyRate || 0;
   const baseRental = dailyRate * Math.max(days, 1);
-  // Gross total stored on booking; downpayment already paid
   const grossTotal = booking.price;
   const downpayment = booking.downpayment || DOWNPAYMENT;
   const dueAtPickup = Math.max(0, grossTotal - downpayment);
   const needsReupload =
     booking.requiresProofReupload || booking.paymentStatus === "rejected";
+
   const originalPickupDateInput = toDateInput(booking.dates.pickup);
   const originalReturnDateInput = toDateInput(booking.dates.return);
   const originalReturnTime = booking.times.return || "08:00";
+
   const [rescheduleForm, setRescheduleForm] = useState({
     pickupDate: originalPickupDateInput,
     pickupTime: booking.times.pickup || "08:00",
@@ -736,7 +933,6 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
     ["pending", "pending_reservation", "pending_full_payment"].includes(
       booking.status,
     ) && !booking.isDeleted;
-
   const canExtend = booking.status === "active" && !booking.isDeleted;
 
   useEffect(() => {
@@ -750,7 +946,12 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       returnDate: toDateInput(booking.dates.return),
       returnTime: booking.times.return || "08:00",
     });
-  }, [booking.dates.pickup, booking.dates.return, booking.times.pickup, booking.times.return]);
+  }, [
+    booking.dates.pickup,
+    booking.dates.return,
+    booking.times.pickup,
+    booking.times.return,
+  ]);
 
   useEffect(() => {
     if (!reuploadFile) {
@@ -767,21 +968,17 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       setBookingReview(null);
       return;
     }
-
     try {
       setReviewLoading(true);
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.get(`${API_BASE}/api/reviews/booking/${booking.id}`, {
-        headers,
-      });
+      const response = await axios.get(
+        `${API_BASE}/api/reviews/booking/${booking.id}`,
+        { headers },
+      );
       setBookingReview(response?.data?.review || response?.data || null);
     } catch (err) {
-      if (err?.response?.status === 404) {
-        setBookingReview(null);
-      } else {
-        console.error("Failed to fetch booking review:", err);
-      }
+      if (err?.response?.status === 404) setBookingReview(null);
     } finally {
       setReviewLoading(false);
     }
@@ -795,6 +992,7 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
     ? resolveImageUrl(booking.raw.paymentProofImage)
     : "";
   const proofPreviewSrc = reuploadPreviewUrl || existingProofPreview;
+
   const validReturnTimeSlots =
     rescheduleForm.returnDate &&
     rescheduleForm.pickupDate &&
@@ -810,7 +1008,10 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
     dailyRate > 0
       ? dailyRate * rescheduledDays + booking.distanceFee + booking.helmetFee
       : grossTotal;
-  const rescheduledDueAtPickup = Math.max(0, rescheduledGrossTotal - downpayment);
+  const rescheduledDueAtPickup = Math.max(
+    0,
+    rescheduledGrossTotal - downpayment,
+  );
 
   const extensionDays = daysBetweenWithTime(
     originalPickupDateInput,
@@ -820,21 +1021,27 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
   );
   const extensionGrossTotal =
     dailyRate > 0
-      ? dailyRate * Math.max(extensionDays, 1) + booking.distanceFee + booking.helmetFee
+      ? dailyRate * Math.max(extensionDays, 1) +
+        booking.distanceFee +
+        booking.helmetFee
       : grossTotal;
-  const extensionAdditionalAmount = Math.max(0, extensionGrossTotal - grossTotal);
+  const extensionAdditionalAmount = Math.max(
+    0,
+    extensionGrossTotal - grossTotal,
+  );
   const latestExtension = Array.isArray(booking.raw?.extensions)
     ? booking.raw.extensions[booking.raw.extensions.length - 1]
     : null;
-  const originalReturnDateFromExtension = latestExtension?.previousReturnDate || null;
-  const originalReturnTimeFromExtension = latestExtension?.previousReturnTime || "";
+  const originalReturnDateFromExtension =
+    latestExtension?.previousReturnDate || null;
+  const originalReturnTimeFromExtension =
+    latestExtension?.previousReturnTime || "";
 
   const minPickupDate = useMemo(() => {
-    const today = getTodayStart();
-    const originalPickup = parseLocalDateOnly(originalPickupDateInput);
+    const today = getTodayStart(),
+      originalPickup = parseLocalDateOnly(originalPickupDateInput);
     if (!originalPickup) return formatDateInput(today);
-    const min = originalPickup > today ? originalPickup : today;
-    return formatDateInput(min);
+    return formatDateInput(originalPickup > today ? originalPickup : today);
   }, [originalPickupDateInput]);
   const maxPickupDate = formatDateInput(sevenDaysFromToday());
   const maxReturnDate = formatDateInput(sixMonthsFromToday());
@@ -847,38 +1054,34 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       });
       return false;
     }
-
-    if (!isTimeWithinRentalHours(pickupTime) || !isTimeWithinRentalHours(returnTime)) {
-      await alertModal(
-        "Pickup and return times must be between 8:00 AM and 8:00 PM only.",
-        { isError: true },
-      );
-      return false;
-    }
-
-    const pickupDateObj = parseLocalDateOnly(pickupDate);
-    const returnDateObj = parseLocalDateOnly(returnDate);
-    const originalPickupObj = parseLocalDateOnly(originalPickupDateInput);
-    if (!pickupDateObj || !returnDateObj || !originalPickupObj) {
-      await alertModal("Invalid date input. Please review your schedule.", {
+    if (
+      !isTimeWithinRentalHours(pickupTime) ||
+      !isTimeWithinRentalHours(returnTime)
+    ) {
+      await alertModal("Times must be between 8:00 AM and 8:00 PM.", {
         isError: true,
       });
       return false;
     }
-
-    const today = getTodayStart();
-    const sevenDayLimit = sevenDaysFromToday();
-    const sixMonthLimit = sixMonthsFromToday();
-    const minAllowedPickup = originalPickupObj > today ? originalPickupObj : today;
-
+    const pickupDateObj = parseLocalDateOnly(pickupDate),
+      returnDateObj = parseLocalDateOnly(returnDate),
+      originalPickupObj = parseLocalDateOnly(originalPickupDateInput);
+    if (!pickupDateObj || !returnDateObj || !originalPickupObj) {
+      await alertModal("Invalid date input.", { isError: true });
+      return false;
+    }
+    const today = getTodayStart(),
+      sevenDayLimit = sevenDaysFromToday(),
+      sixMonthLimit = sixMonthsFromToday();
+    const minAllowedPickup =
+      originalPickupObj > today ? originalPickupObj : today;
     if (pickupDateObj < minAllowedPickup) {
       await alertModal(
-        "Pickup date cannot be earlier than your original pickup date and cannot be in the past.",
+        "Pickup date cannot be earlier than original or in the past.",
         { isError: true },
       );
       return false;
     }
-
     if (pickupDateObj > sevenDayLimit) {
       await alertModal(
         "Pickup date can only be rescheduled within the next 7 days.",
@@ -886,7 +1089,6 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       );
       return false;
     }
-
     if (returnDateObj > sixMonthLimit) {
       await alertModal(
         "Return date can only be rescheduled up to 6 months from today.",
@@ -894,26 +1096,20 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       );
       return false;
     }
-
-    const pickupDateTime = combineLocalDateTime(pickupDate, pickupTime);
-    const returnDateTime = combineLocalDateTime(returnDate, returnTime);
+    const pickupDateTime = combineLocalDateTime(pickupDate, pickupTime),
+      returnDateTime = combineLocalDateTime(returnDate, returnTime);
     if (!pickupDateTime || !returnDateTime) {
-      await alertModal("Return date/time is invalid.", {
-        isError: true,
-      });
+      await alertModal("Return date/time is invalid.", { isError: true });
       return false;
     }
-
-    const minReturnDateTime = new Date(
-      pickupDateTime.getTime() + 24 * 60 * 60 * 1000,
-    );
-    if (returnDateTime < minReturnDateTime) {
+    if (
+      returnDateTime < new Date(pickupDateTime.getTime() + 24 * 60 * 60 * 1000)
+    ) {
       await alertModal("Minimum rental duration is 24 hours.", {
         isError: true,
       });
       return false;
     }
-
     return true;
   };
 
@@ -925,39 +1121,33 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       });
       return false;
     }
-
     if (!isTimeWithinRentalHours(returnTime)) {
-      await alertModal("Return time must be between 8:00 AM and 8:00 PM only.", {
+      await alertModal("Return time must be between 8:00 AM and 8:00 PM.", {
         isError: true,
       });
       return false;
     }
-
     const currentReturnDateTime = combineLocalDateTime(
-      originalReturnDateInput,
-      originalReturnTime,
-    );
-    const nextReturnDateTime = combineLocalDateTime(returnDate, returnTime);
+        originalReturnDateInput,
+        originalReturnTime,
+      ),
+      nextReturnDateTime = combineLocalDateTime(returnDate, returnTime);
     if (!currentReturnDateTime || !nextReturnDateTime) {
       await alertModal("Return date/time is invalid.", { isError: true });
       return false;
     }
-
     if (nextReturnDateTime <= currentReturnDateTime) {
-      await alertModal(
-        "New return time must be later than your current return time.",
-        { isError: true },
-      );
+      await alertModal("New return time must be later than current.", {
+        isError: true,
+      });
       return false;
     }
-
     if (extensionDays <= 0) {
       await alertModal("Please select a valid extension duration.", {
         isError: true,
       });
       return false;
     }
-
     return true;
   };
 
@@ -969,9 +1159,7 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       return;
     }
     if (!reuploadSentAt) {
-      await alertModal("Please enter payment sent time.", {
-        isError: true,
-      });
+      await alertModal("Please enter payment sent time.", { isError: true });
       return;
     }
     if (!reuploadFile) {
@@ -980,7 +1168,6 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
       });
       return;
     }
-
     try {
       setReuploading(true);
       await onReupload(booking.id, {
@@ -999,13 +1186,11 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
   const submitReschedule = async () => {
     const isValid = await validateReschedule();
     if (!isValid) return;
-
     const confirmed = await confirmModal(
-      "Apply this new pickup and return schedule to your booking?",
+      "Apply this new schedule to your booking?",
       { confirmLabel: "Yes, Reschedule" },
     );
     if (!confirmed) return;
-
     try {
       setRescheduling(true);
       await onReschedule(booking.id, {
@@ -1021,13 +1206,11 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
   const submitExtension = async () => {
     const isValid = await validateExtension();
     if (!isValid) return;
-
     const confirmed = await confirmModal(
       "Extend your rental to the new return date/time?",
       { confirmLabel: "Yes, Extend" },
     );
     if (!confirmed) return;
-
     try {
       setExtending(true);
       await onExtend(booking.id, {
@@ -1040,898 +1223,1718 @@ const BookingRow = ({ booking, onCancel, onReupload, onReschedule, onExtend, onD
     }
   };
 
+  const tabCfg =
+    STATUS_TABS.find(
+      (t) => t.key === (booking.isDeleted ? "rejected" : booking.status),
+    ) || STATUS_TABS[0];
+  const accentColor = tabCfg.color;
+
+  const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "9px 12px",
+    borderRadius: 8,
+    border: "1.5px solid rgba(0,0,0,0.1)",
+    background: "#F5F5F3",
+    color: "#0E0E0E",
+    fontSize: 13,
+    fontFamily: "'Space Grotesk', sans-serif",
+    outline: "none",
+    transition: "border-color 0.2s",
+  };
+  const selectStyle = { ...inputStyle, appearance: "none", cursor: "pointer" };
+  const labelStyle = {
+    display: "block",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "1.5px",
+    textTransform: "uppercase",
+    color: "rgba(14,14,14,0.38)",
+    marginBottom: 5,
+    fontFamily: "'Space Grotesk', sans-serif",
+  };
+
   return (
     <>
-    <div
-      className={`bg-white/70 backdrop-blur-sm border border-white/50 rounded-2xl overflow-hidden shadow-lg shadow-black/10 transition-all duration-200
-      ${booking.isDeleted ? "opacity-60" : "hover:shadow-xl hover:shadow-black/15 hover:bg-white/90"}`}
-    >
-      {/* ── Collapsed row ── */}
-      <div className="flex items-center gap-3 p-3 sm:p-4">
-        {/* Thumbnail */}
-        <div className="flex-shrink-0 w-16 h-14 sm:w-20 sm:h-16 rounded-xl overflow-hidden bg-[#e8e8e8]">
-          <img
-            src={booking.motorcycle.image}
-            alt={motorcycleName}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.src =
-                "https://via.placeholder.com/800x450.png?text=No+Image";
+      <div
+        className="booking-card"
+        style={{
+          background: "#fff",
+          border: "1.5px solid rgba(0,0,0,0.08)",
+          borderRadius: 18,
+          overflow: "hidden",
+          transition: "all 0.25s cubic-bezier(.2,.8,.2,1)",
+          opacity: booking.isDeleted ? 0.55 : 1,
+          borderLeft: `4px solid ${accentColor}`,
+        }}
+      >
+        {/* Collapsed Row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "14px 18px",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Thumbnail */}
+          <div
+            style={{
+              flexShrink: 0,
+              width: 76,
+              height: 60,
+              borderRadius: 12,
+              overflow: "hidden",
+              background: "#F5F5F3",
             }}
-          />
-        </div>
-
-        {/* Core info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="font-bold text-[#171717] text-sm leading-tight truncate">
-              {motorcycleName}
-            </h3>
-            {booking.motorcycle.year && (
-              <span className="text-xs text-[#171717]/40 hidden sm:inline">
-                {booking.motorcycle.year}
-              </span>
-            )}
-            <StatusBadge
-              status={booking.status}
-              isDeleted={booking.isDeleted}
+          >
+            <img
+              src={booking.motorcycle.image}
+              alt={motorcycleName}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transition: "transform 0.4s ease",
+              }}
+              className="booking-thumb"
+              onError={(e) => {
+                e.target.src =
+                  "https://via.placeholder.com/800x450.png?text=No+Image";
+              }}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#171717]/55">
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <FaCalendarAlt className="text-[#b50002] text-xs" />
-              {formatDate(booking.dates.pickup)}
-              {booking.times.pickup && ` · ${formatTime(booking.times.pickup)}`}
-              <span className="mx-0.5">—</span>
-              {formatDate(booking.dates.return)}
-              {booking.times.return && ` · ${formatTime(booking.times.return)}`}
-            </span>
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <FaClock className="text-[#b50002] text-xs" /> {days}d
-            </span>
-            {booking.destination && (
-              <span className="hidden md:flex items-center gap-1 truncate max-w-[160px]">
-                <FaMapMarkerAlt className="text-[#b50002] text-xs flex-shrink-0" />
-                {booking.destination}
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+              <span
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 800,
+                  color: "#0E0E0E",
+                  fontSize: 15,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "220px",
+                  letterSpacing: "-0.3px",
+                }}
+              >
+                {motorcycleName}
               </span>
-            )}
+              {booking.motorcycle.year && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "rgba(14,14,14,0.35)",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {booking.motorcycle.year}
+                </span>
+              )}
+              <StatusBadge
+                status={booking.status}
+                isDeleted={booking.isDeleted}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 12,
+                fontSize: 12,
+                color: "rgba(14,14,14,0.45)",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <FaCalendarAlt style={{ color: accentColor, fontSize: 10 }} />
+                {formatDate(booking.dates.pickup)}
+                {booking.times.pickup &&
+                  ` · ${formatTime(booking.times.pickup)}`}
+                <span style={{ opacity: 0.4 }}>→</span>
+                {formatDate(booking.dates.return)}
+                {booking.times.return &&
+                  ` · ${formatTime(booking.times.return)}`}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <FaClock style={{ color: accentColor, fontSize: 10 }} />
+                {days}d
+              </span>
+              {booking.destination && (
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    maxWidth: 160,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <FaMapMarkerAlt
+                    style={{ color: accentColor, fontSize: 10, flexShrink: 0 }}
+                  />
+                  {booking.destination}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Price — show due at pickup */}
-        <div className="flex-shrink-0 text-right hidden sm:block mr-1">
-          <p className="font-black text-[#171717] text-sm">
-            {formatPrice(dueAtPickup)}
-          </p>
-          <p className="text-xs text-[#171717]/40">due at pickup</p>
-        </div>
+          {/* Price */}
+          <div style={{ flexShrink: 0, textAlign: "right", marginRight: 4 }}>
+            <div
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 800,
+                color: "#0E0E0E",
+                fontSize: 16,
+                letterSpacing: "-0.5px",
+              }}
+            >
+              {formatPrice(dueAtPickup)}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: "rgba(14,14,14,0.38)",
+                fontFamily: "'Space Grotesk', sans-serif",
+                marginTop: 1,
+              }}
+            >
+              due at pickup
+            </div>
+          </div>
 
-        {/* Action buttons */}
-        <div className="flex-shrink-0 flex items-center gap-2">
-          {[
-            "pending",
-            "pending_reservation",
-            "pending_full_payment",
-          ].includes(booking.status) && !booking.isDeleted && (
+          {/* Actions */}
+          <div
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              "pending",
+              "pending_reservation",
+              "pending_full_payment",
+            ].includes(booking.status) &&
+              !booking.isDeleted && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel(booking.id);
+                  }}
+                  className="action-btn-cancel"
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 9,
+                    background: "#fee2e2",
+                    color: "#b50002",
+                    border: "1.5px solid #fecaca",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    transition: "all 0.18s",
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onCancel(booking.id);
+                onDownloadAgreement(booking.id, booking.user?.name);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#b50002] text-white text-sm font-bold rounded-xl
-                      shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              title="Download Rental Agreement"
+              className="action-btn-icon"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 9,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#dbeafe",
+                color: "#2563eb",
+                border: "1.5px solid #bfdbfe",
+                cursor: "pointer",
+                transition: "all 0.18s",
+              }}
             >
-              Cancel
+              <FaFileDownload style={{ fontSize: 13 }} />
             </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownloadAgreement(booking.id, booking.customer);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] text-white text-sm font-bold rounded-xl
-                    shadow-lg shadow-[#2563eb]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-            title="Download Rental Agreement PDF"
-          >
-            <FaFileDownload className="text-xs" />
-            <span className="hidden sm:inline">Agreement</span>
-          </button>
-          <button
-            onClick={() => setExpanded((p) => !p)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#171717] text-white text-sm font-bold rounded-xl
-                      shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-          >
-            <FaReceipt className="text-xs" />
-            <span className="hidden sm:inline">
-              {expanded ? "Hide" : "Details"}
-            </span>
-            {expanded ? (
-              <FaChevronUp className="text-xs" />
-            ) : (
-              <FaChevronDown className="text-xs" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Expanded detail panel ── */}
-      {expanded && (
-        <div className="border-t border-[#171717]/10 px-3 sm:px-4 pb-4 pt-3 space-y-3 bg-[#f4f3f3]/60">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Motorcycle specs */}
-            <DetailCard icon={FaMotorcycle} title="Motorcycle">
-              {booking.motorcycle.engineSize && (
-                <DetailRow
-                  label="Engine"
-                  value={`${booking.motorcycle.engineSize}cc`}
-                />
+            <button
+              onClick={() => setExpanded((p) => !p)}
+              className="action-btn-details"
+              style={{
+                padding: "7px 13px",
+                borderRadius: 9,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: expanded ? "#0E0E0E" : "#F5F5F3",
+                color: expanded ? "#fff" : "#0E0E0E",
+                border: "1.5px solid",
+                borderColor: expanded ? "#0E0E0E" : "rgba(0,0,0,0.1)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+                transition: "all 0.18s",
+              }}
+            >
+              <FaReceipt style={{ fontSize: 11 }} />
+              Details
+              {expanded ? (
+                <FaChevronUp style={{ fontSize: 9 }} />
+              ) : (
+                <FaChevronDown style={{ fontSize: 9 }} />
               )}
-              {booking.motorcycle.transmission && (
-                <DetailRow
-                  label="Transmission"
-                  value={booking.motorcycle.transmission}
-                />
-              )}
-              {booking.motorcycle.fuelType && (
-                <DetailRow label="Fuel" value={booking.motorcycle.fuelType} />
-              )}
-              <DetailRow
-                label="ABS"
-                value={booking.motorcycle.hasABS ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="Rate/day"
-                value={formatPrice(dailyRate)}
-                valueClass="text-[#b50002]"
-              />
-            </DetailCard>
-
-            {/* Booking info */}
-            <DetailCard icon={FaCalendarAlt} title="Booking Info">
-              <div className="flex justify-between gap-2">
-                <span className="text-[#171717]/50 flex-shrink-0">Pickup</span>
-                <span className="font-semibold text-[#171717] text-right">
-                  {formatDate(booking.dates.pickup)}
-                  {booking.times.pickup && (
-                    <span className="text-[#b50002] ml-1">
-                      {formatTime(booking.times.pickup)}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="text-[#171717]/50 flex-shrink-0">Return</span>
-                <span className="font-semibold text-[#171717] text-right">
-                  {formatDate(booking.dates.return)}
-                  {booking.times.return && (
-                    <span className="text-[#b50002] ml-1">
-                      {formatTime(booking.times.return)}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <DetailRow
-                label="Duration"
-                value={`${days} ${days === 1 ? "day" : "days"}`}
-              />
-              {booking.destination && (
-                <div className="flex justify-between gap-2">
-                  <span className="text-[#171717]/50 flex-shrink-0">
-                    Destination
-                  </span>
-                  <span className="font-semibold text-[#171717] text-right truncate">
-                    {booking.destination}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between gap-2">
-                <span className="text-[#171717]/50 flex-shrink-0">
-                  Booked on
-                </span>
-                <span className="font-semibold text-[#171717] text-right">
-                  {formatDateTime(booking.bookingDate)}
-                </span>
-              </div>
-              <DetailRow
-                label="Payment via"
-                value={booking.paymentMethod || "—"}
-              />
-            </DetailCard>
-
-            {/* Fee breakdown */}
-            <DetailCard icon={FaReceipt} title="Fee Breakdown">
-              {dailyRate > 0 && (
-                <DetailRow
-                  label={`₱${dailyRate.toLocaleString()} × ${days}d`}
-                  value={formatPrice(baseRental)}
-                />
-              )}
-              {booking.distanceFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[#171717]/50 flex items-center gap-1">
-                    <FaMapMarkerAlt className="text-[#b50002]" />
-                    Distance
-                    {booking.distanceTierLabel && (
-                      <span className="text-[#171717]/40 ml-0.5">
-                        ({booking.distanceTierLabel})
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-semibold text-[#b50002]">
-                    +{formatPrice(booking.distanceFee)}
-                  </span>
-                </div>
-              )}
-              {booking.helmetRequested && booking.helmetFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[#171717]/50 flex items-center gap-1">
-                    <FaHardHat className="text-[#b50002]" /> Helmet
-                  </span>
-                  <span className="font-semibold text-[#b50002]">
-                    +{formatPrice(booking.helmetFee)}
-                  </span>
-                </div>
-              )}
-              {booking.raw?.returnInspection?.clearanceStatus === "penalty_required" &&
-                booking.raw?.returnInspection?.penaltyAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[#171717]/50 flex items-center gap-1">
-                    <FaExclamationTriangle className="text-[#b50002]" /> Penalty
-                  </span>
-                  <span className={`font-semibold ${booking.raw?.returnInspection?.penaltySettled ? "text-green-600" : "text-[#b50002]"}`}>
-                    +{formatPrice(booking.raw.returnInspection.penaltyAmount)}
-                  </span>
-                </div>
-              )}
-              {/* Gross total */}
-              <div className="border-t border-[#171717]/15 pt-1.5 flex justify-between">
-                <span className="font-bold text-[#171717]">Total</span>
-                <span className="font-black text-[#171717]">
-                  {formatPrice(
-                    grossTotal +
-                    (booking.raw?.returnInspection?.clearanceStatus === "penalty_required" &&
-                    booking.raw?.returnInspection?.penaltyAmount > 0 &&
-                    !booking.raw?.returnInspection?.penaltySettled
-                      ? booking.raw.returnInspection.penaltyAmount
-                      : 0)
-                  )}
-                </span>
-              </div>
-              {/* Downpayment deducted */}
-              <div className="flex justify-between">
-                <span className="text-[#171717]/50">Downpayment (paid)</span>
-                <span className="font-semibold text-green-600">
-                  −{formatPrice(downpayment)}
-                </span>
-              </div>
-              {/* Due at pickup */}
-              <div className="border-t border-[#171717]/15 pt-1.5 flex justify-between">
-                <span className="font-bold text-[#171717]">Due at Pickup</span>
-                <span className="font-black text-[#b50002]">
-                  {formatPrice(dueAtPickup)}
-                </span>
-              </div>
-            </DetailCard>
+            </button>
           </div>
+        </div>
 
-          {/* Inspection Section */}
-          {booking.status === "inspection" && booking.returnInspection && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <FaExclamationTriangle className="text-purple-700 text-lg" />
-                <h3 className="text-sm font-bold text-purple-900">
-                  Return Inspection Status
-                </h3>
+        {/* Expanded Panel */}
+        {expanded && (
+          <div
+            style={{
+              borderTop: "1.5px solid rgba(0,0,0,0.06)",
+              padding: "20px 18px",
+              background: "#FAFAFA",
+            }}
+          >
+            {/* 3-column detail grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              {/* Motorcycle card */}
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid rgba(0,0,0,0.07)",
+                  borderRadius: 14,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 7,
+                      background: tabCfg.bg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <FaMotorcycle
+                      style={{ color: accentColor, fontSize: 11 }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "1.5px",
+                      textTransform: "uppercase",
+                      color: "rgba(14,14,14,0.38)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Motorcycle
+                  </span>
+                </div>
+                {[
+                  booking.motorcycle.engineSize && [
+                    "Engine",
+                    `${booking.motorcycle.engineSize}cc`,
+                  ],
+                  booking.motorcycle.transmission && [
+                    "Transmission",
+                    booking.motorcycle.transmission,
+                  ],
+                  booking.motorcycle.fuelType && [
+                    "Fuel",
+                    booking.motorcycle.fuelType,
+                  ],
+                  ["ABS", booking.motorcycle.hasABS ? "Yes" : "No"],
+                  dailyRate > 0 && ["Rate/day", formatPrice(dailyRate)],
+                ]
+                  .filter(Boolean)
+                  .map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 7,
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(14,14,14,0.45)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: label === "Rate/day" ? accentColor : "#0E0E0E",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
               </div>
 
-              <div className="space-y-3">
-                {/* Status message */}
-                <div className="bg-white rounded-lg p-3 border border-purple-200">
-                  <p className="text-sm font-semibold text-purple-900 mb-1">
-                    Inspection Status:
-                  </p>
-                  <p className="text-sm text-purple-800">
-                    Your rented motorcycle is currently under inspection. Please wait for the admin to settle your penalties if you have any before you rent another motorcycle.
-                  </p>
+              {/* Booking info */}
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid rgba(0,0,0,0.07)",
+                  borderRadius: 14,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 7,
+                      background: tabCfg.bg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <FaCalendarAlt
+                      style={{ color: accentColor, fontSize: 11 }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "1.5px",
+                      textTransform: "uppercase",
+                      color: "rgba(14,14,14,0.38)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Booking Info
+                  </span>
                 </div>
+                {[
+                  [
+                    "Pickup",
+                    `${formatDate(booking.dates.pickup)}${booking.times.pickup ? ` · ${formatTime(booking.times.pickup)}` : ""}`,
+                  ],
+                  [
+                    "Return",
+                    `${formatDate(booking.dates.return)}${booking.times.return ? ` · ${formatTime(booking.times.return)}` : ""}`,
+                  ],
+                  ["Duration", `${days} ${days === 1 ? "day" : "days"}`],
+                  booking.destination && ["Destination", booking.destination],
+                  ["Booked on", formatDateTime(booking.bookingDate)],
+                  ["Payment", booking.paymentMethod || "—"],
+                ]
+                  .filter(Boolean)
+                  .map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 7,
+                        gap: 8,
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(14,14,14,0.45)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#0E0E0E",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          textAlign: "right",
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+              </div>
 
-                {/* Damage Found Section */}
-                {booking.returnInspection.clearanceStatus === "damage_found" && (
-                  <>
-                    {booking.returnInspection.damageNotes && (
-                      <div>
-                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
-                          Damage Notes
-                        </p>
-                        <p className="text-sm text-purple-900 bg-white rounded-lg p-2 border border-purple-100">
-                          {booking.returnInspection.damageNotes}
-                        </p>
-                      </div>
-                    )}
-                    {booking.returnInspection.mechanicNotes && (
-                      <div>
-                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
-                          Mechanic Notes
-                        </p>
-                        <p className="text-sm text-purple-900 bg-white rounded-lg p-2 border border-purple-100">
-                          {booking.returnInspection.mechanicNotes}
-                        </p>
-                      </div>
-                    )}
-                    {booking.returnInspection.repairEstimateAmount > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-1">
-                          Repair Estimate
-                        </p>
-                        <div className="bg-white rounded-lg p-2 border border-purple-100 space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-purple-800">Amount:</span>
-                            <span className="text-sm font-semibold text-purple-900">
-                              ₱{booking.returnInspection.repairEstimateAmount.toLocaleString()}
-                            </span>
-                          </div>
-                          {booking.returnInspection.repairEstimateNotes && (
-                            <p className="text-xs text-purple-700 mt-1">
-                              {booking.returnInspection.repairEstimateNotes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {Array.isArray(booking.returnInspection.damagePhotos) &&
-                      booking.returnInspection.damagePhotos.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-2">
-                            Damage Photos
-                          </p>
-                          <div className="grid grid-cols-3 gap-2">
-                            {booking.returnInspection.damagePhotos.map((photo, idx) => (
-                              <img
-                                key={idx}
-                                src={photo}
-                                alt={`Damage ${idx + 1}`}
-                                className="w-full h-24 object-cover rounded-lg border border-purple-200"
-                                onError={(e) => {
-                                  e.target.src = "https://via.placeholder.com/400x300.png?text=Image+Not+Found";
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                  </>
+              {/* Fee breakdown */}
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid rgba(0,0,0,0.07)",
+                  borderRadius: 14,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 7,
+                      background: tabCfg.bg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <FaReceipt style={{ color: accentColor, fontSize: 11 }} />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "1.5px",
+                      textTransform: "uppercase",
+                      color: "rgba(14,14,14,0.38)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Fee Breakdown
+                  </span>
+                </div>
+                {dailyRate > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      ₱{dailyRate.toLocaleString()} × {days}d
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {formatPrice(baseRental)}
+                    </span>
+                  </div>
                 )}
-
-                {/* Penalty Required / Damage Found - Penalty Section */}
-                {booking.returnInspection.clearanceStatus === "penalty_required" && (
-                  <>
-                    {booking.returnInspection.penaltyAmount > 0 && (
-                      <div className="bg-red-50 rounded-lg p-3 border border-red-200">
-                        <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-1">
-                          Penalty Amount
-                        </p>
-                        <p className="text-lg font-black text-red-900">
-                          ₱{booking.returnInspection.penaltyAmount.toLocaleString()}
-                        </p>
-                        {booking.returnInspection.penaltySummary && (
-                          <p className="text-xs text-red-800 mt-2">
-                            {booking.returnInspection.penaltySummary}
-                          </p>
+                {booking.distanceFee > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Distance
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#ea580c",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      +{formatPrice(booking.distanceFee)}
+                    </span>
+                  </div>
+                )}
+                {booking.helmetRequested && booking.helmetFee > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Helmet
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#ea580c",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      +{formatPrice(booking.helmetFee)}
+                    </span>
+                  </div>
+                )}
+                {booking.raw?.returnInspection?.clearanceStatus ===
+                  "penalty_required" &&
+                  booking.raw?.returnInspection?.penaltyAmount > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 7,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(14,14,14,0.45)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        Penalty
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: booking.raw?.returnInspection?.penaltySettled
+                            ? "#16a34a"
+                            : "#b50002",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        +
+                        {formatPrice(
+                          booking.raw.returnInspection.penaltyAmount,
                         )}
-                      </div>
-                    )}
-                  </>
-                )}
+                      </span>
+                    </div>
+                  )}
+                <div
+                  style={{
+                    borderTop: "1.5px solid rgba(0,0,0,0.06)",
+                    paddingTop: 10,
+                    marginTop: 6,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Total
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 800,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {formatPrice(grossTotal)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Downpayment
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#16a34a",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      −{formatPrice(downpayment)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      borderTop: "1.5px solid rgba(0,0,0,0.06)",
+                      paddingTop: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#0E0E0E",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        Due at Pickup
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 17,
+                          fontWeight: 800,
+                          color: accentColor,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          letterSpacing: "-0.5px",
+                        }}
+                      >
+                        {formatPrice(dueAtPickup)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
 
-          {needsReupload && !booking.isDeleted && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
-              <p className="text-sm font-bold text-orange-800 mb-1">
-                Admin requested payment proof re-upload
-              </p>
-              {booking.adminReviewComment && (
-                <p className="text-xs text-orange-700 mb-3">
-                  Comment: {booking.adminReviewComment}
+            {/* Inspection Section */}
+            {booking.status === "inspection" && booking.returnInspection && (
+              <div
+                style={{
+                  background: "#ede9fe",
+                  border: "1.5px solid #c4b5fd",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <FaExclamationTriangle style={{ color: "#7c3aed" }} />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 800,
+                      color: "#5b21b6",
+                      fontSize: 14,
+                    }}
+                  >
+                    Return Inspection Status
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#5b21b6",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Your motorcycle is under inspection. Please wait for the admin
+                  to settle any penalties.
                 </p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                    Reference ID
-                  </label>
-                  <input
-                    type="text"
-                    value={reuploadRef}
-                    onChange={(e) => setReuploadRef(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    placeholder="e.g. GCash12345678"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                    Payment Sent Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={reuploadSentAt}
-                    onChange={(e) => setReuploadSentAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                    Amount Sent
-                  </label>
-                  <input
-                    type="number"
-                    value={DOWNPAYMENT}
-                    readOnly
-                    className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-gray-100 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                    New Proof Image
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <label className="inline-flex items-center px-3 py-2 rounded-lg bg-[#171717] text-white text-xs font-bold cursor-pointer hover:brightness-110 transition-all">
-                      Choose Image
+                {booking.returnInspection.clearanceStatus ===
+                  "penalty_required" &&
+                  booking.returnInspection.penaltyAmount > 0 && (
+                    <div
+                      style={{
+                        background: "#fee2e2",
+                        border: "1.5px solid #fecaca",
+                        borderRadius: 10,
+                        padding: 12,
+                        marginTop: 10,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "1.5px",
+                          textTransform: "uppercase",
+                          color: "#991b1b",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Penalty Amount
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 800,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        ₱
+                        {booking.returnInspection.penaltyAmount.toLocaleString()}
+                      </p>
+                      {booking.returnInspection.penaltySummary && (
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#991b1b",
+                            marginTop: 6,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {booking.returnInspection.penaltySummary}
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Re-upload Proof */}
+            {needsReupload && !booking.isDeleted && (
+              <div
+                style={{
+                  background: "#ffedd5",
+                  border: "1.5px solid #fed7aa",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 800,
+                    color: "#9a3412",
+                    fontSize: 14,
+                    marginBottom: 4,
+                  }}
+                >
+                  Payment Proof Re-upload Required
+                </p>
+                {booking.adminReviewComment && (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "#9a3412",
+                      marginBottom: 12,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Comment: {booking.adminReviewComment}
+                  </p>
+                )}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <label style={labelStyle}>Reference ID</label>
+                    <input
+                      type="text"
+                      value={reuploadRef}
+                      onChange={(e) => setReuploadRef(e.target.value)}
+                      style={inputStyle}
+                      placeholder="e.g. GCash12345678"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Payment Sent Time</label>
+                    <input
+                      type="datetime-local"
+                      value={reuploadSentAt}
+                      onChange={(e) => setReuploadSentAt(e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>New Proof Image</label>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "9px 12px",
+                        borderRadius: 8,
+                        border: "1.5px solid rgba(0,0,0,0.1)",
+                        background: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(14,14,14,0.45)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {reuploadFile ? "Image selected" : "Choose image…"}
+                      </span>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={(e) =>
                           setReuploadFile(e.target.files?.[0] || null)
                         }
-                        className="hidden"
+                        style={{ display: "none" }}
                       />
                     </label>
-                    <span className="text-xs text-[#171717]/55">
-                      {reuploadFile ? "Image selected" : "No new image selected"}
-                    </span>
-                  </div>
-                  {proofPreviewSrc && (
-                    <div className="mt-2">
+                    {proofPreviewSrc && (
                       <img
                         src={proofPreviewSrc}
-                        alt="Payment proof preview"
-                        className="w-full max-h-48 object-contain rounded-lg border border-[#171717]/15 bg-white"
+                        alt="Proof preview"
+                        style={{
+                          marginTop: 8,
+                          width: "100%",
+                          maxHeight: 140,
+                          objectFit: "contain",
+                          borderRadius: 8,
+                          border: "1.5px solid rgba(0,0,0,0.1)",
+                        }}
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3">
                 <button
                   onClick={submitReupload}
                   disabled={reuploading}
-                  className="px-4 py-2 bg-[#b50002] text-white text-sm font-bold rounded-xl shadow-lg shadow-[#b50002]/30 hover:brightness-110 disabled:opacity-60"
+                  style={{
+                    ...btnStyle("danger"),
+                    opacity: reuploading ? 0.6 : 1,
+                  }}
                 >
-                  {reuploading ? "Uploading..." : "Re-upload Payment Proof"}
+                  {reuploading ? "Uploading…" : "Re-upload Payment Proof"}
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {canReschedule && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-blue-900">
-                    Need to reschedule?
-                  </p>
-                  <p className="text-xs text-blue-800/80">
-                    Update pickup and return schedule with instant price preview.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsRescheduling((prev) => !prev)}
-                  className="px-3 py-2 bg-[#171717] text-white text-xs sm:text-sm font-bold rounded-lg hover:brightness-110 transition-all"
+            {/* Reschedule */}
+            {canReschedule && (
+              <div
+                style={{
+                  background: "#dbeafe",
+                  border: "1.5px solid #bfdbfe",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
                 >
-                  {isRescheduling ? "Hide" : "Reschedule"}
-                </button>
-              </div>
-
-              {isRescheduling && (
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      Pickup Date
-                    </label>
-                    <input
-                      type="date"
-                      value={rescheduleForm.pickupDate}
-                      min={minPickupDate}
-                      max={maxPickupDate}
-                      onChange={(e) =>
-                        setRescheduleForm((prev) => ({
-                          ...prev,
-                          pickupDate: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      Pickup Time
-                    </label>
-                    <select
-                      value={rescheduleForm.pickupTime}
-                      onChange={(e) =>
-                        setRescheduleForm((prev) => {
-                          const nextPickupTime = e.target.value;
-                          const sameDay = prev.returnDate === prev.pickupDate;
-                          const invalidReturnTime =
-                            sameDay && prev.returnTime <= nextPickupTime;
-                          return {
-                            ...prev,
-                            pickupTime: nextPickupTime,
-                            returnTime: invalidReturnTime ? "" : prev.returnTime,
-                          };
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
+                    <p
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 800,
+                        color: "#1e40af",
+                        fontSize: 14,
+                      }}
                     >
-                      <option value="">Select time</option>
-                      {ALL_TIME_SLOTS.map((slot) => (
-                        <option key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      Return Date
-                    </label>
-                    <input
-                      type="date"
-                      value={rescheduleForm.returnDate}
-                      min={addDaysToDateInput(
-                        rescheduleForm.pickupDate || minPickupDate,
-                        1,
-                      )}
-                      max={maxReturnDate}
-                      onChange={(e) =>
-                        setRescheduleForm((prev) => ({
-                          ...prev,
-                          returnDate: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      Return Time
-                    </label>
-                    <select
-                      value={rescheduleForm.returnTime}
-                      onChange={(e) =>
-                        setRescheduleForm((prev) => ({
-                          ...prev,
-                          returnTime: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    >
-                      <option value="">Select time</option>
-                      {validReturnTimeSlots.map((slot) => (
-                        <option key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-2 bg-white border border-[#171717]/10 rounded-lg p-3">
-                    <p className="text-xs font-bold text-[#171717]/60 uppercase tracking-wider mb-2">
-                      Updated Price Preview
+                      Need to reschedule?
                     </p>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#171717]/60">
-                          ₱{dailyRate.toLocaleString()} × {rescheduledDays}d
-                        </span>
-                        <span className="font-semibold text-[#171717]">
-                          {formatPrice(dailyRate * rescheduledDays)}
-                        </span>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#3b82f6",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginTop: 2,
+                      }}
+                    >
+                      Update your schedule with a live price preview.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsRescheduling((p) => !p)}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: 9,
+                      background: "#fff",
+                      color: "#2563eb",
+                      border: "1.5px solid #bfdbfe",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      transition: "all 0.18s",
+                    }}
+                  >
+                    {isRescheduling ? "Hide" : "Reschedule"}
+                  </button>
+                </div>
+                {isRescheduling && (
+                  <div style={{ marginTop: 14 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(180px, 1fr))",
+                        gap: 10,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div>
+                        <label style={labelStyle}>Pickup Date</label>
+                        <input
+                          type="date"
+                          value={rescheduleForm.pickupDate}
+                          min={minPickupDate}
+                          max={maxPickupDate}
+                          onChange={(e) =>
+                            setRescheduleForm((p) => ({
+                              ...p,
+                              pickupDate: e.target.value,
+                            }))
+                          }
+                          style={inputStyle}
+                        />
                       </div>
-                      {booking.distanceFee > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#171717]/60">Distance Fee</span>
-                          <span className="font-semibold text-[#b50002]">
-                            +{formatPrice(booking.distanceFee)}
-                          </span>
-                        </div>
-                      )}
-                      {booking.helmetFee > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#171717]/60">Helmet Fee</span>
-                          <span className="font-semibold text-[#b50002]">
-                            +{formatPrice(booking.helmetFee)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="border-t border-[#171717]/15 pt-1 mt-1 flex items-center justify-between">
-                        <span className="font-bold text-[#171717]">Total</span>
-                        <span className="font-black text-[#171717]">
-                          {formatPrice(rescheduledGrossTotal)}
-                        </span>
+                      <div>
+                        <label style={labelStyle}>Pickup Time</label>
+                        <select
+                          value={rescheduleForm.pickupTime}
+                          onChange={(e) =>
+                            setRescheduleForm((p) => {
+                              const sameDay = p.returnDate === p.pickupDate;
+                              return {
+                                ...p,
+                                pickupTime: e.target.value,
+                                returnTime:
+                                  sameDay && p.returnTime <= e.target.value
+                                    ? ""
+                                    : p.returnTime,
+                              };
+                            })
+                          }
+                          style={selectStyle}
+                        >
+                          {ALL_TIME_SLOTS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#171717]/60">Downpayment (paid)</span>
-                        <span className="font-semibold text-green-600">
-                          -{formatPrice(downpayment)}
-                        </span>
+                      <div>
+                        <label style={labelStyle}>Return Date</label>
+                        <input
+                          type="date"
+                          value={rescheduleForm.returnDate}
+                          min={addDaysToDateInput(
+                            rescheduleForm.pickupDate || minPickupDate,
+                            1,
+                          )}
+                          max={maxReturnDate}
+                          onChange={(e) =>
+                            setRescheduleForm((p) => ({
+                              ...p,
+                              returnDate: e.target.value,
+                            }))
+                          }
+                          style={inputStyle}
+                        />
                       </div>
-                      <div className="border-t border-[#171717]/15 pt-1 mt-1 flex items-center justify-between">
-                        <span className="font-bold text-[#171717]">Due at Pickup</span>
-                        <span className="font-black text-[#b50002]">
+                      <div>
+                        <label style={labelStyle}>Return Time</label>
+                        <select
+                          value={rescheduleForm.returnTime}
+                          onChange={(e) =>
+                            setRescheduleForm((p) => ({
+                              ...p,
+                              returnTime: e.target.value,
+                            }))
+                          }
+                          style={selectStyle}
+                        >
+                          <option value="">Select time</option>
+                          {validReturnTimeSlots.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1.5px solid #bfdbfe",
+                        borderRadius: 10,
+                        padding: 14,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <p style={{ ...labelStyle, marginBottom: 10 }}>
+                        Updated Price Preview
+                      </p>
+                      {[
+                        [
+                          `₱${dailyRate.toLocaleString()} × ${rescheduledDays}d`,
+                          formatPrice(dailyRate * rescheduledDays),
+                        ],
+                        booking.distanceFee > 0 && [
+                          "Distance Fee",
+                          `+${formatPrice(booking.distanceFee)}`,
+                        ],
+                        booking.helmetFee > 0 && [
+                          "Helmet Fee",
+                          `+${formatPrice(booking.helmetFee)}`,
+                        ],
+                      ]
+                        .filter(Boolean)
+                        .map(([label, value]) => (
+                          <div
+                            key={label}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              marginBottom: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color: "rgba(14,14,14,0.45)",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {label}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#0E0E0E",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {value}
+                            </span>
+                          </div>
+                        ))}
+                      <div
+                        style={{
+                          borderTop: "1.5px solid rgba(0,0,0,0.06)",
+                          paddingTop: 8,
+                          marginTop: 6,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Due at Pickup
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 800,
+                            color: "#2563eb",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
                           {formatPrice(rescheduledDueAtPickup)}
                         </span>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="sm:col-span-2 flex items-center justify-end">
-                    <button
-                      onClick={submitReschedule}
-                      disabled={rescheduling}
-                      className="px-4 py-2 bg-[#b50002] text-white text-sm font-bold rounded-xl shadow-lg shadow-[#b50002]/30 hover:brightness-110 disabled:opacity-60"
+                    <div
+                      style={{ display: "flex", justifyContent: "flex-end" }}
                     >
-                      {rescheduling ? "Saving..." : "Save New Schedule"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canExtend && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-emerald-900">
-                    Extend your rental
-                  </p>
-                  <p className="text-xs text-emerald-800/80">
-                    Update the return schedule and see the new total instantly.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsExtending((prev) => !prev)}
-                  className="px-3 py-2 bg-[#171717] text-white text-xs sm:text-sm font-bold rounded-lg hover:brightness-110 transition-all"
-                >
-                  {isExtending ? "Hide" : "Extend"}
-                </button>
-              </div>
-
-              {isExtending && (
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2 bg-emerald-100/60 border border-emerald-200 rounded-lg p-3 text-xs">
-                    <p className="font-semibold text-emerald-900">Original Schedule</p>
-                    <div className="mt-1 text-emerald-900/80 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>
-                        Pickup: {formatDate(booking.dates.pickup)}
-                        {booking.times.pickup && ` · ${formatTime(booking.times.pickup)}`}
-                      </span>
-                      <span>
-                        Return: {formatDate(originalReturnDateFromExtension || booking.dates.return)}
-                        {(originalReturnTimeFromExtension || booking.times.return) &&
-                          ` · ${formatTime(originalReturnTimeFromExtension || booking.times.return)}`}
-                      </span>
+                      <button
+                        onClick={submitReschedule}
+                        disabled={rescheduling}
+                        style={{
+                          padding: "9px 20px",
+                          borderRadius: 10,
+                          background: "#2563eb",
+                          color: "#fff",
+                          border: "none",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          opacity: rescheduling ? 0.6 : 1,
+                          transition: "all 0.18s",
+                        }}
+                      >
+                        {rescheduling ? "Saving…" : "Save New Schedule"}
+                      </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      New Return Date
-                    </label>
-                    <input
-                      type="date"
-                      value={extensionForm.returnDate}
-                      min={originalReturnDateInput}
-                      max={formatDateInput(sixMonthsFromToday())}
-                      onChange={(e) =>
-                        setExtensionForm((prev) => ({
-                          ...prev,
-                          returnDate: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide block mb-1">
-                      New Return Time
-                    </label>
-                    <select
-                      value={extensionForm.returnTime}
-                      onChange={(e) =>
-                        setExtensionForm((prev) => ({
-                          ...prev,
-                          returnTime: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-[#171717]/15 bg-white text-sm"
-                    >
-                      <option value="">Select time</option>
-                      {ALL_TIME_SLOTS.map((slot) => (
-                        <option key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                )}
+              </div>
+            )}
 
-                  <div className="sm:col-span-2 bg-white border border-[#171717]/10 rounded-lg p-3">
-                    <p className="text-xs font-bold text-[#171717]/60 uppercase tracking-wider mb-2">
-                      Extension Price Preview
+            {/* Extension */}
+            {canExtend && (
+              <div
+                style={{
+                  background: "#dcfce7",
+                  border: "1.5px solid #bbf7d0",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 800,
+                        color: "#166534",
+                        fontSize: 14,
+                      }}
+                    >
+                      Extend your rental
                     </p>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#171717]/60">
-                          ₱{dailyRate.toLocaleString()} × {Math.max(extensionDays, 1)}d
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#16a34a",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginTop: 2,
+                      }}
+                    >
+                      Update return schedule and see new total instantly.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsExtending((p) => !p)}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: 9,
+                      background: "#fff",
+                      color: "#16a34a",
+                      border: "1.5px solid #bbf7d0",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      transition: "all 0.18s",
+                    }}
+                  >
+                    {isExtending ? "Hide" : "Extend"}
+                  </button>
+                </div>
+                {isExtending && (
+                  <div style={{ marginTop: 14 }}>
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1.5px solid #bbf7d0",
+                        borderRadius: 9,
+                        padding: 10,
+                        marginBottom: 12,
+                        fontSize: 12,
+                        color: "#166534",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ fontWeight: 800 }}>Current Return:</span>{" "}
+                      {formatDate(
+                        originalReturnDateFromExtension || booking.dates.return,
+                      )}
+                      {(originalReturnTimeFromExtension ||
+                        booking.times.return) &&
+                        ` · ${formatTime(originalReturnTimeFromExtension || booking.times.return)}`}
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(180px, 1fr))",
+                        gap: 10,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div>
+                        <label style={labelStyle}>New Return Date</label>
+                        <input
+                          type="date"
+                          value={extensionForm.returnDate}
+                          min={originalReturnDateInput}
+                          max={formatDateInput(sixMonthsFromToday())}
+                          onChange={(e) =>
+                            setExtensionForm((p) => ({
+                              ...p,
+                              returnDate: e.target.value,
+                            }))
+                          }
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>New Return Time</label>
+                        <select
+                          value={extensionForm.returnTime}
+                          onChange={(e) =>
+                            setExtensionForm((p) => ({
+                              ...p,
+                              returnTime: e.target.value,
+                            }))
+                          }
+                          style={selectStyle}
+                        >
+                          <option value="">Select time</option>
+                          {ALL_TIME_SLOTS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1.5px solid #bbf7d0",
+                        borderRadius: 10,
+                        padding: 14,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <p style={{ ...labelStyle, marginBottom: 10 }}>
+                        Extension Price Preview
+                      </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: "rgba(14,14,14,0.45)",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          ₱{dailyRate.toLocaleString()} ×{" "}
+                          {Math.max(extensionDays, 1)}d
                         </span>
-                        <span className="font-semibold text-[#171717]">
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
                           {formatPrice(dailyRate * Math.max(extensionDays, 1))}
                         </span>
                       </div>
-                      {booking.distanceFee > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#171717]/60">Distance Fee</span>
-                          <span className="font-semibold text-[#b50002]">
-                            +{formatPrice(booking.distanceFee)}
-                          </span>
-                        </div>
-                      )}
-                      {booking.helmetFee > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#171717]/60">Helmet Fee</span>
-                          <span className="font-semibold text-[#b50002]">
-                            +{formatPrice(booking.helmetFee)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="border-t border-[#171717]/15 pt-1 mt-1 flex items-center justify-between">
-                        <span className="font-bold text-[#171717]">Extension Total</span>
-                        <span className="font-black text-[#171717]">
-                          {formatPrice(extensionGrossTotal)}
+                      <div
+                        style={{
+                          borderTop: "1.5px solid rgba(0,0,0,0.06)",
+                          paddingTop: 8,
+                          marginTop: 6,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Additional Due
                         </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#171717]/60">Additional Due</span>
-                        <span className="font-semibold text-emerald-700">
+                        <span
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 800,
+                            color: "#16a34a",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
                           +{formatPrice(extensionAdditionalAmount)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-emerald-900/80 mt-1">
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(14,14,14,0.38)",
+                          marginTop: 6,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
                         Extension fee is paid upon return.
                       </p>
                     </div>
-                  </div>
-
-                  <div className="sm:col-span-2 flex items-center justify-end">
-                    <button
-                      onClick={submitExtension}
-                      disabled={extending}
-                      className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-600/30 hover:brightness-110 disabled:opacity-60"
+                    <div
+                      style={{ display: "flex", justifyContent: "flex-end" }}
                     >
-                      {extending ? "Saving..." : "Confirm Extension"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Footer bar */}
-          {booking.status === "completed" && !booking.isDeleted && (
-            <div className="bg-[#f8f8f8] rounded-xl border border-black/10 p-3 mt-3">
-              <p className="text-xs font-semibold text-[#171717]/70 uppercase tracking-wide mb-2">
-                Your Review Status
-              </p>
-              {reviewLoading ? (
-                <p className="text-sm text-[#171717]/60">Loading review details...</p>
-              ) : bookingReview ? (
-                <>
-                  <p className="text-sm text-[#171717]">
-                    Review status: <span className="font-bold capitalize">{bookingReview.status || "pending"}</span>
-                  </p>
-                  {bookingReview.adminReplyMessage ? (
-                    <div className="mt-2 bg-white rounded-lg border border-[#b50002]/20 p-3">
-                      <p className="text-xs font-semibold text-[#b50002] uppercase tracking-wide mb-1">
-                        Admin Reply
-                      </p>
-                      <p className="text-sm text-[#171717] leading-relaxed">{bookingReview.adminReplyMessage}</p>
-                      {bookingReview.adminRepliedAt && (
-                        <p className="text-xs text-[#171717]/50 mt-2">
-                          Replied on {formatDateTime(bookingReview.adminRepliedAt)}
-                        </p>
-                      )}
+                      <button
+                        onClick={submitExtension}
+                        disabled={extending}
+                        style={{
+                          padding: "9px 20px",
+                          borderRadius: 10,
+                          background: "#16a34a",
+                          color: "#fff",
+                          border: "none",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          opacity: extending ? 0.6 : 1,
+                          transition: "all 0.18s",
+                        }}
+                      >
+                        {extending ? "Saving…" : "Confirm Extension"}
+                      </button>
                     </div>
-                  ) : (
-                    <p className="text-xs text-[#171717]/55 mt-1">
-                      No admin reply yet.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-[#171717]/60">
-                  No review submitted yet.
-                </p>
-              )}
-            </div>
-          )}
+                  </div>
+                )}
+              </div>
+            )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Review Status */}
+            {booking.status === "completed" && !booking.isDeleted && (
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid rgba(0,0,0,0.07)",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "1.5px",
+                    textTransform: "uppercase",
+                    color: "rgba(14,14,14,0.35)",
+                    marginBottom: 10,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  Your Review
+                </p>
+                {reviewLoading ? (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(14,14,14,0.4)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Loading…
+                  </p>
+                ) : bookingReview ? (
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "rgba(14,14,14,0.6)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Status:{" "}
+                      <span
+                        style={{
+                          fontWeight: 800,
+                          color: "#0E0E0E",
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {bookingReview.status || "pending"}
+                      </span>
+                    </p>
+                    {bookingReview.adminReplyMessage && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          background: "#fff7ed",
+                          border: "1.5px solid #fed7aa",
+                          borderRadius: 10,
+                          padding: 12,
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#9a3412",
+                            letterSpacing: "1.5px",
+                            textTransform: "uppercase",
+                            marginBottom: 6,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Admin Reply
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            color: "#7c2d12",
+                            lineHeight: 1.6,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {bookingReview.adminReplyMessage}
+                        </p>
+                        {bookingReview.adminRepliedAt && (
+                          <p
+                            style={{
+                              fontSize: 11,
+                              color: "rgba(14,14,14,0.38)",
+                              marginTop: 6,
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Replied{" "}
+                            {formatDateTime(bookingReview.adminRepliedAt)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(14,14,14,0.4)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    No review submitted yet.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                paddingTop: 4,
+              }}
+            >
               <StatusBadge
                 status={booking.status}
                 isDeleted={booking.isDeleted}
               />
-              {[
-                "pending",
-                "pending_reservation",
-                "pending_full_payment",
-              ].includes(booking.status) && !booking.isDeleted && (
-                <button
-                  onClick={() => onCancel(booking.id)}
-                  className="sm:hidden px-3 py-1.5 rounded-lg bg-red-50 text-[#b50002] border border-[#b50002]/20
-                    hover:bg-red-100 transition-all text-xs font-semibold"
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  "pending",
+                  "pending_reservation",
+                  "pending_full_payment",
+                ].includes(booking.status) &&
+                  !booking.isDeleted && (
+                    <button
+                      onClick={() => onCancel(booking.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 16px",
+                        borderRadius: 9,
+                        background: "#fee2e2",
+                        color: "#b50002",
+                        border: "1.5px solid #fecaca",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        transition: "all 0.18s",
+                      }}
+                    >
+                      Cancel Booking
+                    </button>
+                  )}
+                {booking.status === "completed" && !booking.isDeleted && (
+                  <button
+                    onClick={() => {
+                      if (bookingReview) {
+                        setExpanded(true);
+                        return;
+                      }
+                      setShowReviewModal(true);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 16px",
+                      borderRadius: 9,
+                      background: "#fef3c7",
+                      color: "#92400e",
+                      border: "1.5px solid #fde68a",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      transition: "all 0.18s",
+                    }}
+                  >
+                    {bookingReview ? "View Review" : "⭐ Leave Review"}
+                  </button>
+                )}
+                <Link
+                  to="/motorcycles"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 16px",
+                    borderRadius: 9,
+                    background: "#0E0E0E",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    transition: "all 0.18s",
+                  }}
                 >
-                  Cancel Booking
-                </button>
-              )}
+                  <FaMotorcycle style={{ fontSize: 11 }} />
+                  {[
+                    "pending",
+                    "pending_reservation",
+                    "pending_full_payment",
+                    "active",
+                  ].includes(booking.status)
+                    ? "Browse More"
+                    : "Rent Again"}
+                  <FaArrowRight style={{ fontSize: 10 }} />
+                </Link>
+              </div>
             </div>
-            <Link
-              to="/motorcycles"
-              className="flex items-center gap-2 px-4 py-2 bg-[#171717] text-white text-sm font-bold rounded-xl
-                      shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
-              <FaMotorcycle className="text-xs" />
-              {[
-                "pending",
-                "pending_reservation",
-                "pending_full_payment",
-                "active",
-              ].includes(booking.status)
-                ? "View More"
-                : "Rent Again"}
-              <FaArrowRight className="text-xs" />
-            </Link>
-                      {booking.status === "completed" && !booking.isDeleted && (
-                        <button
-                          onClick={() => {
-                            if (bookingReview) {
-                              setExpanded(true);
-                              return;
-                            }
-                            setShowReviewModal(true);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#fbbf24] text-[#171717] text-sm font-bold rounded-xl
-                                  shadow-lg shadow-[#fbbf24]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                        >
-                          {bookingReview ? "View Review" : "⭐ Review"}
-                        </button>
-                      )}
           </div>
-        </div>
-      )}
-      
-    </div>
+        )}
+      </div>
 
-    {showReviewModal &&
-         createPortal(
-           <ReviewModal
-             booking={booking.raw}
-             onSuccess={fetchBookingReview}
-             onClose={() => setShowReviewModal(false)}
-           />,
-           document.body,
-         )}
+      {showReviewModal &&
+        createPortal(
+          <ReviewModal
+            booking={booking.raw}
+            onSuccess={fetchBookingReview}
+            onClose={() => setShowReviewModal(false)}
+          />,
+          document.body,
+        )}
     </>
   );
 };
@@ -1953,7 +2956,6 @@ const MyBookings = () => {
   const fetchBookings = useCallback(async () => {
     setError(null);
     if (!hasLoadedOnceRef.current) setLoading(true);
-
     if (requestAbortRef.current) {
       try {
         requestAbortRef.current.abort();
@@ -1961,26 +2963,19 @@ const MyBookings = () => {
     }
     const controller = new AbortController();
     requestAbortRef.current = controller;
-
     const token = localStorage.getItem("token");
     const headers = {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     };
-
     let lastErr = null;
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const response = await axios.get(
             `${API_BASE}/api/motorcycle-bookings/mybooking`,
-            {
-              headers,
-              signal: controller.signal,
-              timeout: TIMEOUT,
-            },
+            { headers, signal: controller.signal, timeout: TIMEOUT },
           );
-
           const rawData = Array.isArray(response.data)
             ? response.data
             : response.data?.data ||
@@ -1991,7 +2986,6 @@ const MyBookings = () => {
           const normalized = (Array.isArray(rawData) ? rawData : []).map(
             normalizeBooking,
           );
-
           if (!isMounted.current) return;
           setBookings(normalized);
           hasLoadedOnceRef.current = true;
@@ -2004,37 +2998,30 @@ const MyBookings = () => {
           const wasCancelled =
             err?.name === "CanceledError" || err?.message === "canceled";
           const wasTimeout = err?.code === "ECONNABORTED";
-
-          if (wasCancelled) {
-            // If this request was replaced by a newer one, suppress stale error.
-            if (controller.signal.aborted) return;
-          }
-
-          // Retry once for transient timeout/network spikes.
+          if (wasCancelled && controller.signal.aborted) return;
           if ((wasTimeout || wasCancelled) && attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 700));
+            await new Promise((r) => setTimeout(r, 700));
             continue;
           }
-
           throw err;
         }
       }
     } catch (err) {
       if (!isMounted.current) return;
-      if (err?.name === "CanceledError" || err?.message === "canceled") {
+      if (err?.name === "CanceledError" || err?.message === "canceled")
         setError("Request interrupted. Retrying may fix this.");
-      } else if (err?.code === "ECONNABORTED") {
+      else if (err?.code === "ECONNABORTED")
         setError("Loading is taking too long. Please try again.");
-      } else {
+      else
         setError(
           err.response?.data?.message ||
             lastErr?.message ||
             err.message ||
             "Failed to load bookings",
         );
-      }
     } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null;
+      if (requestAbortRef.current === controller)
+        requestAbortRef.current = null;
       if (isMounted.current) setLoading(false);
     }
   }, []);
@@ -2048,9 +3035,7 @@ const MyBookings = () => {
         setBookings(parsed.map(normalizeBooking));
         hasLoadedOnceRef.current = true;
       }
-    } catch {
-      // Ignore bad cache and fetch fresh data.
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -2063,6 +3048,7 @@ const MyBookings = () => {
       }
     };
   }, [fetchBookings]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
@@ -2109,17 +3095,11 @@ const MyBookings = () => {
       formData.append("paymentSentAt", payload.paymentSentAt);
       formData.append("paymentSentAmount", String(DOWNPAYMENT));
       formData.append("paymentProofImage", payload.paymentProofImage);
-
       const response = await axios.patch(
         `${API_BASE}/api/motorcycle-bookings/${bookingId}/reupload-proof`,
         formData,
-        {
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-        },
+        { headers: { ...(token && { Authorization: `Bearer ${token}` }) } },
       );
-
       const updated = normalizeBooking(
         response?.data?.booking || { _id: bookingId },
       );
@@ -2145,7 +3125,6 @@ const MyBookings = () => {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       };
-
       const response = await axios.put(
         `${API_BASE}/api/motorcycle-bookings/${bookingId}`,
         {
@@ -2157,7 +3136,6 @@ const MyBookings = () => {
         },
         { headers },
       );
-
       const updated = normalizeBooking(response?.data || { _id: bookingId });
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? updated : b)),
@@ -2179,16 +3157,11 @@ const MyBookings = () => {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       };
-
       const response = await axios.patch(
         `${API_BASE}/api/motorcycle-bookings/${bookingId}/extend`,
-        {
-          returnDate: payload.returnDate,
-          returnTime: payload.returnTime,
-        },
+        { returnDate: payload.returnDate, returnTime: payload.returnTime },
         { headers },
       );
-
       const updated = normalizeBooking(
         response?.data?.booking || response?.data || { _id: bookingId },
       );
@@ -2205,56 +3178,59 @@ const MyBookings = () => {
     }
   }, []);
 
-  const downloadRentalAgreement = useCallback(async (bookingId, customerName) => {
-    try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const downloadRentalAgreement = useCallback(
+    async (bookingId, customerName) => {
+      try {
+        const token = localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await axios.get(
+          `${API_BASE}/api/motorcycle-bookings/${bookingId}/rental-agreement`,
+          { headers, responseType: "blob" },
+        );
+        const blob = new Blob([response.data], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `RentalAgreement_${customerName?.replace(/\s+/g, "_") || "RentalAgreement"}.pdf`,
+        );
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        await alertModal("Rental agreement downloaded successfully.");
+      } catch (err) {
+        await alertModal(
+          err.response?.data?.message || "Failed to download rental agreement.",
+          { isError: true },
+        );
+      }
+    },
+    [],
+  );
 
-      const response = await axios.get(
-        `${API_BASE}/api/motorcycle-bookings/${bookingId}/rental-agreement`,
-        { headers, responseType: "blob" },
-      );
-
-      // Create blob and download
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const sanitizedName = customerName?.replace(/\s+/g, "_") || "RentalAgreement";
-      link.setAttribute("download", `RentalAgreement_${sanitizedName}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      await alertModal("Rental agreement downloaded successfully.");
-    } catch (err) {
-      console.error("Download error:", err);
-      await alertModal(
-        err.response?.data?.message || "Failed to download rental agreement.",
-        { isError: true },
-      );
-    }
-  }, []);
-
-  const tabCounts = useMemo(() => {
-    return STATUS_TABS.reduce((acc, tab) => {
-      acc[tab.key] =
-        tab.key === "rejected"
-          ? bookings.filter((b) => b.isDeleted).length
-          : bookings.filter((b) => !b.isDeleted && b.status === tab.key).length;
-      return acc;
-    }, {});
-  }, [bookings]);
+  const tabCounts = useMemo(
+    () =>
+      STATUS_TABS.reduce((acc, tab) => {
+        acc[tab.key] =
+          tab.key === "rejected"
+            ? bookings.filter((b) => b.isDeleted).length
+            : bookings.filter((b) => !b.isDeleted && b.status === tab.key)
+                .length;
+        return acc;
+      }, {}),
+    [bookings],
+  );
 
   const inspectionIssueCount = useMemo(
     () =>
       bookings.filter(
-        (booking) =>
-          !booking.isDeleted &&
-          booking.status === "inspection" &&
+        (b) =>
+          !b.isDeleted &&
+          b.status === "inspection" &&
           ["damage_found", "penalty_required"].includes(
-            booking.raw?.returnInspection?.clearanceStatus,
+            b.raw?.returnInspection?.clearanceStatus,
           ),
       ).length,
     [bookings],
@@ -2276,144 +3252,407 @@ const MyBookings = () => {
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  return (
-    <div className="min-h-screen bg-[#e8e8e8]">
-      <Navbar />
+  const activeTabConfig =
+    STATUS_TABS.find((t) => t.key === activeTab) || STATUS_TABS[0];
 
-      <div className="max-w-6xl mx-auto px-4 pt-32 pb-16">
-        <div ref={topRef} className="mt-10">
-          <div className="bg-[#f4f3f3] rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
-            {/* Panel header bar */}
-            <div className="bg-gradient-to-r from-[#171717] to-[#2a2a2a] px-6 py-4">
-              <h2 className="text-white font-black text-base tracking-tight">
-                Booking History
-              </h2>
-              <p className="text-white/50 text-xs mt-0.5">
-                View details, track status, and manage your rentals
-              </p>
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+
+        .mybookings-root * { box-sizing: border-box; }
+
+        .tab-full-label { display: inline; }
+        .tab-short-label { display: none; }
+        @media (max-width: 600px) {
+          .tab-full-label { display: none; }
+          .tab-short-label { display: inline; }
+        }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .booking-card-enter {
+          animation: fadeUp 0.3s ease forwards;
+        }
+
+        .booking-card:hover {
+          box-shadow: 0 8px 32px rgba(0,0,0,0.09);
+          border-color: rgba(0,0,0,0.13) !important;
+          transform: translateY(-1px);
+        }
+        .booking-card:hover .booking-thumb {
+          transform: scale(1.06);
+        }
+
+        .action-btn-cancel:hover {
+          background: #fecaca !important;
+          border-color: #fca5a5 !important;
+        }
+        .action-btn-icon:hover {
+          background: #bfdbfe !important;
+          transform: scale(1.08);
+        }
+        .action-btn-details:hover {
+          opacity: 0.85;
+        }
+      `}</style>
+
+      <div
+        className="mybookings-root"
+        style={{
+          minHeight: "100vh",
+          background: "#F5F5F3",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        <Navbar />
+
+        {/* Header */}
+        <div
+          style={{
+            paddingTop: 96,
+            background: "#fff",
+            borderBottom: "1.5px solid rgba(0,0,0,0.07)",
+          }}
+        >
+          <div
+            style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 0" }}
+          >
+            
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "space-between",
+                gap: 16,
+                marginBottom: 28,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 800,
+                    fontSize: "clamp(24px, 3.5vw, 38px)",
+                    color: "#0E0E0E",
+                    letterSpacing: "-1.5px",
+                    lineHeight: 1.1,
+                    margin: 0,
+                  }}
+                >
+                  Booking History
+                </h1>
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "rgba(14,14,14,0.45)",
+                    marginTop: 6,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  View details, track status, and manage your rentals
+                </p>
+              </div>
+              <div
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 999,
+                  background: activeTabConfig.bg,
+                  color: activeTabConfig.color,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  border: `1.5px solid ${activeTabConfig.color}30`,
+                }}
+              >
+                {filteredBookings.length} {activeTabConfig.label.toLowerCase()}{" "}
+                {filteredBookings.length === 1 ? "booking" : "bookings"}
+              </div>
             </div>
 
-            <div className="p-4 sm:p-6">
-              {/* Tabs */}
-              <div className="flex flex-wrap gap-2 mb-5 justify-center">
-                {STATUS_TABS.map((tab) => (
-                  <TabButton
-                    key={tab.key}
-                    tab={tab}
-                    isActive={activeTab === tab.key}
-                    count={tabCounts[tab.key] || 0}
-                    issueCount={tab.key === "inspection" ? inspectionIssueCount : 0}
-                    onClick={setActiveTab}
-                  />
-                ))}
-              </div>
-
-              {/* Result count */}
-              {!loading && !error && filteredBookings.length > 0 && (
-                <p className="text-sm text-[#171717]/60 mb-4">
-                  {filteredBookings.length} {activeTab} booking
-                  {filteredBookings.length !== 1 ? "s" : ""}
-                  {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
-                </p>
-              )}
-
-              {/* Loading */}
-              {loading && (
-                <div className="flex justify-center items-center py-20">
-                  <div className="flex items-center gap-3 text-[#171717]">
-                    <div className="w-5 h-5 border-2 border-[#b50002] border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm font-medium">
-                      Loading bookings…
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Error */}
-              {!loading && error && (
-                <div className="flex flex-col items-center justify-center py-16 gap-4">
-                  <FaExclamationTriangle className="text-[#b50002] text-3xl" />
-                  <p className="text-[#171717]/70 text-sm text-center">
-                    {error}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={fetchBookings}
-                    className="px-6 py-2.5 bg-[#171717] text-white text-sm font-bold rounded-xl
-                      shadow-lg shadow-black/20 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {/* Empty */}
-              {!loading && !error && filteredBookings.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                  <div className="w-16 h-16 bg-white/60 border border-[#171717]/10 rounded-2xl flex items-center justify-center shadow-sm">
-                    <FaMotorcycle className="text-[#b50002] text-2xl" />
-                  </div>
-                  <div>
-                    <h3 className="text-[#171717] font-bold text-base">
-                      No {activeTab} bookings
-                    </h3>
-                    <p className="text-[#171717]/50 text-sm mt-1">
-                      {activeTab === "pending"
-                        ? "You don't have any pending bookings."
-                        : activeTab === "pending_reservation"
-                          ? "You don't have any pending reservation requests."
-                          : activeTab === "pending_full_payment"
-                            ? "You don't have any pending full payment bookings."
-                        : activeTab === "active"
-                          ? "You don't have any active rentals."
-                          : activeTab === "completed"
-                            ? "You haven't completed any trips yet."
-                            : activeTab === "cancelled"
-                              ? "You don't have any cancelled bookings."
-                              : "No rejected bookings found."}
-                    </p>
-                  </div>
-                  <Link
-                    to="/motorcycles"
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#171717] text-white text-sm font-bold rounded-xl
-                      shadow-lg shadow-[#171717]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    <FaMotorcycle className="text-xs" /> Browse Motorcycles
-                  </Link>
-                </div>
-              )}
-
-              {/* Booking list */}
-              {!loading && !error && paginatedBookings.length > 0 && (
-                <div className="space-y-3">
-                  {paginatedBookings.map((booking) => (
-                    <BookingRow
-                      key={booking.id}
-                      booking={booking}
-                      onCancel={cancelBooking}
-                      onReupload={reuploadPaymentProof}
-                      onReschedule={rescheduleBooking}
-                      onExtend={extendBooking}
-                      onDownloadAgreement={downloadRentalAgreement}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Pagination */}
-              {!loading && !error && filteredBookings.length > 0 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredBookings.length}
-                  onPageChange={handlePageChange}
+            {/* Tab bar */}
+            <div
+              ref={topRef}
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                paddingBottom: 0,
+              }}
+            >
+              {STATUS_TABS.map((tab) => (
+                <TabButton
+                  key={tab.key}
+                  tab={tab}
+                  isActive={activeTab === tab.key}
+                  count={tabCounts[tab.key] || 0}
+                  issueCount={
+                    tab.key === "inspection" ? inspectionIssueCount : 0
+                  }
+                  onClick={(key) => {
+                    setActiveTab(key);
+                    setCurrentPage(1);
+                  }}
                 />
-              )}
+              ))}
+            </div>
+
+            {/* Active indicator line */}
+            <div
+              style={{
+                height: 2.5,
+                background: "rgba(0,0,0,0.05)",
+                marginTop: 16,
+                position: "relative",
+                borderRadius: 2,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  width: "30%",
+                  height: "100%",
+                  background: `linear-gradient(90deg, ${activeTabConfig.color}, transparent)`,
+                  transition: "all 0.3s",
+                  borderRadius: 2,
+                  opacity: 0.6,
+                }}
+              />
             </div>
           </div>
         </div>
+
+        {/* Content */}
+        <div
+          style={{
+            maxWidth: 1100,
+            margin: "0 auto",
+            padding: "28px 24px 64px",
+          }}
+        >
+          {/* Loading */}
+          {loading && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "80px 20px",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  border: "2.5px solid rgba(0,0,0,0.08)",
+                  borderTopColor: "#b50002",
+                  borderRadius: "50%",
+                  animation: "spin 0.7s linear infinite",
+                }}
+              />
+              <span
+                style={{
+                  color: "rgba(14,14,14,0.45)",
+                  fontSize: 14,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Loading your bookings…
+              </span>
+            </div>
+          )}
+
+          {/* Error */}
+          {!loading && error && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "80px 20px",
+                gap: 16,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  background: "#fee2e2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <FaExclamationTriangle
+                  style={{ color: "#b50002", fontSize: 20 }}
+                />
+              </div>
+              <p
+                style={{
+                  color: "rgba(14,14,14,0.5)",
+                  fontSize: 14,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  maxWidth: 320,
+                }}
+              >
+                {error}
+              </p>
+              <button
+                onClick={fetchBookings}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 10,
+                  background: "#0E0E0E",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  transition: "all 0.18s",
+                }}
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Empty */}
+          {!loading && !error && filteredBookings.length === 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "80px 20px",
+                gap: 16,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: 20,
+                  background: "#fff",
+                  border: "1.5px solid rgba(0,0,0,0.08)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                }}
+              >
+                <FaMotorcycle
+                  style={{ color: "rgba(14,14,14,0.2)", fontSize: 28 }}
+                />
+              </div>
+              <div>
+                <h3
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 18,
+                    color: "#0E0E0E",
+                    marginBottom: 6,
+                    letterSpacing: "-0.5px",
+                  }}
+                >
+                  No {activeTabConfig.label.toLowerCase()} bookings
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(14,14,14,0.4)",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {activeTab === "pending_reservation"
+                    ? "You don't have any pending reservation requests."
+                    : activeTab === "pending_full_payment"
+                      ? "No bookings awaiting full payment."
+                      : activeTab === "active"
+                        ? "You don't have any active rentals."
+                        : activeTab === "completed"
+                          ? "You haven't completed any trips yet."
+                          : activeTab === "cancelled"
+                            ? "No cancelled bookings."
+                            : activeTab === "rejected"
+                              ? "No rejected bookings."
+                              : `No ${activeTabConfig.label.toLowerCase()} bookings found.`}
+                </p>
+              </div>
+              <Link
+                to="/motorcycles"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 22px",
+                  borderRadius: 10,
+                  background: "#b50002",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  boxShadow: "0 4px 16px rgba(181,0,2,0.2)",
+                  transition: "all 0.18s",
+                }}
+              >
+                <FaMotorcycle style={{ fontSize: 12 }} /> Browse Motorcycles{" "}
+                <FaArrowRight style={{ fontSize: 10 }} />
+              </Link>
+            </div>
+          )}
+
+          {/* Booking list */}
+          {!loading && !error && paginatedBookings.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {paginatedBookings.map((booking, idx) => (
+                <div
+                  key={booking.id}
+                  className="booking-card-enter"
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                >
+                  <BookingRow
+                    booking={booking}
+                    onCancel={cancelBooking}
+                    onReupload={reuploadPaymentProof}
+                    onReschedule={rescheduleBooking}
+                    onExtend={extendBooking}
+                    onDownloadAgreement={downloadRentalAgreement}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading && !error && filteredBookings.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredBookings.length}
+              onPageChange={handlePageChange}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

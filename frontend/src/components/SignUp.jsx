@@ -14,13 +14,12 @@ import {
   FaCheckCircle,
   FaIdCard,
   FaChevronRight,
-  FaShieldAlt,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import axios from "axios";
-import bgImage from "../assets/bgImage2.jpg";
+// import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
 import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 

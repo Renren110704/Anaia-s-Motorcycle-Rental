@@ -16,11 +16,11 @@ import {
   FaSort,
   FaCalendarAlt,
   FaTools,
-  FaCheckCircle,
+  // FaCheckCircle,
 } from "react-icons/fa";
 import {
-  Wrench,
-  Bike,
+  // Wrench,
+  // Bike,
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
@@ -545,7 +545,7 @@ const MotorcycleCard = ({
   onReschedule,
   updating,
 }) => {
-  const isMaintenance = m.status === "maintenance";
+  // const isMaintenance = m.status === "maintenance";
   const isUpdating = updating === (m._id ?? m.id);
 
   return (
@@ -699,7 +699,7 @@ const MotorcycleTable = ({
           </thead>
           <tbody className="divide-y divide-slate-50">
             {motorcycles.map((m) => {
-              const isMaintenance = m.status === "maintenance";
+              // const isMaintenance = m.status === "maintenance";
               const isUpdating = updating === (m._id ?? m.id);
               return (
                 <tr

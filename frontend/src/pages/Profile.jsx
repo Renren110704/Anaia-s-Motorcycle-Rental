@@ -16,7 +16,6 @@ import {
   FaShieldAlt,
   FaKey,
   FaCalendarAlt,
-  FaMotorcycle,
 } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
@@ -730,40 +729,40 @@ const Profile = () => {
     .join("")
     .toUpperCase();
 
-  const primaryBtn = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: "11px 20px",
-    borderRadius: 12,
-    border: "none",
-    background: "#b50002",
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 700,
-    fontFamily: "'Space Grotesk', sans-serif",
-    cursor: "pointer",
-    transition: "background 0.18s, transform 0.15s",
-    width: "100%",
-  };
-  const secondaryBtn = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: "11px 20px",
-    borderRadius: 12,
-    border: "1.5px solid rgba(0,0,0,0.1)",
-    background: "#fff",
-    color: "#0E0E0E",
-    fontSize: 13,
-    fontWeight: 700,
-    fontFamily: "'Space Grotesk', sans-serif",
-    cursor: "pointer",
-    transition: "all 0.18s",
-    width: "100%",
-  };
+  // const primaryBtn = {
+  //   display: "flex",
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  //   gap: 8,
+  //   padding: "11px 20px",
+  //   borderRadius: 12,
+  //   border: "none",
+  //   background: "#b50002",
+  //   color: "#fff",
+  //   fontSize: 13,
+  //   fontWeight: 700,
+  //   fontFamily: "'Space Grotesk', sans-serif",
+  //   cursor: "pointer",
+  //   transition: "background 0.18s, transform 0.15s",
+  //   width: "100%",
+  // };
+  // const secondaryBtn = {
+  //   display: "flex",
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  //   gap: 8,
+  //   padding: "11px 20px",
+  //   borderRadius: 12,
+  //   border: "1.5px solid rgba(0,0,0,0.1)",
+  //   background: "#fff",
+  //   color: "#0E0E0E",
+  //   fontSize: 13,
+  //   fontWeight: 700,
+  //   fontFamily: "'Space Grotesk', sans-serif",
+  //   cursor: "pointer",
+  //   transition: "all 0.18s",
+  //   width: "100%",
+  // };
 
   if (loading) {
     return (

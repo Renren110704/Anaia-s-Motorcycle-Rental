@@ -11,12 +11,11 @@ import {
   FaMapMarkerAlt,
   FaIdCard,
   FaKey,
-  FaChevronRight,
 } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import axios from "axios";
-import bgImage from "../assets/bgImage2.jpg";
+// import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
 import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
 
@@ -386,17 +385,17 @@ const ForgotPassword = () => {
     }
   };
 
-  const resendBtnStyle = (canResend) => ({
-    fontSize: 12,
-    fontWeight: 600,
-    fontFamily: "'Space Grotesk', sans-serif",
-    background: "none",
-    border: "none",
-    padding: 0,
-    cursor: canResend ? "pointer" : "not-allowed",
-    color: canResend ? "#b50002" : "rgba(0,0,0,0.3)",
-    textAlign: "left",
-  });
+  // const resendBtnStyle = (canResend) => ({
+  //   fontSize: 12,
+  //   fontWeight: 600,
+  //   fontFamily: "'Space Grotesk', sans-serif",
+  //   background: "none",
+  //   border: "none",
+  //   padding: 0,
+  //   cursor: canResend ? "pointer" : "not-allowed",
+  //   color: canResend ? "#b50002" : "rgba(0,0,0,0.3)",
+  //   textAlign: "left",
+  // });
 
   const BG_URL = "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
   // const BG_URL = typeof bgImage === "string" ? bgImage : "";

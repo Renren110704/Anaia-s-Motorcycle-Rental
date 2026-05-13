@@ -1905,7 +1905,7 @@ const MotorcycleDetail = () => {
 
   // Calendar data state
   const [calBookings, setCalBookings] = useState([]);
-  const [calMotorcycles, setCalMotorcycles] = useState([]);
+  // const [calMotorcycles, setCalMotorcycles] = useState([]);
   const [maintenanceRanges, setMaintenanceRanges] = useState([]);
 
   const initialPickupSlots = getAvailablePickupSlots(todayISO());
@@ -3054,16 +3054,16 @@ const MotorcycleDetail = () => {
                 const s = new Date(rawStart),
                   e = new Date(rawEnd);
                 if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
-                const sl = s.toLocaleDateString("en-PH", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-                const el = e.toLocaleDateString("en-PH", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
+                // const sl = s.toLocaleDateString("en-PH", {
+                //   month: "short",
+                //   day: "numeric",
+                //   year: "numeric",
+                // });
+                // const el = e.toLocaleDateString("en-PH", {
+                //   month: "short",
+                //   day: "numeric",
+                //   year: "numeric",
+                // });
                 // return (
                 //   <div
                 //     style={{

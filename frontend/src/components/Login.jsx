@@ -124,7 +124,7 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
     <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
       {digits.map((digit, idx) => {
         const filled = digit && digit !== " ";
-        const isFocused = false; // controlled via CSS :focus
+        // const isFocused = false; 
         return (
           <input
             key={idx}
@@ -543,22 +543,22 @@ const Login = () => {
     }
   };
 
-  const submitBtn = (label, loadingLabel, color = "#0E0E0E") => ({
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "11px 24px",
-    borderRadius: 12,
-    border: "none",
-    background: color,
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 700,
-    fontFamily: "'Space Grotesk', sans-serif",
-    cursor: loading ? "not-allowed" : "pointer",
-    opacity: loading ? 0.6 : 1,
-    transition: "all 0.18s",
-  });
+  // const submitBtn = (label, loadingLabel, color = "#0E0E0E") => ({
+  //   display: "flex",
+  //   alignItems: "center",
+  //   gap: 8,
+  //   padding: "11px 24px",
+  //   borderRadius: 12,
+  //   border: "none",
+  //   background: color,
+  //   color: "#fff",
+  //   fontSize: 13,
+  //   fontWeight: 700,
+  //   fontFamily: "'Space Grotesk', sans-serif",
+  //   cursor: loading ? "not-allowed" : "pointer",
+  //   opacity: loading ? 0.6 : 1,
+  //   transition: "all 0.18s",
+  // });
 
   const resendBtnStyle = (canResend) => ({
     fontSize: 12,

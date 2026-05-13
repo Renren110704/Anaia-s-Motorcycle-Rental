@@ -936,7 +936,7 @@ const DetailDrawer = ({
           )}
 
           {/* Motorcycle */}
-          <Section title="Motorcycle">
+          <Section title="Unit Details">
             <div className="flex items-center gap-4 mb-4">
               {booking.motorcycleImage && (
                 <div className="w-20 h-14 flex-shrink-0 rounded-xl overflow-hidden bg-slate-50 border border-slate-100">
@@ -1137,7 +1137,7 @@ const BookingTable = ({
 }) => {
   const cols = [
     { label: "Customer", key: "customer", sortable: true },
-    { label: "Motorcycle", key: "motorcycle", sortable: true },
+    { label: "Unit", key: "motorcycle", sortable: true },
     { label: "Pickup", key: "pickupDate", sortable: true },
     { label: "Return", key: "returnDate", sortable: true },
     { label: "Booked", key: "bookingDate", sortable: true },
@@ -1923,7 +1923,7 @@ const MotorcycleBooking = () => {
             <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
             <input
               type="text"
-              placeholder="Search by customer, motorcycle, unit ID, or email..."
+              placeholder="Search by customer, unit name, unit ID, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"

@@ -643,7 +643,7 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
             )}
           </Section>
 
-          <Section id="specs" title="Motorcycle Specs" icon={FaMotorcycle}>
+          <Section id="specs" title="Specifications" icon={FaMotorcycle}>
             <Row
               label="Make / Model"
               value={`${motorcycle.make} ${motorcycle.model}`}
@@ -1076,7 +1076,7 @@ const MotorcycleTracking = () => {
               GPS Tracking
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              Live motorcycle tracking · refreshes every 30 seconds
+              Live tracking · refreshes every 30 seconds
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1189,7 +1189,7 @@ const MotorcycleTracking = () => {
                     <FaMotorcycle className="text-slate-200 text-2xl" />
                   </div>
                   <p className="font-black text-[#171717] text-sm mb-1">
-                    No active motorcycles
+                    No active units
                   </p>
                   <p className="text-[11px] text-slate-400">
                     Only units with active bookings are tracked

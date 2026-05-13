@@ -139,8 +139,8 @@ const MaintenanceAlertBanner = ({ maintenanceItems, selectedDate }) => {
         <div>
           <p className="text-[13px] font-black text-violet-700">
             {count === 1
-              ? "1 motorcycle under maintenance"
-              : `${count} motorcycles under maintenance`}
+              ? "1 unit under maintenance"
+              : `${count} units under maintenance`}
           </p>
           <p className="text-[11px] text-violet-500 mt-0.5 leading-relaxed">
             <strong>{names}</strong> {count === 1 ? "is" : "are"} unavailable
@@ -170,7 +170,7 @@ const BufferDayAlertBanner = ({ bufferedItems }) => {
         <div>
           <p className="text-[13px] font-black text-amber-700">
             Last return date for{" "}
-            {count === 1 ? "1 motorcycle" : `${count} motorcycles`}
+            {count === 1 ? "1 unit" : `${count} units`}
           </p>
           <p className="text-[11px] text-amber-600 mt-0.5 leading-relaxed">
             <strong>{names}</strong> {count === 1 ? "has" : "have"} maintenance

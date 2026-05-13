@@ -11,8 +11,7 @@ const MY_BOOKINGS_ENDPOINT = "/api/motorcycle-bookings/mybooking";
 
 const navLinks = [
   { to: "/", label: "Home" },
-  { to: "/motorcycles", label: "Motorcycles" },
-  { to: "/calendar", label: "Calendar" },
+  { to: "/motorcycles", label: "Vehicles" },
   { to: "/contact", label: "Contact" },
   { to: "/bookings", label: "Bookings" },
 ];

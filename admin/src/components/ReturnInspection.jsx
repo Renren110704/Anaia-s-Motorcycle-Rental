@@ -563,7 +563,7 @@ const ReturnInspection = () => {
                     <tr className="border-b border-slate-50">
                       {[
                         "Customer",
-                        "Motorcycle",
+                        "Unit",
                         "Return Date",
                         "Clearance",
                         "Actions",
@@ -762,7 +762,7 @@ const ReturnInspection = () => {
                     )}
                     {clearanceStatus === "pending_inspection" && (
                       <p className="text-[11px] text-violet-600 mt-2 font-semibold bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100">
-                        ⏳ Motorcycle temporarily unavailable for inspection
+                        ⏳ Unit temporarily unavailable for inspection
                       </p>
                     )}
                   </PanelSection>
@@ -945,7 +945,7 @@ const ReturnInspection = () => {
                 {[
                   {
                     status: "pending_inspection",
-                    desc: "Under review, motorcycle held",
+                    desc: "Under review, unit held",
                   },
                   { status: "cleared", desc: "No issues, unit released" },
                   {

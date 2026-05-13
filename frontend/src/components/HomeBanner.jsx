@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import img1 from "../assets/scooter.png";
-import img2 from "../assets/naked.png";
+import img2 from "../assets/car.png";
 import img3 from "../assets/underbone.png";
 import hondaLogo from "../assets/logos/honda.svg";
 import yamahaLogo from "../assets/logos/yamaha.svg";
 import suzukiLogo from "../assets/logos/suzuki.svg";
 import kawasakiLogo from "../assets/logos/kawasaki.svg";
+import toyotaLogo from "../assets/logos/toyota.svg";
+import nissanLogo from "../assets/logos/nissan.svg";
 
 // ─── Map each tab to its own motorcycle image ───────────────────────
 // Replace img1 with the actual imports once you add the image files.
 const TAB_IMAGES = {
   Scooter: img1,
-  Naked: img2, // replace with img2
+  Car: img2, // replace with img2
   Underbone: img3, // replace with img3
 };
 
@@ -22,9 +24,11 @@ const BrandLogos = {
   Kawasaki: (
     <img src={kawasakiLogo} alt="Kawasaki" className="h-4 object-contain" />
   ),
+  Toyota: <img src={toyotaLogo} alt="Toyota" className="h-6 object-contain" />,
+  Nissan: <img src={nissanLogo} alt="Nissan" className="h-5 object-contain" />,
 };
 
-const BRAND_ITEMS = ["Yamaha", "Honda", "Suzuki", "Kawasaki"];
+const BRAND_ITEMS = ["Yamaha", "Honda", "Suzuki", "Kawasaki", "Toyota", "Nissan"];
 
 function BrandMarquee() {
   const items = [...BRAND_ITEMS, ...BRAND_ITEMS];
@@ -79,7 +83,7 @@ function BrandMarquee() {
   );
 }
 
-const TABS = ["Scooter", "Naked", "Underbone"];
+const TABS = ["Scooter", "Car", "Underbone"];
 const AUTO_INTERVAL = 3500;
 
 export default function HeroBanner() {
@@ -533,7 +537,7 @@ export default function HeroBanner() {
           <div className="hb-content">
             <div className={`hb-eyebrow ${mounted ? "in" : ""}`}>
               <span className="hb-eyebrow-line" />
-              Motorcycle Rental
+              Vehicle Rental
             </div>
 
             <h1 className={`hb-h1 ${mounted ? "in" : ""}`}>
@@ -545,8 +549,9 @@ export default function HeroBanner() {
             </h1>
 
             <p className={`hb-desc ${mounted ? "in" : ""}`}>
-              Choose from scooter, naked, or underbone motorcycles built for
-              thrill and adventure. Your journey begins here.
+              Choose from scooter, bigbike and underbone motorcycles, as well as pickup,
+              sedan, MPV, and SUV cars built for thrill, comfort, and adventure.
+              Your journey begins here.
             </p>
 
             {/* Search card */}
@@ -605,6 +610,11 @@ export default function HeroBanner() {
               <div className="hb-stat">
                 <span className="hb-stat-num">30+</span>
                 <span className="hb-stat-label">Motorcycles</span>
+              </div>
+              <div className="hb-stat-sep" />
+              <div className="hb-stat">
+                <span className="hb-stat-num">3+</span>
+                <span className="hb-stat-label">Car Models</span>
               </div>
               <div className="hb-stat-sep" />
               <div className="hb-stat">

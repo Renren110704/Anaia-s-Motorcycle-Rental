@@ -24,19 +24,19 @@ function useScrollReveal(options = {}) {
 
 const FAQS = [
   {
-    question: "How do I book a motorcycle?",
+    question: "How do I book a vehicle?",
     answer:
-      "Browse our available motorcycles, pick your preferred unit, select your pickup and return dates, then click 'Rent Now'. You'll be guided through uploading a proof of payment to complete your booking.",
+      "Browse our available vehicles, pick your preferred unit, select your pickup and return dates, then click 'Rent Now'. You'll be guided through uploading a proof of payment to complete your booking.",
   },
   {
-    question: "What documents do I need to rent a motorcycle?",
+    question: "What documents do I need to rent a unit?",
     answer:
-      "You'll need a valid government-issued ID (UMID, SSS, PhilHealth, Passport, or Driver's License) and proof of payment. A motorcycle driver's license is required",
+      "You'll need a valid government-issued ID (UMID, SSS, PhilHealth, Passport, or Driver's License) and proof of payment. A driver's license is required",
   },
   {
     question: "How does payment work?",
     answer:
-      "We accept GCash, Maya, and bank transfer. After selecting your motorcycle and dates, you'll upload your proof of payment for verification. Bookings are confirmed once payment is approved by our team.",
+      "We accept GCash, Maya, and bank transfer. After selecting your vehicle and dates, you'll upload your proof of payment for verification. Bookings are confirmed once payment is approved by our team.",
   },
   {
     question: "How can we get the unit? do you deliver it or accept meet-ups?",
@@ -44,14 +44,14 @@ const FAQS = [
       "Our policy is straightforward: Units are strictly pick-up and return at our place. Need directions? No problem! Just request a Google Maps link from our admin to easily locate us: Soldier's Hills IV, Molino VI, Bacoor, Cavite",
   },
   {
-    question: "Do you provide a helmet when we rent?",
+    question: "Do you provide a helmet for motorcycles when we rent?",
     answer:
       "Absolutely! We offer one free helmet with each rental. Need an extra for your backride? Just add 100 pesos! While we've got you covered, we also encourage you to bring your own helmet for your safety and convenience. Please note: Our helmets are for public use, and due to hectic rental schedules, we can't wash them daily. However, rest assured that we sanitize them before handing them over to the next renter!",
   },
   {
-    question: "Are there fuel limits?",
+    question: "Are there fuel or mileage limits?",
     answer:
-      "We only ask that you return the motorcycle with the same fuel level as when you picked it up.",
+      "Good news — we offer unlimited fuel usage and unlimited mileage during your rental period! You can enjoy your trip without worrying about fuel or distance restrictions. We only ask that you return the motorcycle with the same fuel level as when you picked it up.",
   },
   {
     question: "Can I extend my rental period?",
@@ -357,8 +357,8 @@ export default function FAQPage() {
           {/* ── Right: accordion ── */}
           <div className="faq-right">
             <p className="faq-sub">
-              Common questions about renting motorcycles at Anaia's — answered
-              quickly so you can get on the road faster.
+              Common questions about renting at Anaia's — answered quickly so
+              you can get on the road faster.
             </p>
 
             <div ref={listRef} className="faq-list">

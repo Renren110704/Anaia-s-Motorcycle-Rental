@@ -625,7 +625,7 @@ const MotorcycleCard = ({
           </button>
         </div>
 
-        <div className="pt-3 border-t border-slate-50">
+        {/* <div className="pt-3 border-t border-slate-50">
           {isMaintenance ? (
             <button
               onClick={() => onSetAvailable(m._id ?? m.id)}
@@ -645,7 +645,7 @@ const MotorcycleCard = ({
               {isUpdating ? "Updating..." : "Set to Maintenance"}
             </button>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );
@@ -663,12 +663,12 @@ const MotorcycleTable = ({
 }) => {
   const cols = [
     { label: "Unit", key: "unitId", sortable: true },
-    { label: "Motorcycle", key: "make", sortable: true },
+    { label: "Vehicle", key: "make", sortable: true },
     { label: "Year", key: "year", sortable: true },
     { label: "Engine", key: "engineSize", sortable: true },
     { label: "Rate/Day", key: "dailyRate", sortable: true },
     { label: "Next Maintenance", key: "maintenanceScheduleAt", sortable: true },
-    { label: "Status", key: null, sortable: false },
+    // { label: "Status", key: null, sortable: false },
     { label: "Action", key: null, sortable: false },
   ];
 
@@ -761,9 +761,9 @@ const MotorcycleTable = ({
                       )}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
+                  {/* <td className="px-5 py-3.5">
                     <StatusBadge status={m.status} />
-                  </td>
+                  </td> */}
                   <td className="px-5 py-3.5">
                     <div className="flex flex-col gap-2">
                       <button
@@ -774,7 +774,7 @@ const MotorcycleTable = ({
                         <FaCalendarAlt className="text-xs" />
                         Reschedule
                       </button>
-                      {isMaintenance ? (
+                      {/* {isMaintenance ? (
                         <button
                           onClick={() => onSetAvailable(m._id ?? m.id)}
                           disabled={isUpdating}
@@ -792,7 +792,7 @@ const MotorcycleTable = ({
                           <Wrench className="w-3 h-3" />
                           {isUpdating ? "Updating..." : "Set Maintenance"}
                         </button>
-                      )}
+                      )} */}
                     </div>
                   </td>
                 </tr>
@@ -812,7 +812,7 @@ const EmptyState = ({ onReset }) => (
       <FaTools className="text-slate-200 text-3xl" />
     </div>
     <h3 className="font-black text-[#171717] text-lg mb-1">
-      No motorcycles found
+      No units found
     </h3>
     <p className="text-slate-400 text-sm mb-4">
       Try adjusting your filters or search term
@@ -1074,13 +1074,13 @@ const MaintenancePage = () => {
           <StatCard
             label="Total Units"
             value={counts.all}
-            sub="Available + maintenance"
+            sub=""
             subColor="text-slate-400"
             icon={ClipboardList}
             accent="bg-slate-400"
             loading={loading}
           />
-          <StatCard
+          {/* <StatCard
             label="Available"
             value={counts.available}
             sub="Ready to rent"
@@ -1088,8 +1088,8 @@ const MaintenancePage = () => {
             icon={Bike}
             accent="bg-emerald-500"
             loading={loading}
-          />
-          <StatCard
+          /> */}
+          {/* <StatCard
             label="In Maintenance"
             value={counts.maintenance}
             sub={counts.maintenance > 0 ? "Needs attention" : "All clear"}
@@ -1099,19 +1099,19 @@ const MaintenancePage = () => {
             icon={Wrench}
             accent="bg-amber-500"
             loading={loading}
-          />
+          /> */}
         </div>
 
         {/* Status Tab Filter */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {[
             { key: "all", label: "All Units", count: counts.all },
-            { key: "available", label: "Available", count: counts.available },
-            {
-              key: "maintenance",
-              label: "In Maintenance",
-              count: counts.maintenance,
-            },
+            // { key: "available", label: "Available", count: counts.available },
+            // {
+            //   key: "maintenance",
+            //   label: "In Maintenance",
+            //   count: counts.maintenance,
+            // },
           ].map((tab) => (
             <button
               key={tab.key}

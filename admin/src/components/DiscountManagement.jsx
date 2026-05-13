@@ -76,14 +76,13 @@ const DISCOUNT_TYPES = [
 ];
 
 const VEHICLE_CATEGORIES = [
-  "Sport",
-  "Naked",
   "Scooter",
-  "Adventure",
-  "Cruiser",
+  "Big Bike",
   "Underbone",
-  "Moped",
-  "Touring",
+  "Pickup",
+  "Sedan",
+  "MPV",
+  "SUV",
 ];
 
 const MIN_DURATION_OPTIONS = [
@@ -552,7 +551,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
               <div className="mt-2 max-h-40 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-3 bg-slate-50">
                 {motorcycles.length === 0 ? (
                   <p className="text-xs text-slate-400 text-center py-2">
-                    No motorcycles found
+                    No units found
                   </p>
                 ) : (
                   motorcycles.map((m) => {

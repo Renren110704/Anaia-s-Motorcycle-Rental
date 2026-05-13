@@ -75,8 +75,12 @@ const CATEGORY_TABS = [
   "All",
   "New",
   "Scooters",
-  "Naked",
+  "Big Bikes",
   "Underbone",
+  "Pickup",
+  "Sedan",
+  "MPV",
+  "SUV",
   "Top Rated",
 ];
 const BASE = "https://anaias-motorcycle-rental.onrender.com";
@@ -190,16 +194,31 @@ const HomeMotorcycles = () => {
   }, [fetchMotorcycles]);
 
   /* filter by tab */
+  /* filter by tab */
   const displayed = motorcycles.filter((m) => {
     if (activeTab === "All") return true;
-    if (activeTab === "New")
+
+    if (activeTab === "New") {
       return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
-    if (activeTab === "Top Rated") return (m.rating ?? 0) >= 4.5;
+    }
+
+    if (activeTab === "Top Rated") {
+      return (m.rating ?? 0) >= 4.5;
+    }
+
     const cat = (m.category || "").toLowerCase();
     const tab = activeTab.toLowerCase();
+
     if (tab === "scooters") return cat.includes("scooter");
-    if (tab === "naked") return cat.includes("naked");
+    if (tab === "big bikes") return cat.includes("big bike");
     if (tab === "underbone") return cat.includes("underbone");
+
+    // NEW VEHICLE CATEGORY FILTERS
+    if (tab === "pickup") return cat.includes("pickup");
+    if (tab === "sedan") return cat.includes("sedan");
+    if (tab === "mpv") return cat.includes("mpv");
+    if (tab === "suv") return cat.includes("suv");
+
     return true;
   });
 
@@ -598,7 +617,7 @@ const HomeMotorcycles = () => {
           ref={headerRef}
           className={`hm-header hm-reveal ${headerVisible ? "visible" : ""}`}
         >
-          <h2 className="hm-title">Featured Motorcycles</h2>
+          <h2 className="hm-title">Featured Vehicles</h2>
           <a href="/motorcycles" className="hm-viewall">
             View all <ArrowRight size={13} />
           </a>
@@ -685,7 +704,7 @@ const HomeMotorcycles = () => {
           {/* Empty */}
           {!loading && !error && displayed.length === 0 && (
             <div className="hm-empty">
-              No motorcycles found for this category.
+              No vehicles found for this category.
             </div>
           )}
 

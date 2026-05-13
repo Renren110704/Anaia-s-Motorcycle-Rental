@@ -22,6 +22,8 @@ import {
   CreditCard,
   BarChart3,
 } from "lucide-react";
+import ExportCSVModal from "./ExportCSVModal"; 
+import PrintReportModal from "./PrintReportModal";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
@@ -288,6 +290,10 @@ const AdminAnalytics = () => {
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ── Modal state ─────────────────────────────────────────────────────────────
+  const [csvModalOpen, setCsvModalOpen] = useState(false); // ← added
+  const [printModalOpen, setPrintModalOpen] = useState(false); // ← added
 
   const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
@@ -589,34 +595,6 @@ const AdminAnalytics = () => {
       .slice(0, 5);
   }, [filteredBookings]);
 
-  const exportCSV = useCallback(() => {
-    const lines = [
-      ["Metric", "Value"].join(","),
-      ["Period", selectedPeriodLabel].join(","),
-      ["Total Bookings", metrics.totalBookings].join(","),
-      ["Total Revenue", metrics.totalRevenue].join(","),
-    ];
-    const blob = new Blob([lines.join("\n")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `analytics-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [metrics, selectedPeriodLabel]);
-
-  const exportPDF = useCallback(() => {
-    const html = `<html><head><title>Analytics Report</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#171717}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left}th{background:#f4f4f4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}.card{border:1px solid #ddd;border-radius:8px;padding:10px}</style></head><body><h1>Analytics Report — ${selectedPeriodLabel}</h1><div class="grid"><div class="card"><strong>Total Bookings:</strong> ${metrics.totalBookings}</div><div class="card"><strong>Revenue:</strong> ${formatMoney(metrics.totalRevenue)}</div><div class="card"><strong>Due At Pickup:</strong> ${formatMoney(metrics.totalDueAtPickup)}</div><div class="card"><strong>Active Rentals:</strong> ${metrics.activeRentals}</div></div></body></html>`;
-    const w = window.open("", "_blank", "width=1100,height=800");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    w.print();
-  }, [metrics, selectedPeriodLabel]);
-
   const statCards = [
     {
       label: "Total Bookings",
@@ -729,18 +707,22 @@ const AdminAnalytics = () => {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* ── Export CSV → opens modal ── */}
             <button
-              onClick={exportCSV}
+              onClick={() => setCsvModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
             >
               <FaFileExport className="text-[10px]" /> Export CSV
             </button>
+
+            {/* ── Print Report → opens modal ── */}
             <button
-              onClick={exportPDF}
+              onClick={() => setPrintModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
             >
               <FaPrint className="text-[10px]" /> Print Report
             </button>
+
             <button
               onClick={fetchAnalyticsData}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#b50002] text-white font-bold text-xs shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
@@ -864,7 +846,7 @@ const AdminAnalytics = () => {
             </div>
 
             {/* Top motorcycles */}
-            <SectionCard title="Top Requested Motorcycles" icon={FaMotorcycle}>
+            <SectionCard title="Top Requested Units" icon={FaMotorcycle}>
               {topMotorcycles.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">
                   No bookings yet
@@ -883,7 +865,6 @@ const AdminAnalytics = () => {
                 </div>
               )}
             </SectionCard>
-
           </div>
 
           {/* Right sidebar — 1/4 */}
@@ -1036,6 +1017,23 @@ const AdminAnalytics = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      <ExportCSVModal
+        open={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        selectedPeriodLabel={selectedPeriodLabel}
+        metrics={metrics}
+      />
+
+      <PrintReportModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        selectedPeriodLabel={selectedPeriodLabel}
+        metrics={metrics}
+        fleetStats={fleetStats}
+        earningsAndExpenses={earningsAndExpenses}
+      />
     </div>
   );
 };

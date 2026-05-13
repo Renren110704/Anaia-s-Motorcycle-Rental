@@ -327,7 +327,7 @@ const MotorcycleLocationLog = () => {
         <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-              Motorcycle Location Log
+              Location Log
             </h1>
             <p className="text-slate-400 text-sm mt-1">
               Last known location snapshots per unit · refreshes every 10
@@ -455,7 +455,7 @@ const MotorcycleLocationLog = () => {
                   <tr className="border-b border-slate-50">
                     {[
                       "Unit",
-                      "Motorcycle",
+                      "Vehicle",
                       "Last Known Location",
                       "Last Updated",
                       "Source",

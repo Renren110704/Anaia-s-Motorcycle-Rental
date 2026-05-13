@@ -12,11 +12,12 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_FOLDER =
+  process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET,
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET,
 );
 
 if (CLOUDINARY_ENABLED) {
@@ -39,8 +40,9 @@ const verifyCloudinaryResource = async (publicId) => {
     const resource = await cloudinary.api.resource(publicId);
     const hasUrl = Boolean(
       resource &&
-        ((typeof resource.secure_url === "string" && resource.secure_url.trim()) ||
-          (typeof resource.url === "string" && resource.url.trim())),
+      ((typeof resource.secure_url === "string" &&
+        resource.secure_url.trim()) ||
+        (typeof resource.url === "string" && resource.url.trim())),
     );
     return hasUrl;
   } catch (err) {
@@ -58,9 +60,11 @@ const uploadFileToCloudinary = async (filePath) => {
   };
   logMsg(`[UPLOAD] filePath: ${filePath}`);
   logMsg(`[UPLOAD] CLOUDINARY_ENABLED: ${CLOUDINARY_ENABLED}`);
-  
+
   if (!filePath || !CLOUDINARY_ENABLED) {
-    logMsg(`[UPLOAD] skipped: filePath=${!!filePath}, enabled=${CLOUDINARY_ENABLED}`);
+    logMsg(
+      `[UPLOAD] skipped: filePath=${!!filePath}, enabled=${CLOUDINARY_ENABLED}`,
+    );
     return null;
   }
 
@@ -70,7 +74,9 @@ const uploadFileToCloudinary = async (filePath) => {
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      logMsg(`[UPLOAD] attempt ${attempt}/${MAX_RETRIES}: calling cloudinary.uploader.upload...`);
+      logMsg(
+        `[UPLOAD] attempt ${attempt}/${MAX_RETRIES}: calling cloudinary.uploader.upload...`,
+      );
       const result = await cloudinary.uploader.upload(filePath, {
         folder: CLOUDINARY_FOLDER,
         resource_type: "image",
@@ -82,9 +88,13 @@ const uploadFileToCloudinary = async (filePath) => {
         timeout: 30000,
       });
 
-      const url = normalizeUrl(result.secure_url || result.url || result.secureUrl || "");
+      const url = normalizeUrl(
+        result.secure_url || result.url || result.secureUrl || "",
+      );
       if (!url) {
-        logMsg(`[UPLOAD] invalid response, missing url: ${JSON.stringify(result)}`);
+        logMsg(
+          `[UPLOAD] invalid response, missing url: ${JSON.stringify(result)}`,
+        );
         lastError = new Error("No URL in Cloudinary response");
         if (attempt < MAX_RETRIES) continue;
         return null;
@@ -98,12 +108,14 @@ const uploadFileToCloudinary = async (filePath) => {
       if (attempt < MAX_RETRIES) {
         const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
         logMsg(`[UPLOAD] retrying after ${delayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }
 
-  logMsg(`[UPLOAD] FAILED after ${MAX_RETRIES} attempts: ${lastError?.message || lastError}`);
+  logMsg(
+    `[UPLOAD] FAILED after ${MAX_RETRIES} attempts: ${lastError?.message || lastError}`,
+  );
   return null;
 };
 
@@ -199,7 +211,7 @@ const getUploadedUrl = async (file) => {
   const absolutePath = path.resolve(file.path);
   const exists = fs.existsSync(absolutePath);
   console.error("[GETURL] path:", absolutePath, "exists:", exists);
-  
+
   if (!exists) {
     console.error("[GETURL] file does not exist");
     return null;
@@ -207,8 +219,13 @@ const getUploadedUrl = async (file) => {
 
   console.error("[GETURL] CLOUDINARY_ENABLED:", CLOUDINARY_ENABLED);
   const cloudUrl = await uploadFileToCloudinary(absolutePath);
-  console.error("[GETURL] cloudinary result:", cloudUrl ? "success" : "failed", "value:", cloudUrl);
-  
+  console.error(
+    "[GETURL] cloudinary result:",
+    cloudUrl ? "success" : "failed",
+    "value:",
+    cloudUrl,
+  );
+
   if (cloudUrl) {
     if (!/^https?:\/\//i.test(cloudUrl)) {
       const cleaned = String(cloudUrl).trim().replace(/^\/+/, "");
@@ -266,9 +283,21 @@ export const createMotorcycle = async (req, res, next) => {
     } = req.body;
 
     console.error("===== [MOTORCYCLE CREATE] =====");
-    console.error("[FILE]", req.file ? { originalname: req.file.originalname, path: req.file.path, size: req.file.size } : "NO FILE");
-    
-    fs.writeFileSync("/tmp/motorcycle-create-called.txt", `CALLED at ${new Date().toISOString()}\nreq.file: ${req.file ? req.file.path : 'null'}\n`);
+    console.error(
+      "[FILE]",
+      req.file
+        ? {
+            originalname: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size,
+          }
+        : "NO FILE",
+    );
+
+    fs.writeFileSync(
+      "/tmp/motorcycle-create-called.txt",
+      `CALLED at ${new Date().toISOString()}\nreq.file: ${req.file ? req.file.path : "null"}\n`,
+    );
 
     if (!make || !model || !dailyRate) {
       return res.status(400).json({
@@ -287,14 +316,17 @@ export const createMotorcycle = async (req, res, next) => {
 
     let imageFilename = "";
 
-    console.error("[UPLOADING] calling getUploadedUrl with file:", req.file ? "yes" : "no");
+    console.error(
+      "[UPLOADING] calling getUploadedUrl with file:",
+      req.file ? "yes" : "no",
+    );
     let uploadedUrl = null;
     if (req.file) {
       uploadedUrl = await getUploadedUrl(req.file);
-    } else if (req.body.image && req.body.image.startsWith('data:image')) {
+    } else if (req.body.image && req.body.image.startsWith("data:image")) {
       // Handle base64 image from mobile
-      const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
+      const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
       const filename = req.body.imageName || `mobile-${Date.now()}.jpg`;
       const filePath = path.join(UPLOADS_DIR, filename);
       fs.writeFileSync(filePath, buffer);
@@ -346,10 +378,10 @@ export const createMotorcycle = async (req, res, next) => {
     await createSystemLog({
       req,
       actorType: "admin",
-      action: "motorcycle_created",
-      targetType: "motorcycle",
+      action: "unit_created", // <-- Changed
+      targetType: "unit", // <-- Changed
       targetId: saved._id,
-      summary: `Motorcycle added: ${saved.make} ${saved.model}`,
+      summary: `Unit added: ${saved.make} ${saved.model}`,
       metadata: {
         unitId: saved.unitId || "",
         status: saved.status,
@@ -454,8 +486,7 @@ export const getMotorcycleById = async (req, res, next) => {
     }
 
     const motorcycle = await Motorcycle.findOne(query);
-    if (!motorcycle)
-      return res.status(404).json({ message: "Motorcycle not found" });
+    if (!motorcycle) return res.status(404).json({ message: "Unit not found" });
 
     const plain = motorcycle.toObject();
     plain.availability = motorcycle.getAvailabilitySummary();
@@ -494,7 +525,7 @@ export const getMotorcycleByUnitId = async (req, res, next) => {
 
     const motorcycle = await Motorcycle.findOne(query);
     if (!motorcycle) {
-      return res.status(404).json({ message: "Motorcycle not found" });
+      return res.status(404).json({ message: "Unit not found" });
     }
 
     const plain = motorcycle.toObject();
@@ -517,8 +548,7 @@ export const updateMotorcycle = async (req, res, next) => {
       isDeleted: false,
     });
 
-    if (!motorcycle)
-      return res.status(404).json({ message: "Motorcycle not found" });
+    if (!motorcycle) return res.status(404).json({ message: "Unit not found" });
 
     if (req.body.unitId && String(req.body.unitId).trim()) {
       const duplicate = await Motorcycle.findOne({
@@ -570,7 +600,6 @@ export const updateMotorcycle = async (req, res, next) => {
       "maintenanceScheduleEndAt",
       "description",
       "traccarDeviceId",
-
     ];
 
     fields.forEach((f) => {
@@ -582,9 +611,12 @@ export const updateMotorcycle = async (req, res, next) => {
         } else if (f === "maintenanceScheduleAt") {
           motorcycle[f] = normalizeMaintenanceScheduleAt(req.body[f]);
         } else if (f === "maintenanceScheduleStartAt") {
-          motorcycle.maintenanceScheduleStartAt = normalizeMaintenanceScheduleAt(req.body[f]);
+          motorcycle.maintenanceScheduleStartAt =
+            normalizeMaintenanceScheduleAt(req.body[f]);
         } else if (f === "maintenanceScheduleEndAt") {
-          motorcycle.maintenanceScheduleEndAt = normalizeMaintenanceScheduleAt(req.body[f]);
+          motorcycle.maintenanceScheduleEndAt = normalizeMaintenanceScheduleAt(
+            req.body[f],
+          );
         } else {
           motorcycle[f] = req.body[f];
         }
@@ -598,9 +630,14 @@ export const updateMotorcycle = async (req, res, next) => {
       req.body.maintenanceScheduleAt === undefined
     ) {
       const defaultDate = getDefaultMaintenanceScheduleAt(new Date());
-      motorcycle.maintenanceScheduleAt = motorcycle.maintenanceScheduleAt || defaultDate;
-      motorcycle.maintenanceScheduleStartAt = motorcycle.maintenanceScheduleStartAt || defaultDate;
-      motorcycle.maintenanceScheduleEndAt = motorcycle.maintenanceScheduleEndAt || motorcycle.maintenanceScheduleStartAt || defaultDate;
+      motorcycle.maintenanceScheduleAt =
+        motorcycle.maintenanceScheduleAt || defaultDate;
+      motorcycle.maintenanceScheduleStartAt =
+        motorcycle.maintenanceScheduleStartAt || defaultDate;
+      motorcycle.maintenanceScheduleEndAt =
+        motorcycle.maintenanceScheduleEndAt ||
+        motorcycle.maintenanceScheduleStartAt ||
+        defaultDate;
     }
 
     const updated = await motorcycle.save();
@@ -608,10 +645,10 @@ export const updateMotorcycle = async (req, res, next) => {
     await createSystemLog({
       req,
       actorType: "admin",
-      action: "motorcycle_updated",
-      targetType: "motorcycle",
+      action: "unit_updated", // <-- Changed
+      targetType: "unit", // <-- Changed
       targetId: updated._id,
-      summary: `Motorcycle updated: ${updated.make} ${updated.model}`,
+      summary: `Unit updated: ${updated.make} ${updated.model}`,
       metadata: {
         unitId: updated.unitId || "",
         status: updated.status,
@@ -638,8 +675,7 @@ export const deleteMotorcycle = async (req, res, next) => {
       isDeleted: false,
     });
 
-    if (!motorcycle)
-      return res.status(404).json({ message: "Motorcycle not found" });
+    if (!motorcycle) return res.status(404).json({ message: "Unit not found" });
 
     const userId = req.user?.id || null;
     await motorcycle.softDelete(userId);
@@ -647,10 +683,10 @@ export const deleteMotorcycle = async (req, res, next) => {
     await createSystemLog({
       req,
       actorType: "admin",
-      action: "motorcycle_deleted",
-      targetType: "motorcycle",
+      action: "unit_deleted", // <-- Changed
+      targetType: "unit", // <-- Changed
       targetId: motorcycle._id,
-      summary: `Motorcycle deleted: ${motorcycle.make} ${motorcycle.model}`,
+      summary: `Unit deleted: ${motorcycle.make} ${motorcycle.model}`,
       metadata: {
         unitId: motorcycle.unitId || "",
         deletedAt: motorcycle.deletedAt,
@@ -658,7 +694,7 @@ export const deleteMotorcycle = async (req, res, next) => {
     });
 
     res.json({
-      message: "Motorcycle deleted successfully",
+      message: "Unit deleted successfully",
       deletedAt: motorcycle.deletedAt,
       canRestore: true,
     });
@@ -670,8 +706,7 @@ export const deleteMotorcycle = async (req, res, next) => {
 export const hardDeleteMotorcycle = async (req, res, next) => {
   try {
     const motorcycle = await Motorcycle.findById(req.params.id);
-    if (!motorcycle)
-      return res.status(404).json({ message: "Motorcycle not found" });
+    if (!motorcycle) return res.status(404).json({ message: "Unit not found" });
 
     // Note: Cloudinary images are left in cloud storage
 
@@ -680,16 +715,16 @@ export const hardDeleteMotorcycle = async (req, res, next) => {
     await createSystemLog({
       req,
       actorType: "admin",
-      action: "motorcycle_permanently_deleted",
-      targetType: "motorcycle",
+      action: "unit_permanently_deleted", // <-- Changed
+      targetType: "unit", // <-- Changed
       targetId: motorcycle._id,
-      summary: `Motorcycle permanently deleted: ${motorcycle.make} ${motorcycle.model}`,
+      summary: `Unit permanently deleted: ${motorcycle.make} ${motorcycle.model}`,
       metadata: {
         unitId: motorcycle.unitId || "",
       },
     });
 
-    res.json({ message: "Motorcycle permanently deleted" });
+    res.json({ message: "Unit permanently deleted" });
   } catch (err) {
     next(err);
   }
@@ -703,7 +738,7 @@ export const restoreMotorcycle = async (req, res, next) => {
     });
 
     if (!motorcycle) {
-      return res.status(404).json({ message: "Deleted motorcycle not found" });
+      return res.status(404).json({ message: "Deleted unit not found" });
     }
 
     await motorcycle.restore();
@@ -711,10 +746,10 @@ export const restoreMotorcycle = async (req, res, next) => {
     await createSystemLog({
       req,
       actorType: "admin",
-      action: "motorcycle_restored",
-      targetType: "motorcycle",
+      action: "unit_restored", // <-- Changed
+      targetType: "unit", // <-- Changed
       targetId: motorcycle._id,
-      summary: `Motorcycle restored: ${motorcycle.make} ${motorcycle.model}`,
+      summary: `Unit restored: ${motorcycle.make} ${motorcycle.model}`,
       metadata: {
         unitId: motorcycle.unitId || "",
       },
@@ -725,7 +760,7 @@ export const restoreMotorcycle = async (req, res, next) => {
     plain.image = getRelativeImagePath(plain.image);
 
     res.json({
-      message: "Motorcycle restored successfully",
+      message: "Unit restored successfully",
       data: plain,
     });
   } catch (err) {

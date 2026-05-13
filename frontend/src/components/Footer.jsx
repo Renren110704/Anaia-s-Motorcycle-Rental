@@ -204,8 +204,8 @@ const Footer = () => {
                 <img src={logo} alt="ANAIA'S Logo" className="ft-logo-img" />
               </Link>
               <p className="ft-desc">
-                Motorcycle rental service with the latest models and exceptional
-                customer service. Ride your dream motorcycle today!
+                Rental service with the latest models and exceptional
+                customer service. Ride your dream vehicle today!
               </p>
               <div className="ft-socials">
                 {[
@@ -237,7 +237,7 @@ const Footer = () => {
               <ul className="ft-links">
                 {[
                   { label: "Home", to: "/" },
-                  { label: "Motorcycles", to: "/motorcycles" },
+                  { label: "Vehicles", to: "/motorcycles" },
                   { label: "Contact Us", to: "/contact" },
                 ].map(({ label, to }) => (
                   <li key={label}>

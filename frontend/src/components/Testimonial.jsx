@@ -348,7 +348,7 @@ const Testimonial = () => {
             <span className="tm-eyebrow-line" />
             Reviews
           </div>
-          <h2 className="tm-title">Ride Experiences</h2>
+          <h2 className="tm-title">Anaia's Highlights</h2>
         </div>
 
         <div

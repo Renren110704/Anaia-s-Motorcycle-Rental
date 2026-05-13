@@ -727,7 +727,7 @@ const WalkInRentals = () => {
       );
       const m = res.data;
       if (!m || !m._id) {
-        toast.error("Motorcycle not found.");
+        toast.error("Unit not found.");
         setMotorcycle(null);
         return;
       }
@@ -738,7 +738,7 @@ const WalkInRentals = () => {
       }
       if ((m.status || "").toLowerCase() !== "available") {
         toast.error(
-          "This motorcycle is not available for a new walk-in rental.",
+          "This unit is not available for a new walk-in rental.",
         );
         setMotorcycle(null);
         return;
@@ -816,7 +816,7 @@ const WalkInRentals = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!motorcycle?._id) {
-      toast.error("Load a motorcycle by Unit ID first.");
+      toast.error("Load a unit by Unit ID first.");
       return;
     }
     if (!formData.customerName.trim()) {
@@ -992,7 +992,7 @@ const WalkInRentals = () => {
             {/* Left column — forms */}
             <div className="xl:col-span-2 space-y-4">
               {/* Motorcycle Unit */}
-              <FormSection title="Motorcycle Being Rented">
+              <FormSection title="Unit Being Rented">
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
                   <IconField icon={FaSearch} label="Unit ID">
                     <div className="relative w-full">
@@ -1565,7 +1565,7 @@ const WalkInRentals = () => {
                     {[
                       { label: "Unit", value: motorcycle.unitId || "—" },
                       {
-                        label: "Motorcycle",
+                        label: "Vehicle",
                         value: `${motorcycle.make} ${motorcycle.model}`,
                       },
                       {
@@ -1620,7 +1620,7 @@ const WalkInRentals = () => {
 
               {!motorcycle && (
                 <p className="text-center text-[11px] text-slate-400">
-                  Load a motorcycle by Unit ID to enable booking
+                  Load a unit by Unit ID to enable booking
                 </p>
               )}
             </div>

@@ -486,7 +486,7 @@ export default function Contact() {
               </h1>
 
               <p className="ct-sub">
-                Whether you have a question about a motorcycle, a booking, or
+                Whether you have a question about a motorcycle, a car, a booking, or
                 just want to chat — we're here. Let's talk.
               </p>
 

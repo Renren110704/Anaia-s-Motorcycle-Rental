@@ -458,7 +458,7 @@ const MotorcycleTable = ({
 }) => {
   const cols = [
     { label: "Unit", key: "unitId", sortable: true },
-    { label: "Motorcycle", key: "make", sortable: true },
+    { label: "Vehicle", key: "make", sortable: true },
     { label: "Year", key: "year", sortable: true },
     { label: "Engine", key: "engineSize", sortable: true },
     { label: "Rate/Day", key: "dailyRate", sortable: true },
@@ -670,14 +670,14 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
           data.image.name || "motorcycle-image",
         );
       await api.post("/api/motorcycles", formData);
-      toast.success("Motorcycle added successfully!");
+      toast.success("Unit added successfully!");
       onSuccess();
       onClose();
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
           err.message ||
-          "Failed to add motorcycle",
+          "Failed to add unit",
       );
     } finally {
       setSubmitting(false);
@@ -691,7 +691,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
         <div className="sticky top-0 bg-white border-b border-slate-50 px-6 py-4 flex items-center justify-between z-10 rounded-t-2xl">
           <div>
             <h2 className="font-black text-[#171717] text-lg">
-              Add New Motorcycle
+              Add New Unit
             </h2>
           </div>
           <button
@@ -745,7 +745,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LEFT — Specs */}
             <div className="space-y-4">
-              <p className={labelCls}>Motorcycle Details</p>
+              <p className={labelCls}>Details</p>
 
               {/* Brand / Category / Year */}
               <div className="grid grid-cols-3 gap-3">
@@ -757,7 +757,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
                     onChange={handleChange}
                     className={fieldClsIcon}
                   >
-                    {["Honda", "Yamaha", "Suzuki", "Kawasaki"].map((b) => (
+                    {["Honda", "Yamaha", "Suzuki", "Kawasaki", "Toyota", "Nissan", "Geely", "Mitsubishi", "BYD", "Ford", "Isuzu", "Mazda"].map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>
@@ -772,7 +772,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
                     onChange={handleChange}
                     className={fieldClsIcon}
                   >
-                    {["Scooter", "Naked", "Underbone"].map((c) => (
+                    {["Scooter", "Big Bike", "Underbone", "Pickup", "Sedan", "MPV", "SUV"].map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -830,7 +830,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
                     onChange={handleChange}
                     className={fieldClsIcon}
                   >
-                    {["Unleaded", "Premium"].map((f) => (
+                    {["Unleaded", "Premium", "Diesel", "Electric"].map((f) => (
                       <option key={f} value={f}>
                         {f}
                       </option>
@@ -925,7 +925,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
 
               {/* Image upload */}
               <div>
-                <label className={labelCls}>Motorcycle Image</label>
+                <label className={labelCls}>Unit Image</label>
                 <label className="block cursor-pointer">
                   <div
                     className={`w-full rounded-2xl border-2 border-dashed transition-colors overflow-hidden
@@ -995,7 +995,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all disabled:opacity-60"
             >
               <FaMotorcycle className="text-sm" />
-              {submitting ? "Adding..." : "Add Motorcycle"}
+              {submitting ? "Adding..." : "Add Unit"}
             </button>
           </div>
         </form>
@@ -1188,7 +1188,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
             <SF
               label="Category *"
               name="category"
-              options={["Scooter", "Naked", "Underbone"]}
+              options={["Scooter", "Big Bike", "Underbone", "Pickup", "Sedan", "MPV", "SUV"]}
             />
             {/* <SF
               label="Status *"
@@ -1212,7 +1212,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
             <SF
               label="Fuel Type *"
               name="fuelType"
-              options={["Unleaded", "Premium"]}
+              options={["Unleaded", "Premium", "Diesel", "Electric"]}
             />
             <SF
               label="ABS"
@@ -1247,7 +1247,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
             />
           </div>
           <div>
-            <label className={labelCls}>Motorcycle Image</label>
+            <label className={labelCls}>Unit Image</label>
             <label className="block cursor-pointer">
               <div
                 className={`w-full rounded-2xl border-2 border-dashed transition-colors overflow-hidden ${imagePreview ? "border-slate-200" : "border-slate-200 hover:border-[#b50002]/30"}`}
@@ -1310,7 +1310,7 @@ const EmptyState = ({ onReset }) => (
       <FaMotorcycle className="text-slate-200 text-3xl" />
     </div>
     <h3 className="font-black text-[#171717] text-lg mb-1">
-      No motorcycles found
+      No units found
     </h3>
     <p className="text-slate-400 text-sm mb-4">
       Try adjusting your filters or search term
@@ -1360,7 +1360,7 @@ const ManageMotorcycle = () => {
       );
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load motorcycles");
+      toast.error("Failed to load units");
     } finally {
       setLoading(false);
     }
@@ -1506,7 +1506,7 @@ const ManageMotorcycle = () => {
 
   const handleDelete = async (id, permanent = false) => {
     const m = motorcycles.find((x) => x._id === id || x.id === id);
-    if (!m) return toast.error("Motorcycle not found");
+    if (!m) return toast.error("Unit not found");
     const confirmed = await confirmModal(
       permanent
         ? `Permanently delete ${m.make} ${m.model}? This cannot be undone.`
@@ -1557,7 +1557,7 @@ const ManageMotorcycle = () => {
   const handleEditSubmit = async (payload) => {
     try {
       await api.put(`/api/motorcycles/${editingMotorcycle._id}`, payload);
-      toast.success("Motorcycle updated");
+      toast.success("Unit updated");
       setShowEditModal(false);
       setEditingMotorcycle(null);
       fetchMotorcycles();
@@ -1621,7 +1621,7 @@ const ManageMotorcycle = () => {
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-              Motorcycle Management
+              Vehicle Management
             </h1>
             <p className="text-slate-400 text-sm mt-1">
               Manage units, monitor availability, and keep fleet details
@@ -1919,7 +1919,7 @@ const ManageMotorcycle = () => {
                 <QuickAction
                   onClick={() => setShowAddModal(true)}
                   icon={PlusCircle}
-                  title="Add Motorcycle"
+                  title="Add Unit"
                   desc="Register a new unit"
                   accent="bg-violet-500"
                 />

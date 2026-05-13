@@ -454,7 +454,7 @@ const Dashboard = () => {
                   to="/manage-motorcycles"
                   icon={FaMotorcycle}
                   title="Manage Fleet"
-                  desc="Add or update motorcycles"
+                  desc="Add or update units"
                   accent="bg-violet-500"
                 />
                 <QuickAction

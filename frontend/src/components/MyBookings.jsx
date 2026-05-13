@@ -1562,7 +1562,7 @@ const BookingRow = ({
                       fontFamily: "'Space Grotesk', sans-serif",
                     }}
                   >
-                    Motorcycle
+                    Unit
                   </span>
                 </div>
                 {[

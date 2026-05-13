@@ -24,6 +24,8 @@ import {
   FaThumbsUp,
   FaThumbsDown,
   FaStar,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import { GiFullMotorcycleHelmet } from "react-icons/gi";
 import { ToastContainer, toast } from "react-toastify";
@@ -151,6 +153,7 @@ const normalizeCity = (raw = "") =>
     .replace(/\bMUNICIPALITY\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
 const getDistanceFee = (cityName) => {
   if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0 };
   const upper = cityName.toUpperCase().trim();
@@ -265,6 +268,39 @@ const handleImageError = (e) => {
   };
 };
 
+/* ── Calendar Helpers ──────────────────────────────────────────── */
+const toDateKey = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const addMonths = (date, amount) =>
+  new Date(date.getFullYear(), date.getMonth() + amount, 1);
+const getMonthGrid = (monthDate) => {
+  const firstDay = startOfMonth(monthDate);
+  const firstWeekday = firstDay.getDay();
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - firstWeekday);
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    return d;
+  });
+};
+const MAINTENANCE_STORAGE_KEY = "moto_maintenance_schedules";
+const loadMaintenanceSchedules = () => {
+  try {
+    return JSON.parse(localStorage.getItem(MAINTENANCE_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+const addDaysHelper = (date, n) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+};
+
 /* ── Shared styles ─────────────────────────────────────────────── */
 const S = {
   card: {
@@ -364,6 +400,412 @@ const S = {
     border: "none",
     cursor: "pointer",
   },
+};
+
+/* ── Inline Calendar Picker ────────────────────────────────────── */
+const InlineDatePicker = ({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+  label,
+  mode, // "pickup" | "return"
+  pickupDateISO,
+  maintenanceRanges = [],
+  bookingRanges = [],
+  disabled = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    if (value) return new Date(value + "T00:00:00");
+    return new Date();
+  });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const monthGrid = getMonthGrid(viewMonth);
+  const minD = minDate ? new Date(minDate + "T00:00:00") : null;
+  const maxD = maxDate ? new Date(maxDate + "T00:00:00") : null;
+
+  const isMaintenanceDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some(
+      (s) => dk >= toDateKey(s.startDate) && dk <= toDateKey(s.endDate),
+    );
+  };
+  const isBufferDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some((s) => {
+      const buf = addDaysHelper(s.startDate, -1);
+      return dk === toDateKey(buf);
+    });
+  };
+  const isBookedDay = (date) => {
+    const dk = toDateKey(date);
+    return bookingRanges.some(
+      (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+  };
+
+  const handleDayClick = (date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (minD && d < minD) return;
+    if (maxD && d > maxD) return;
+    if (isMaintenanceDay(date)) return;
+    if (mode === "return" && isBufferDay(date)) return;
+    onChange(formatLocalDate(d));
+    setOpen(false);
+  };
+
+  const displayValue = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "10px 12px 10px 38px",
+          borderRadius: 10,
+          border: `1.5px solid ${open ? "#b50002" : "rgba(0,0,0,0.09)"}`,
+          background: disabled ? "rgba(245,245,243,0.6)" : "#F5F5F3",
+          fontSize: 13,
+          fontFamily: "'Space Grotesk',sans-serif",
+          color: value ? "#0E0E0E" : "rgba(0,0,0,0.35)",
+          outline: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          transition: "border-color 0.2s",
+        }}
+      >
+        <FaCalendarAlt
+          style={{
+            position: "absolute",
+            left: 12,
+            color: "#b50002",
+            fontSize: 13,
+            pointerEvents: "none",
+          }}
+        />
+        <span style={{ flex: 1 }}>{displayValue || `Select ${label}`}</span>
+        <FaChevronDown
+          style={{
+            fontSize: 10,
+            color: "rgba(0,0,0,0.3)",
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      {/* Dropdown calendar */}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 200,
+            background: "#fff",
+            borderRadius: 18,
+            border: "1.5px solid rgba(0,0,0,0.09)",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.14)",
+            padding: 16,
+            minWidth: 300,
+            width: "100%",
+            maxWidth: 340,
+            animation: "calFadeIn 0.18s ease",
+          }}
+        >
+          {/* Month navigation */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, -1))}
+              style={{
+                ...S.btnSecondary,
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                color: "#0E0E0E",
+              }}
+            >
+              <FaChevronLeft size={10} />
+            </button>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                fontFamily: "'Space Grotesk',sans-serif",
+                color: "#0E0E0E",
+              }}
+            >
+              {monthLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, 1))}
+              style={{
+                ...S.btnSecondary,
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                color: "#0E0E0E",
+              }}
+            >
+              <FaChevronRight size={10} />
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+              marginBottom: 4,
+            }}
+          >
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <div
+                key={d}
+                style={{
+                  textAlign: "center",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  color: "rgba(0,0,0,0.3)",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  padding: "4px 0",
+                }}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+            }}
+          >
+            {monthGrid.map((date) => {
+              const inMonth = date.getMonth() === viewMonth.getMonth();
+              const dk = toDateKey(date);
+              const isSelected = value === dk;
+              const d = new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+              );
+              const tooEarly = minD && d < minD;
+              const tooLate = maxD && d > maxD;
+              const isMaint = isMaintenanceDay(date);
+              const isBuf = isBufferDay(date);
+              const isBooked = isBookedDay(date);
+              const isDisabled =
+                tooEarly || tooLate || isMaint || (mode === "return" && isBuf);
+              const isToday = dk === todayISO();
+
+              // Pickup range highlight (show range between pickup and return)
+              const isPickupDate = mode === "return" && pickupDateISO === dk;
+              const isInRange =
+                mode === "return" &&
+                pickupDateISO &&
+                value &&
+                dk > pickupDateISO &&
+                dk < value;
+
+              let bg = "transparent";
+              let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
+              let border = "1.5px solid transparent";
+              let cursor = isDisabled ? "not-allowed" : "pointer";
+              let opacity = isDisabled
+                ? isMaint || (mode === "return" && isBuf)
+                  ? 1
+                  : 0.3
+                : 1;
+
+              if (isSelected) {
+                bg = "#0E0E0E";
+                color = "#fff";
+                border = "1.5px solid #0E0E0E";
+              } else if (isPickupDate) {
+                bg = "#b50002";
+                color = "#fff";
+                border = "1.5px solid #b50002";
+              } else if (isInRange) {
+                bg = "rgba(181,0,2,0.07)";
+                border = "1.5px solid rgba(181,0,2,0.12)";
+              } else if (isMaint) {
+                bg = "rgba(124,58,237,0.08)";
+                color = "#7c3aed";
+                border = "1.5px solid rgba(124,58,237,0.2)";
+              } else if (isBuf && mode === "return") {
+                bg = "rgba(245,158,11,0.08)";
+                color = "#b45309";
+                border = "1.5px solid rgba(245,158,11,0.25)";
+              } else if (isBooked && !isSelected) {
+                bg = "rgba(181,0,2,0.05)";
+                border = "1.5px solid rgba(181,0,2,0.1)";
+              } else if (isToday && inMonth) {
+                border = "1.5px solid rgba(0,0,0,0.2)";
+              }
+
+              return (
+                <button
+                  key={dk}
+                  type="button"
+                  disabled={isDisabled || !inMonth}
+                  onClick={() => inMonth && !isDisabled && handleDayClick(date)}
+                  title={
+                    isMaint
+                      ? "Under maintenance"
+                      : isBuf && mode === "return"
+                        ? "Buffer day — maintenance starts tomorrow"
+                        : undefined
+                  }
+                  style={{
+                    background: bg,
+                    color,
+                    border,
+                    borderRadius: 8,
+                    padding: "6px 2px",
+                    fontSize: 11,
+                    fontWeight: isSelected || isToday ? 800 : 600,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    cursor,
+                    opacity,
+                    minHeight: 30,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    transition: "all 0.15s",
+                    position: "relative",
+                  }}
+                >
+                  {date.getDate()}
+                  {isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: isSelected ? "#fff" : "#7c3aed",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {isBuf && !isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "#f59e0b",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {isBooked && !isMaint && !isBuf && !isSelected && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "rgba(181,0,2,0.4)",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: "1px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 12px",
+            }}
+          >
+            {[
+              { dot: "#7c3aed", label: "Maintenance" },
+              { dot: "#f59e0b", label: "Buffer day" },
+              { dot: "rgba(181,0,2,0.4)", label: "Booked" },
+            ].map(({ dot, label }) => (
+              <div
+                key={label}
+                style={{ display: "flex", alignItems: "center", gap: 5 }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: dot,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "rgba(0,0,0,0.4)",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /* ── Field wrapper ─────────────────────────────────────────────── */
@@ -1017,8 +1459,6 @@ const DestinationSelect = ({ value, onChange }) => {
     );
   };
 
-  const selStyle = { ...S.select };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {[
@@ -1083,7 +1523,7 @@ const DestinationSelect = ({ value, onChange }) => {
               }}
             />
             <select
-              style={selStyle}
+              style={S.select}
               value={item.val}
               onChange={item.handler}
               disabled={item.disabled}
@@ -1434,8 +1874,6 @@ const PriceSummary = ({
   );
 };
 
-// collapsed states for booking form sections (moved inside component)
-
 /* ── Main Component ────────────────────────────────────────────── */
 const MotorcycleDetail = () => {
   const { id } = useParams();
@@ -1464,6 +1902,11 @@ const MotorcycleDetail = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
   const [votingReviewId, setVotingReviewId] = useState("");
+
+  // Calendar data state
+  const [calBookings, setCalBookings] = useState([]);
+  const [calMotorcycles, setCalMotorcycles] = useState([]);
+  const [maintenanceRanges, setMaintenanceRanges] = useState([]);
 
   const initialPickupSlots = getAvailablePickupSlots(todayISO());
   const defaultPickupTime =
@@ -1510,6 +1953,106 @@ const MotorcycleDetail = () => {
   );
   const days = calculateDays(formData.pickupDate, formData.returnDate);
   const applicableDiscount = useApplicableDiscount(motorcycle, days);
+
+  // Build booking ranges for the calendar
+  const bookingRanges = calBookings
+    .map((b) => {
+      const status = String(b?.status || "").toLowerCase();
+      if (["completed", "inspection", "canceled", "cancelled"].includes(status))
+        return null;
+      const pickupDate = new Date(b.pickupDate);
+      const returnDate = new Date(b.returnDate);
+      if (isNaN(pickupDate.getTime()) || isNaN(returnDate.getTime()))
+        return null;
+      return {
+        ...b,
+        pickupDate: new Date(
+          pickupDate.getFullYear(),
+          pickupDate.getMonth(),
+          pickupDate.getDate(),
+        ),
+        returnDate: new Date(
+          returnDate.getFullYear(),
+          returnDate.getMonth(),
+          returnDate.getDate(),
+        ),
+      };
+    })
+    .filter(Boolean);
+
+  // Load calendar data (bookings + motorcycle maintenance)
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const [bookingsRes, motoRes] = await Promise.allSettled([
+          api.get("/api/motorcycle-bookings", {
+            signal: controller.signal,
+            params: { limit: 200 },
+          }),
+          api.get("/api/motorcycles", {
+            signal: controller.signal,
+            params: { limit: 200, includeDeleted: "false" },
+          }),
+        ]);
+        if (bookingsRes.status === "fulfilled") {
+          const payload = bookingsRes.value.data;
+          setCalBookings(
+            Array.isArray(payload)
+              ? payload
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : [],
+          );
+        }
+        if (motoRes.status === "fulfilled") {
+          const payload = motoRes.value.data;
+          const data = Array.isArray(payload)
+            ? payload
+            : payload?.data || payload?.motorcycles || [];
+          setCalMotorcycles(data);
+          const now = new Date();
+          const autoMaint = data
+            .map((m) => {
+              const rawStart =
+                m.maintenanceScheduleStartAt || m.maintenanceScheduleAt || null;
+              const rawEnd =
+                m.maintenanceScheduleEndAt || m.maintenanceScheduleAt || null;
+              if (!rawStart || !rawEnd) return null;
+              const start = new Date(rawStart),
+                end = new Date(rawEnd);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              if (end < now) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return {
+                id: `auto-${m._id}`,
+                motorcycleId: m._id,
+                motorcycle: m,
+                startDate: start,
+                endDate: end,
+                auto: true,
+              };
+            })
+            .filter(Boolean);
+          const stored = loadMaintenanceSchedules()
+            .filter((s) => !s.cancelled && !s.completed)
+            .map((s) => {
+              const moto = data.find((m) => m._id === s.motorcycleId);
+              const start = new Date(s.startDate),
+                end = new Date(s.endDate);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return { ...s, startDate: start, endDate: end, motorcycle: moto };
+            })
+            .filter(Boolean);
+          setMaintenanceRanges([...autoMaint, ...stored]);
+        }
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!formData.returnDate || validReturnSlots.length === 0) return;
@@ -1874,58 +2417,6 @@ const MotorcycleDetail = () => {
       setFormData((p) => ({ ...p, zipCode: n }));
       return;
     }
-    if (name === "pickupDate") {
-      const selected = new Date(value),
-        todayStart = getTodayStart(),
-        maxDate = sevenDaysFromToday();
-      if (isNaN(selected.getTime())) return;
-      if (selected < todayStart) {
-        toast.error("Pickup date cannot be in the past");
-        return;
-      }
-      if (selected > maxDate) {
-        toast.error("Pickup must be within the next 7 days");
-        return;
-      }
-      const newReturnDate =
-        formData.returnDate && new Date(formData.returnDate) <= selected
-          ? ""
-          : formData.returnDate;
-      const freshSlots = getAvailablePickupSlots(value);
-      setFormData((p) => ({
-        ...p,
-        pickupDate: value,
-        pickupTime: freshSlots.length > 0 ? freshSlots[0].value : "08:00",
-        returnDate: newReturnDate,
-      }));
-      return;
-    }
-    if (name === "returnDate") {
-      if (value === "") {
-        setFormData((p) => ({ ...p, returnDate: "" }));
-        return;
-      }
-      const selected = new Date(value);
-      if (isNaN(selected.getTime())) return;
-      if (selected < getTodayStart()) {
-        toast.error("Return date cannot be in the past");
-        return;
-      }
-      if (selected > sixMonthsFromToday()) {
-        toast.error("Date must be within 6 months from today");
-        return;
-      }
-      if (selected <= new Date(formData.pickupDate)) {
-        toast.error("Minimum rental duration is 24 hours.");
-        return;
-      }
-      setFormData((p) => ({ ...p, returnDate: value }));
-      return;
-    }
-    if (name === "returnTime" || name === "pickupTime") {
-      setFormData((p) => ({ ...p, [name]: value }));
-      return;
-    }
     if (name === "wantsHelmet") {
       setFormData((p) => ({ ...p, wantsHelmet: e.target.checked }));
       return;
@@ -1941,7 +2432,43 @@ const MotorcycleDetail = () => {
       }));
       return;
     }
+    if (name === "returnTime" || name === "pickupTime") {
+      setFormData((p) => ({ ...p, [name]: value }));
+      return;
+    }
     setFormData((p) => ({ ...p, [name]: value }));
+  };
+
+  const handlePickupDateChange = (dateISO) => {
+    const selected = new Date(dateISO);
+    const todayStart = getTodayStart();
+    const maxDate = sevenDaysFromToday();
+    if (selected < todayStart || selected > maxDate) return;
+    const newReturnDate =
+      formData.returnDate && new Date(formData.returnDate) <= selected
+        ? ""
+        : formData.returnDate;
+    const freshSlots = getAvailablePickupSlots(dateISO);
+    setFormData((p) => ({
+      ...p,
+      pickupDate: dateISO,
+      pickupTime: freshSlots.length > 0 ? freshSlots[0].value : "08:00",
+      returnDate: newReturnDate,
+    }));
+  };
+
+  const handleReturnDateChange = (dateISO) => {
+    if (!dateISO) {
+      setFormData((p) => ({ ...p, returnDate: "" }));
+      return;
+    }
+    const selected = new Date(dateISO);
+    if (selected < getTodayStart() || selected > sixMonthsFromToday()) return;
+    if (selected <= new Date(formData.pickupDate)) {
+      toast.error("Minimum rental duration is 24 hours.");
+      return;
+    }
+    setFormData((p) => ({ ...p, returnDate: dateISO }));
   };
 
   const handleDestinationChange = (destString, cityName) => {
@@ -2292,19 +2819,17 @@ const MotorcycleDetail = () => {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes calFadeIn { from { opacity:0; transform:translateY(6px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 
-        /* INCREASED BOTTOM PADDING TO AVOID FLOATING ACTION BUTTON OVERLAP */
         .md-page { background:#F5F5F3; min-height:100vh; padding:40px 24px 100px; font-family:'Space Grotesk',sans-serif; box-sizing:border-box; }
-        @media(max-width:640px){ .md-page{padding:24px 14px 120px;} } 
+        @media(max-width:640px){ .md-page{padding:24px 14px 120px;} }
 
         .md-layout { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:380px 1fr; gap:28px; align-items:start; }
         @media(max-width:1024px){ .md-layout{grid-template-columns:1fr;} }
 
-        /* NEW CSS CLASS FOR RESPONSIVE FORM COLUMNS */
         .md-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media(max-width: 640px) { .md-grid-2 { grid-template-columns: 1fr; } }
 
-        /* image gallery */
         .md-gallery { border-radius:20px; overflow:hidden; position:relative; background:#EEEDE9; aspect-ratio:4/3; }
         .md-gallery img { width:100%; height:100%; object-fit:cover; display:block; }
         .md-gallery-btn { position:absolute; top:50%; transform:translateY(-50%); width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.9); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#0E0E0E; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:background 0.18s; }
@@ -2313,25 +2838,19 @@ const MotorcycleDetail = () => {
         .md-gallery-dot { width:6px; height:6px; border-radius:999px; background:rgba(255,255,255,0.5); border:none; cursor:pointer; padding:0; transition:all 0.2s; }
         .md-gallery-dot.active { width:18px; background:#fff; }
 
-        /* specs grid */
         .md-specs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
         .md-spec { background:#F5F5F3; border-radius:12px; padding:12px 14px; }
-        .md-spec-label { font-size:10px; fontWeight:600; color:rgba(0,0,0,0.35); textTransform:uppercase; letterSpacing:1px; marginBottom:4px; }
-        .md-spec-val { font-size:14px; font-weight:700; color:#0E0E0E; }
 
-        /* form card */
         .md-form-card { background:#fff; border-radius:22px; border:1.5px solid rgba(0,0,0,0.07); overflow:hidden; animation:fadeUp 0.4s ease; }
         .md-form-header { background:#171717; padding:20px 24px; display:flex; align-items:center; justify-content:space-between; }
         .md-form-body { padding:24px; }
 
-        /* review card */
         .md-review { background:#F5F5F3; border-radius:14px; padding:14px; border:1.5px solid rgba(0,0,0,0.06); }
         .md-vote-btn { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:11px; font-weight:700; font-family:'Space Grotesk',sans-serif; cursor:pointer; border:1.5px solid; transition:all 0.15s; }
 
-        input[type="date"]::-webkit-calendar-picker-indicator,
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:opacity(0.4); cursor:pointer; }
+        /* Calendar picker hover */
+        .cal-day-btn:not(:disabled):hover { background: rgba(0,0,0,0.06) !important; border-color: rgba(0,0,0,0.15) !important; }
 
-        /* focus states */
         input:focus, select:focus, textarea:focus { border-color:#b50002 !important; outline:none; }
       `}</style>
 
@@ -2352,7 +2871,6 @@ const MotorcycleDetail = () => {
       )}
 
       <div className="md-page">
-        {/* Back button */}
         <div style={{ maxWidth: 1200, margin: "0 auto 20px" }}>
           <button
             onClick={() => navigate(-1)}
@@ -2546,52 +3064,52 @@ const MotorcycleDetail = () => {
                   day: "numeric",
                   year: "numeric",
                 });
-                return (
-                  <div
-                    style={{
-                      background: "#fffbeb",
-                      border: "1.5px solid #fde68a",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "flex-start",
-                      marginTop: 12,
-                    }}
-                  >
-                    <FaExclamationTriangle
-                      style={{
-                        color: "#f59e0b",
-                        fontSize: 13,
-                        marginTop: 2,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "#78350f",
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        Maintenance Scheduled
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#92400e",
-                          fontFamily: "'Space Grotesk',sans-serif",
-                          marginTop: 2,
-                        }}
-                      >
-                        Under maintenance:{" "}
-                        <strong>{sl === el ? sl : `${sl} — ${el}`}</strong>
-                      </p>
-                    </div>
-                  </div>
-                );
+                // return (
+                //   <div
+                //     style={{
+                //       background: "#fffbeb",
+                //       border: "1.5px solid #fde68a",
+                //       borderRadius: 12,
+                //       padding: "10px 14px",
+                //       display: "flex",
+                //       gap: 8,
+                //       alignItems: "flex-start",
+                //       marginTop: 12,
+                //     }}
+                //   >
+                //     <FaExclamationTriangle
+                //       style={{
+                //         color: "#f59e0b",
+                //         fontSize: 13,
+                //         marginTop: 2,
+                //         flexShrink: 0,
+                //       }}
+                //     />
+                //     <div>
+                //       <p
+                //         style={{
+                //           fontSize: 12,
+                //           fontWeight: 700,
+                //           color: "#78350f",
+                //           fontFamily: "'Space Grotesk',sans-serif",
+                //         }}
+                //       >
+                //         Maintenance Scheduled
+                //       </p>
+                //       <p
+                //         style={{
+                //           fontSize: 11,
+                //           color: "#92400e",
+                //           fontFamily: "'Space Grotesk',sans-serif",
+                //           marginTop: 2,
+                //         }}
+                //       >
+                //         Under maintenance:{" "}
+                //         <strong>{sl === el ? sl : `${sl} — ${el}`}</strong>
+                //       </p>
+                //     </div>
+                //   </div>
+                // );
               })()}
 
               {/* Specs */}
@@ -2656,7 +3174,6 @@ const MotorcycleDetail = () => {
                   </div>
                 ))}
               </div>
-
               {motorcycle.description && (
                 <p
                   style={{
@@ -2910,98 +3427,257 @@ const MotorcycleDetail = () => {
                     </div>
                   )}
 
+                  {/* Pickup Date + Time */}
                   <div className="md-grid-2">
-                    <Field
-                      icon={FaCalendarAlt}
-                      label="Pickup Date"
-                      hint="Today up to 7 days from now"
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
                     >
-                      <input
-                        type="date"
-                        name="pickupDate"
-                        min={todayISO()}
-                        max={formatDate(sevenDaysFromToday())}
-                        value={formData.pickupDate}
-                        onChange={handleInputChange}
-                        style={S.input}
-                        required
-                      />
-                    </Field>
-                    <Field icon={FaClock} label="Pickup Time">
-                      <select
-                        name="pickupTime"
-                        value={formData.pickupTime}
-                        onChange={handleInputChange}
-                        style={S.select}
-                        required
-                        disabled={noSlotsAvailable}
-                      >
-                        {noSlotsAvailable ? (
-                          <option value="">No hours available</option>
-                        ) : (
-                          availablePickupSlots.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <FaChevronDown
+                      <label style={S.label}>Pickup Date</label>
+                      <p
                         style={{
-                          position: "absolute",
-                          right: 10,
-                          color: "rgba(0,0,0,0.3)",
-                          fontSize: 11,
-                          pointerEvents: "none",
+                          fontSize: 10,
+                          color: "rgba(0,0,0,0.35)",
+                          marginBottom: 6,
+                          fontFamily: "'Space Grotesk',sans-serif",
                         }}
-                      />
-                    </Field>
+                      >
+                        Today up to 7 days from now
+                      </p>
+                      <div style={{ marginTop: "auto" }}>
+                        <InlineDatePicker
+                          value={formData.pickupDate}
+                          onChange={handlePickupDateChange}
+                          minDate={todayISO()}
+                          maxDate={formatDate(sevenDaysFromToday())}
+                          label="Pickup Date"
+                          mode="pickup"
+                          maintenanceRanges={maintenanceRanges}
+                          bookingRanges={bookingRanges}
+                        />
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <label style={S.label}>Pickup Time</label>
+                      <div
+                        style={{
+                          marginTop: "auto",
+                          position: "relative",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <FaClock
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            color: "#b50002",
+                            fontSize: 13,
+                            pointerEvents: "none",
+                            zIndex: 1,
+                          }}
+                        />
+                        <select
+                          name="pickupTime"
+                          value={formData.pickupTime}
+                          onChange={handleInputChange}
+                          style={S.select}
+                          required
+                          disabled={noSlotsAvailable}
+                        >
+                          {noSlotsAvailable ? (
+                            <option value="">No hours available</option>
+                          ) : (
+                            availablePickupSlots.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <FaChevronDown
+                          style={{
+                            position: "absolute",
+                            right: 10,
+                            color: "rgba(0,0,0,0.3)",
+                            fontSize: 11,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Return Date + Time */}
                   <div className="md-grid-2">
-                    <Field icon={FaCalendarAlt} label="Return Date">
-                      <input
-                        type="date"
-                        name="returnDate"
-                        min={addDaysToISODate(formData.pickupDate, 1)}
-                        max={formatDate(sixMonthsFromToday())}
-                        value={formData.returnDate}
-                        onChange={handleInputChange}
-                        style={S.input}
-                        required
-                      />
-                    </Field>
-                    <Field icon={FaClock} label="Return Time">
-                      <select
-                        name="returnTime"
-                        value={formData.returnTime}
-                        onChange={handleInputChange}
-                        style={S.select}
-                        required
-                      >
-                        {validReturnSlots.length > 0 ? (
-                          validReturnSlots.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="" disabled>
-                            No hours available
-                          </option>
-                        )}
-                      </select>
-                      <FaChevronDown
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <label style={S.label}>Return Date</label>
+                      <p
                         style={{
-                          position: "absolute",
-                          right: 10,
-                          color: "rgba(0,0,0,0.3)",
-                          fontSize: 11,
-                          pointerEvents: "none",
+                          fontSize: 10,
+                          color: "rgba(0,0,0,0.35)",
+                          marginBottom: 6,
+                          fontFamily: "'Space Grotesk',sans-serif",
                         }}
-                      />
-                    </Field>
+                      >
+                        Must be after pickup
+                      </p>
+                      <div style={{ marginTop: "auto" }}>
+                        <InlineDatePicker
+                          value={formData.returnDate}
+                          onChange={handleReturnDateChange}
+                          minDate={addDaysToISODate(formData.pickupDate, 1)}
+                          maxDate={formatDate(sixMonthsFromToday())}
+                          label="Return Date"
+                          mode="return"
+                          pickupDateISO={formData.pickupDate}
+                          maintenanceRanges={maintenanceRanges}
+                          bookingRanges={bookingRanges}
+                        />
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <label style={S.label}>Return Time</label>
+                      <div
+                        style={{
+                          marginTop: "auto",
+                          position: "relative",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <FaClock
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            color: "#b50002",
+                            fontSize: 13,
+                            pointerEvents: "none",
+                            zIndex: 1,
+                          }}
+                        />
+                        <select
+                          name="returnTime"
+                          value={formData.returnTime}
+                          onChange={handleInputChange}
+                          style={S.select}
+                          required
+                        >
+                          {validReturnSlots.length > 0 ? (
+                            validReturnSlots.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="" disabled>
+                              No hours available
+                            </option>
+                          )}
+                        </select>
+                        <FaChevronDown
+                          style={{
+                            position: "absolute",
+                            right: 10,
+                            color: "rgba(0,0,0,0.3)",
+                            fontSize: 11,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Selected date summary */}
+                  {(formData.pickupDate || formData.returnDate) && (
+                    <div
+                      style={{
+                        background: "#F5F5F3",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <FaCalendarAlt
+                          style={{ color: "#b50002", fontSize: 12 }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {formData.pickupDate
+                            ? new Date(
+                                formData.pickupDate + "T00:00:00",
+                              ).toLocaleDateString("en-PH", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "—"}
+                          {" → "}
+                          {formData.returnDate
+                            ? new Date(
+                                formData.returnDate + "T00:00:00",
+                              ).toLocaleDateString("en-PH", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "Select return"}
+                        </span>
+                      </div>
+                      {formData.returnDate && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#b50002",
+                            background: "rgba(181,0,2,0.08)",
+                            borderRadius: 999,
+                            padding: "3px 10px",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {days} day{days !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   <Field icon={FaMapMarkerAlt} label="Pickup Location">
                     <input
@@ -3141,7 +3817,7 @@ const MotorcycleDetail = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginTop: 24, // ADDED PROPER SPACING
+                      marginTop: 24,
                     }}
                   >
                     <p
@@ -3186,7 +3862,6 @@ const MotorcycleDetail = () => {
                       Update your profile to change these details.
                     </p>
                   </div>
-
                   <Field icon={FaUser} label="Full Name">
                     <input
                       type="text"
@@ -3198,7 +3873,6 @@ const MotorcycleDetail = () => {
                       style={{ ...S.input, opacity: 0.6 }}
                     />
                   </Field>
-
                   <div className="md-grid-2">
                     <Field icon={FaEnvelope} label="Email Address">
                       <input
@@ -3223,7 +3897,6 @@ const MotorcycleDetail = () => {
                       />
                     </Field>
                   </div>
-
                   <div>
                     <Field icon={FaMapMarkerAlt} label="Renter's Address">
                       <input
@@ -3264,13 +3937,12 @@ const MotorcycleDetail = () => {
                       </p>
                     )}
                   </div>
-
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginTop: 24, // ADDED PROPER SPACING
+                      marginTop: 24,
                     }}
                   >
                     <button
@@ -3609,7 +4281,6 @@ const MotorcycleDetail = () => {
                     <p style={{ ...S.label, marginBottom: 14 }}>
                       Downpayment — ₱{DOWNPAYMENT}
                     </p>
-
                     <div style={{ marginBottom: 12 }}>
                       <Field icon={FaCreditCard} label="Payment Method">
                         <select
@@ -3634,7 +4305,6 @@ const MotorcycleDetail = () => {
                         />
                       </Field>
                     </div>
-
                     <p
                       style={{
                         fontSize: 12,
@@ -3647,8 +4317,6 @@ const MotorcycleDetail = () => {
                       {formData.reservationPaymentMethod}, then upload proof
                       below.
                     </p>
-
-                    {/* QR */}
                     <div
                       style={{
                         background: "#F5F5F3",
@@ -3691,7 +4359,6 @@ const MotorcycleDetail = () => {
                         QR shown is for {formData.reservationPaymentMethod}
                       </p>
                     </div>
-
                     <div className="md-grid-2" style={{ marginBottom: 12 }}>
                       <Field icon={FaReceipt} label="Reference ID">
                         <input
@@ -3715,7 +4382,6 @@ const MotorcycleDetail = () => {
                         />
                       </Field>
                     </div>
-
                     <div style={{ marginBottom: 12 }}>
                       <Field icon={FaCreditCard} label="Amount Sent">
                         <input
@@ -3731,7 +4397,6 @@ const MotorcycleDetail = () => {
                         />
                       </Field>
                     </div>
-
                     <div>
                       <p style={S.label}>Payment Proof (Image)</p>
                       <div
@@ -3769,7 +4434,6 @@ const MotorcycleDetail = () => {
                     </div>
                   </div>
 
-                  {/* Info banners */}
                   <div
                     style={{
                       background: "#fffbeb",
@@ -3795,7 +4459,7 @@ const MotorcycleDetail = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginTop: 24, // ADDED PROPER SPACING
+                      marginTop: 24,
                     }}
                   >
                     <button

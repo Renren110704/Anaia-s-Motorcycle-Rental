@@ -821,7 +821,7 @@ const Motorcycles = () => {
 
         .mc-inner { max-width: 1280px; margin: 0 auto; }
 
-        .mc-top { margin-bottom: 32px; margin-top: 32px; }
+        .mc-top { margin-bottom: 20px; margin-top: 32px; }
         .mc-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #b50002; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .mc-eyebrow-line { width: 20px; height: 1.5px; background: #b50002; border-radius: 2px; }
         .mc-title { font-size: clamp(24px, 3.5vw, 38px); font-weight: 800; color: #0E0E0E; letter-spacing: -1px; }
@@ -978,7 +978,7 @@ const Motorcycles = () => {
           {/* Header */}
           <div className="mc-top">
             <div className="mc-eyebrow"></div>
-            <h1 className="mc-title">Motorcycle Collection</h1>
+            <h1 className="mc-title">Vehicle Collection</h1>
           </div>
 
           {/* Search + filter toggle */}
@@ -1021,7 +1021,7 @@ const Motorcycles = () => {
               fontFamily: "'Space Grotesk',sans-serif",
             }}
           >
-            {filteredMotorcycles.length} available motorcycle
+            {filteredMotorcycles.length} available unit
             {filteredMotorcycles.length !== 1 ? "s" : ""}
             {totalPages > 1 && (
               <span style={{ color: "rgba(0,0,0,0.3)" }}>

@@ -37,7 +37,7 @@ const VALUES = [
   {
     icon: "🛡️",
     title: "Safety Above All",
-    desc: "Every motorcycle is inspected before and after each rental. We provide free helmets and encourage riders to gear up before every trip.",
+    desc: "Every unit is inspected before and after each rental. We provide free helmet and encourage riders to gear up before every trip.",
   },
   {
     icon: "📍",
@@ -55,7 +55,7 @@ const MILESTONES = [
   {
     year: "2024",
     label: "30+ Fleet",
-    desc: "Expanded to scooters, nakeds, and underbones across all major brands.",
+    desc: "Expanded to scooters, big bikes, and underbones across all major brands.",
   },
   {
     year: "2025",
@@ -816,7 +816,6 @@ export default function AboutPage() {
           </div>
 
           <div className="ab-hero-content">
-
             <h1 className={`ab-hero-h1 ${mounted ? "in" : ""}`}>
               The road
               <br />
@@ -825,10 +824,10 @@ export default function AboutPage() {
 
             <p className={`ab-hero-sub ${mounted ? "in" : ""}`}>
               Anaia's Motorcycle Rental is Bacoor's most trusted motorcycle
-              rental — putting riders on premium units since 2019.
+              rental — putting riders on premium units since 2022.
             </p>
 
-            <div className={`ab-hero-stats ${mounted ? "in" : ""}`}>
+            {/* <div className={`ab-hero-stats ${mounted ? "in" : ""}`}>
               <div className="ab-hstat">
                 <span className="ab-hstat-num">30+</span>
                 <span className="ab-hstat-label">Motorcycles</span>
@@ -845,7 +844,7 @@ export default function AboutPage() {
                 <span className="ab-hstat-num">5+</span>
                 <span className="ab-hstat-label">Years Serving</span>
               </div>
-            </div>
+            </div> */}
           </div>
         </section>
 
@@ -871,9 +870,10 @@ export default function AboutPage() {
               </p>
               <p className="ab-story-body">
                 We started with just three units and a love for motorcycles.
-                Today, our fleet spans scooters, naked bikes, and underbones
-                from the Philippines' top brands — all maintained to the highest
-                standard and ready to ride.
+                Today, our fleet spans scooters, big bikes, and underbones as well as
+                pickup, sedan, MPV, and SUV cars from the Philippines' top
+                brands — all maintained to the highest standard and ready to
+                ride.
               </p>
               <p className="ab-story-body">
                 Whether you're exploring Cavite's coastal roads, commuting
@@ -982,14 +982,14 @@ export default function AboutPage() {
                 is <em>one click away.</em>
               </h2>
               <p className="ab-cta-sub">
-                Browse our full fleet and book your motorcycle in minutes. Pick
+                Browse our full fleet and book your preferred unit in minutes. Pick
                 up at our place in Bacoor — no delivery, no fuss.
               </p>
             </div>
 
             <div className="ab-cta-right">
               <a href="/motorcycles" className="ab-btn-primary">
-                Browse Motorcycles →
+                Browse Vehicles →
               </a>
               <a href="/contact" className="ab-btn-secondary">
                 Contact Us

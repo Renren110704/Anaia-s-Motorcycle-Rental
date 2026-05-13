@@ -39,7 +39,7 @@ const AdminLogin = ({ onLogin }) => {
       className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6"
       style={{
         backgroundImage: `url(${bgImage})`,
-        backgroundSize: "cover",
+        backgroundSize: "auto",
         backgroundPosition: "center",
       }}
     >

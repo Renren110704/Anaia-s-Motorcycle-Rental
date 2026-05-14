@@ -837,11 +837,11 @@ const getTodayStart = () => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
-const sevenDaysFromToday = () => {
-  const d = getTodayStart();
-  d.setDate(d.getDate() + 7);
-  return d;
-};
+// const sevenDaysFromToday = () => {
+//   const d = getTodayStart();
+//   d.setDate(d.getDate() + 7);
+//   return d;
+// };
 // const sixMonthsFromToday = () => {
 //   const d = getTodayStart();
 //   d.setMonth(d.getMonth() + 6);

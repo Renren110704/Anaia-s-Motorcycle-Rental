@@ -545,16 +545,16 @@ const Motorcycles = () => {
     return { state: "fully_available" };
   }, []);
 
-  const isMotorcycleUnavailable = useCallback(
-    (motorcycle) => {
-      if (motorcycle?.status && motorcycle.status !== "available") return true;
-      const eff = computeEffectiveAvailability(motorcycle);
-      return (
-        eff?.state === "booked" || eff?.state === "available_until_reservation"
-      );
-    },
-    [computeEffectiveAvailability],
-  );
+  // const isMotorcycleUnavailable = useCallback(
+  //   (motorcycle) => {
+  //     if (motorcycle?.status && motorcycle.status !== "available") return true;
+  //     const eff = computeEffectiveAvailability(motorcycle);
+  //     return (
+  //       eff?.state === "booked" || eff?.state === "available_until_reservation"
+  //     );
+  //   },
+  //   [computeEffectiveAvailability],
+  // );
 
   const applyFiltersAndSort = useCallback(() => {
     let filtered = [...motorcycles];

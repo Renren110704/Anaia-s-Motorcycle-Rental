@@ -243,6 +243,7 @@ const ReturnInspection = () => {
   const [penaltyAmount, setPenaltyAmount] = useState("");
   const [penaltySummary, setPenaltySummary] = useState("");
   const [damageFiles, setDamageFiles] = useState([]);
+  const [penaltyFiles, setPenaltyFiles] = useState([]);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -339,6 +340,7 @@ const ReturnInspection = () => {
     );
     setPenaltySummary(inspection.penaltySummary || "");
     setDamageFiles([]);
+    setPenaltyFiles([]);
   }, [selectedBooking]);
 
   const handleStartInspection = async (booking) => {
@@ -376,6 +378,9 @@ const ReturnInspection = () => {
       } else if (clearanceStatus === "penalty_required") {
         formData.append("penaltyAmount", penaltyAmount || "0");
         formData.append("penaltySummary", penaltySummary);
+        Array.from(penaltyFiles || []).forEach((file) =>
+          formData.append("penaltyPhotos", file)
+        );
       }
       const response = await api.patch(
         `/api/motorcycle-bookings/${selectedBooking._id}/return-inspection`,
@@ -874,34 +879,78 @@ const ReturnInspection = () => {
 
                   {/* Penalty Required */}
                   {clearanceStatus === "penalty_required" && (
-                    <PanelSection
-                      icon={ShieldAlert}
-                      title="Penalty"
-                      accent="text-[#b50002]"
-                    >
-                      <div className="space-y-2">
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b50002] text-sm font-bold pointer-events-none">
-                            ₱
-                          </span>
-                          <input
-                            type="number"
-                            value={penaltyAmount}
-                            onChange={(e) => setPenaltyAmount(e.target.value)}
-                            placeholder="0"
-                            min="0"
-                            className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+                    <>
+                      <PanelSection
+                        icon={ShieldAlert}
+                        title="Penalty"
+                        accent="text-[#b50002]"
+                      >
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b50002] text-sm font-bold pointer-events-none">
+                              ₱
+                            </span>
+                            <input
+                              type="number"
+                              value={penaltyAmount}
+                              onChange={(e) => setPenaltyAmount(e.target.value)}
+                              placeholder="0"
+                              min="0"
+                              className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+                            />
+                          </div>
+                          <textarea
+                            value={penaltySummary}
+                            onChange={(e) => setPenaltySummary(e.target.value)}
+                            rows={2}
+                            placeholder="Penalty details..."
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none"
                           />
                         </div>
-                        <textarea
-                          value={penaltySummary}
-                          onChange={(e) => setPenaltySummary(e.target.value)}
-                          rows={2}
-                          placeholder="Penalty details..."
-                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none"
-                        />
-                      </div>
-                    </PanelSection>
+                      </PanelSection>
+
+                      {/* Add the Photo Upload Panel */}
+                      <PanelSection icon={FaImages} title="Penalty Evidence" accent="text-[#b50002]">
+                        <label className="block cursor-pointer">
+                          <div className="w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-[#b50002]/30 transition-colors p-4 text-center">
+                            <FaImages className="text-slate-300 text-xl mx-auto mb-1.5" />
+                            <p className="text-xs text-slate-400 font-semibold">
+                              Click to upload photos
+                            </p>
+                            <p className="text-[10px] text-slate-300 mt-0.5">
+                              PNG, JPG up to 5MB each
+                            </p>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              onChange={(e) => setPenaltyFiles(e.target.files)}
+                              className="hidden"
+                            />
+                          </div>
+                        </label>
+                        {penaltyFiles.length > 0 && (
+                          <p className="text-[11px] text-slate-500 mt-1.5 font-semibold">
+                            {penaltyFiles.length} file(s) selected
+                          </p>
+                        )}
+                        {Array.isArray(selectedBooking.returnInspection?.penaltyPhotos) &&
+                          selectedBooking.returnInspection.penaltyPhotos.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              {selectedBooking.returnInspection.penaltyPhotos.map(
+                                (photo) => (
+                                  <img
+                                    key={photo}
+                                    src={makeImageUrl(photo)}
+                                    alt="Penalty Evidence"
+                                    className="h-16 w-full object-cover rounded-lg border border-slate-100"
+                                  />
+                                ),
+                              )}
+                            </div>
+                          )}
+                      </PanelSection>
+                    </>
                   )}
 
                   {/* Action buttons */}

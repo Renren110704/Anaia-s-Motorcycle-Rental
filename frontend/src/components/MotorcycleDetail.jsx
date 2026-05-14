@@ -42,7 +42,7 @@ const api = axios.create({
 });
 
 const DOWNPAYMENT = 200;
-const HELMET_FEE = 100;
+const HELMET_FEE = 50;
 const CHECKOUT_LOCK_FALLBACK_MINUTES = 10;
 const PICKUP_LOCATION =
   "Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite";
@@ -154,8 +154,15 @@ const normalizeCity = (raw = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const getDistanceFee = (cityName) => {
-  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0 };
+const getDistanceFee = (cityName, destinationStr = "") => {
+  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
+
+  // Check if the full destination string includes NCR or CALABARZON identifiers
+  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  if (isFreeRegion) {
+    return { fee: 0, tier: { label: "Free Region (NCR / CALABARZON)" }, km: 0, isEstimate: false };
+  }
+
   const upper = cityName.toUpperCase().trim();
   const km =
     CITY_DISTANCES[upper] ?? CITY_DISTANCES[normalizeCity(upper)] ?? null;
@@ -2432,7 +2439,7 @@ const MotorcycleDetail = () => {
     tier: distanceTier,
     km: distanceKm,
     isEstimate,
-  } = getDistanceFee(formData.destinationCity);
+  } = getDistanceFee(formData.destinationCity, formData.destination);
   const helmetFee = formData.wantsHelmet ? HELMET_FEE : 0;
   const baseRental = days * price;
   const discountAmount = applicableDiscount

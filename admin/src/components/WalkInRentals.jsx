@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import {
@@ -18,18 +24,21 @@ import {
   FaTag,
   FaCog,
   FaShieldAlt,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { PlusCircle } from "lucide-react";
+import { computeDiscountedPrice, useApplicableDiscount } from "./DiscountBadge";
 
 const baseURL = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
-const HELMET_FEE = 100;
+const HELMET_FEE = 50;
 
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
-// ── Shared styles (same as ManageMotorcycle) ──────────────────────────────────
+// ── Shared styles ──────────────────────────────────
 const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 const fieldClsIcon =
@@ -161,8 +170,15 @@ const normalizeCity = (raw = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const getDistanceFee = (cityName) => {
-  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0 };
+const getDistanceFee = (cityName, destinationStr = "") => {
+  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
+
+  // Check if the full destination string includes NCR or CALABARZON identifiers
+  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  if (isFreeRegion) {
+    return { fee: 0, tier: { label: "Free Region (NCR / CALABARZON)" }, km: 0, isEstimate: false };
+  }
+
   const upper = cityName.toUpperCase().trim();
   const km =
     CITY_DISTANCES[upper] ?? CITY_DISTANCES[normalizeCity(upper)] ?? null;
@@ -203,16 +219,7 @@ const addDaysToISODate = (dateISO, days) => {
   return formatLocalDate(d);
 };
 const todayISO = () => formatLocalDate(new Date());
-const nowHHMM = () => {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-const clampToReturnWindow = (t) => {
-  if (!t) return RETURN_TIME_MIN;
-  if (t < RETURN_TIME_MIN) return RETURN_TIME_MIN;
-  if (t > RETURN_TIME_MAX) return RETURN_TIME_MAX;
-  return t;
-};
+
 const getValidReturnSlots = (pickupDate, returnDate, pickupTime) => {
   if (!returnDate || !pickupDate || returnDate !== pickupDate)
     return ALL_TIME_SLOTS;
@@ -233,6 +240,324 @@ const sixMonthsFrom = (dateIso) => {
   return d;
 };
 const formatMoney = (n) => `₱${Number(n || 0).toLocaleString("en-PH")}`;
+
+// ── Calendar Helpers ────────────────────────────────────────────
+const toDateKey = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const addMonths = (date, amount) =>
+  new Date(date.getFullYear(), date.getMonth() + amount, 1);
+const getMonthGrid = (monthDate) => {
+  const firstDay = startOfMonth(monthDate);
+  const firstWeekday = firstDay.getDay();
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - firstWeekday);
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    return d;
+  });
+};
+const MAINTENANCE_STORAGE_KEY = "moto_maintenance_schedules";
+const loadMaintenanceSchedules = () => {
+  try {
+    return JSON.parse(localStorage.getItem(MAINTENANCE_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+const addDaysHelper = (date, n) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+};
+
+// ── Inline Calendar Picker ──────────────────────────────────────
+const InlineDatePicker = ({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+  label,
+  mode,
+  pickupDateISO,
+  maintenanceRanges = [],
+  bookingRanges = [],
+  disabled = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    if (value) return new Date(value + "T00:00:00");
+    return new Date();
+  });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const monthGrid = getMonthGrid(viewMonth);
+  const minD = minDate ? new Date(minDate + "T00:00:00") : null;
+  const maxD = maxDate ? new Date(maxDate + "T00:00:00") : null;
+
+  const isMaintenanceDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some(
+      (s) => dk >= toDateKey(s.startDate) && dk <= toDateKey(s.endDate),
+    );
+  };
+  const isBufferDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some((s) => {
+      const buf = addDaysHelper(s.startDate, -1);
+      return dk === toDateKey(buf);
+    });
+  };
+  const isBookedDay = (date) => {
+    const dk = toDateKey(date);
+    return bookingRanges.some(
+      (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+  };
+
+  const handleDayClick = (date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (minD && d < minD) return;
+    if (maxD && d > maxD) return;
+    if (isMaintenanceDay(date)) return;
+    if (mode === "return" && isBufferDay(date)) return;
+    onChange(formatLocalDate(d));
+    setOpen(false);
+  };
+
+  const displayValue = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className={`w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-left flex items-center justify-between transition-colors focus:outline-none focus:border-[#b50002]/30 ${disabled ? "opacity-60 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:border-[#b50002]/30"} ${open ? "border-[#b50002]/50 ring-1 ring-[#b50002]/10" : ""}`}
+      >
+        <FaCalendarAlt className="absolute left-3 text-[#b50002] text-sm pointer-events-none" />
+        <span className={value ? "text-[#171717]" : "text-slate-400"}>
+          {displayValue || `Select ${label}`}
+        </span>
+        <FaChevronDown
+          className="text-slate-300 text-[10px] transition-transform"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      {/* Dropdown calendar */}
+      {open && (
+        <div className="absolute top-[calc(100%+6px)] left-0 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 min-w-[300px] w-full max-w-[340px] animate-in fade-in zoom-in-95 duration-100">
+          {/* Month navigation */}
+          <div className="flex items-center justify-between mb-3">
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, -1))}
+              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              <FaChevronLeft size={10} />
+            </button>
+            <span className="text-sm font-bold text-[#171717]">
+              {monthLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, 1))}
+              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              <FaChevronRight size={10} />
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <div
+                key={d}
+                className="text-center text-[10px] font-bold text-slate-400 py-1"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-1">
+            {monthGrid.map((date) => {
+              const inMonth = date.getMonth() === viewMonth.getMonth();
+              const dk = toDateKey(date);
+              const isSelected = value === dk;
+              const d = new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+              );
+              const tooEarly = minD && d < minD;
+              const tooLate = maxD && d > maxD;
+              const isMaint = isMaintenanceDay(date);
+              const isBuf = isBufferDay(date);
+              const isBooked = isBookedDay(date);
+              const isDisabled =
+                tooEarly ||
+                tooLate ||
+                isMaint ||
+                (mode === "return" && isBuf) ||
+                isBooked;
+              const isToday = dk === todayISO();
+
+              const isPickupDate = mode === "return" && pickupDateISO === dk;
+              const isInRange =
+                mode === "return" &&
+                pickupDateISO &&
+                value &&
+                dk > pickupDateISO &&
+                dk < value;
+
+              let bg = "transparent";
+              let color = inMonth ? "#171717" : "rgba(0,0,0,0.2)";
+              let border = "1.5px solid transparent";
+              let cursor = isDisabled ? "not-allowed" : "pointer";
+              let opacity = isDisabled
+                ? isMaint || (mode === "return" && isBuf)
+                  ? 1
+                  : 0.3
+                : 1;
+
+              if (isSelected) {
+                bg = "#171717";
+                color = "#fff";
+                border = "1.5px solid #171717";
+              } else if (isPickupDate) {
+                bg = "#b50002";
+                color = "#fff";
+                border = "1.5px solid #b50002";
+              } else if (isInRange) {
+                bg = "rgba(181,0,2,0.07)";
+                border = "1.5px solid rgba(181,0,2,0.12)";
+              } else if (isMaint) {
+                bg = "rgba(124,58,237,0.08)";
+                color = "#7c3aed";
+                border = "1.5px solid rgba(124,58,237,0.2)";
+              } else if (isBuf && mode === "return") {
+                bg = "rgba(245,158,11,0.08)";
+                color = "#b45309";
+                border = "1.5px solid rgba(245,158,11,0.25)";
+              } else if (isBooked && !isSelected) {
+                bg = "rgba(181,0,2,0.05)";
+                border = "1.5px solid rgba(181,0,2,0.1)";
+              } else if (isToday && inMonth) {
+                border = "1.5px solid rgba(0,0,0,0.2)";
+              }
+
+              return (
+                <button
+                  key={dk}
+                  type="button"
+                  disabled={isDisabled || !inMonth}
+                  onClick={() => inMonth && !isDisabled && handleDayClick(date)}
+                  className={`relative flex flex-col items-center justify-center min-h-[32px] rounded-lg text-xs transition-all ${!isDisabled && inMonth && !isSelected && !isPickupDate && !isInRange ? "hover:bg-slate-100 hover:border-slate-300" : ""}`}
+                  style={{
+                    background: bg,
+                    color,
+                    border,
+                    fontWeight: isSelected || isToday ? 800 : 500,
+                    cursor,
+                    opacity,
+                  }}
+                >
+                  {date.getDate()}
+                  {isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: isSelected ? "#fff" : "#7c3aed",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                  )}
+                  {isBuf && !isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "#f59e0b",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                  )}
+                  {isBooked && !isMaint && !isBuf && !isSelected && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "rgba(181,0,2,0.4)",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap gap-x-3 gap-y-1.5">
+            {[
+              { dot: "#7c3aed", label: "Maintenance" },
+              { dot: "#f59e0b", label: "Buffer day" },
+              { dot: "rgba(181,0,2,0.4)", label: "Booked" },
+            ].map(({ dot, label }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: dot,
+                    flexShrink: 0,
+                  }}
+                />
+                <span className="text-[10px] font-medium text-slate-500">
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── PH Address Hook (unchanged logic) ────────────────────────────────────────
 const usePHAddress = () => {
@@ -591,6 +916,9 @@ const WalkInRentals = () => {
   const [submitting, setSubmitting] = useState(false);
   const [motorcycle, setMotorcycle] = useState(null);
 
+  const [calBookings, setCalBookings] = useState([]);
+  const [maintenanceRanges, setMaintenanceRanges] = useState([]);
+
   const [address, setAddress] = useState({
     regionCode: "",
     regionName: "",
@@ -625,7 +953,7 @@ const WalkInRentals = () => {
     renterEmail: "",
     phone: "",
     pickupDate: todayISO(),
-    pickupTime: nowHHMM(),
+    pickupTime: "08:00",
     returnDate: "",
     returnTime: RETURN_TIME_MIN,
     destination: "",
@@ -634,17 +962,194 @@ const WalkInRentals = () => {
     wantsHelmet: false,
   });
 
+  // ── Load Bookings & Maintenance Calendar Data ───────────────────────
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const [bookingsRes, motoRes] = await Promise.allSettled([
+          api.get("/api/motorcycle-bookings", {
+            signal: controller.signal,
+            params: { limit: 200 },
+          }),
+          api.get("/api/motorcycles", {
+            signal: controller.signal,
+            params: { limit: 200, includeDeleted: "false" },
+          }),
+        ]);
+        if (bookingsRes.status === "fulfilled") {
+          const payload = bookingsRes.value.data;
+          setCalBookings(
+            Array.isArray(payload)
+              ? payload
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : [],
+          );
+        }
+        if (motoRes.status === "fulfilled") {
+          const payload = motoRes.value.data;
+          const data = Array.isArray(payload)
+            ? payload
+            : payload?.data || payload?.motorcycles || [];
+          const now = new Date();
+          const autoMaint = data
+            .map((m) => {
+              const rawStart =
+                m.maintenanceScheduleStartAt || m.maintenanceScheduleAt || null;
+              const rawEnd =
+                m.maintenanceScheduleEndAt || m.maintenanceScheduleAt || null;
+              if (!rawStart || !rawEnd) return null;
+              const start = new Date(rawStart),
+                end = new Date(rawEnd);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              if (end < now) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return {
+                id: `auto-${m._id}`,
+                motorcycleId: m._id,
+                motorcycle: m,
+                startDate: start,
+                endDate: end,
+                auto: true,
+              };
+            })
+            .filter(Boolean);
+          const stored = loadMaintenanceSchedules()
+            .filter((s) => !s.cancelled && !s.completed)
+            .map((s) => {
+              const moto = data.find((m) => m._id === s.motorcycleId);
+              const start = new Date(s.startDate),
+                end = new Date(s.endDate);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return { ...s, startDate: start, endDate: end, motorcycle: moto };
+            })
+            .filter(Boolean);
+          setMaintenanceRanges([...autoMaint, ...stored]);
+        }
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, []);
+
+  const currentMotoId = motorcycle?._id || motorcycle?.id;
+
+  const bookingRanges = calBookings
+    .filter((b) => {
+      const id =
+        b.motorcycle?._id || b.motorcycle?.id || b.motorcycle || b.motorcycleId;
+      return String(id) === String(currentMotoId);
+    })
+    .map((b) => {
+      const status = String(b?.status || "").toLowerCase();
+      if (["completed", "inspection", "canceled", "cancelled"].includes(status))
+        return null;
+      const pickupDate = new Date(b.pickupDate);
+      const returnDate = new Date(b.returnDate);
+      if (isNaN(pickupDate.getTime()) || isNaN(returnDate.getTime()))
+        return null;
+      return {
+        ...b,
+        pickupDate: new Date(
+          pickupDate.getFullYear(),
+          pickupDate.getMonth(),
+          pickupDate.getDate(),
+        ),
+        returnDate: new Date(
+          returnDate.getFullYear(),
+          returnDate.getMonth(),
+          returnDate.getDate(),
+        ),
+      };
+    })
+    .filter(Boolean);
+
+  const currentMaintenanceRanges = maintenanceRanges.filter((m) => {
+    const id = m.motorcycleId || m.motorcycle?._id || m.motorcycle?.id;
+    return String(id) === String(currentMotoId);
+  });
+
+  const getNextUnavailableDate = (pickupDateISO) => {
+    if (!pickupDateISO) return null;
+    const pickup = new Date(pickupDateISO + "T00:00:00");
+    let earliest = null;
+
+    const checkDate = (d) => {
+      if (d > pickup) {
+        if (!earliest || d < earliest) earliest = d;
+      }
+    };
+
+    bookingRanges.forEach((b) => checkDate(b.pickupDate));
+    currentMaintenanceRanges.forEach((m) => checkDate(m.startDate));
+
+    if (earliest) {
+      return formatLocalDate(earliest);
+    }
+    return null;
+  };
+
+  const handlePickupDateChange = (dateISO) => {
+    const selected = new Date(dateISO);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (selected < todayStart) return;
+    const newReturnDate =
+      formData.returnDate && new Date(formData.returnDate) <= selected
+        ? ""
+        : formData.returnDate;
+
+    setFormData((p) => ({
+      ...p,
+      pickupDate: dateISO,
+      pickupTime: "08:00",
+      returnDate: newReturnDate,
+    }));
+  };
+
+  const handleReturnDateChange = (dateISO) => {
+    if (!dateISO) {
+      setFormData((p) => ({ ...p, returnDate: "" }));
+      return;
+    }
+    const selected = new Date(dateISO);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (selected < todayStart) return;
+    if (selected <= new Date(formData.pickupDate)) {
+      toast.error("Minimum rental duration is 24 hours.");
+      return;
+    }
+    setFormData((p) => ({ ...p, returnDate: dateISO }));
+  };
+
+  // Pricing & Discounts logic
   const price = Number(motorcycle?.dailyRate || 0);
   const days = calculateDays(formData.pickupDate, formData.returnDate);
+  const applicableDiscount = useApplicableDiscount(motorcycle, days);
+
   const {
     fee: distanceFee,
     tier: distanceTier,
     km: distanceKm,
     isEstimate,
-  } = getDistanceFee(formData.destinationCity);
+  } = getDistanceFee(formData.destinationCity, formData.destination);
   const helmetFee = formData.wantsHelmet ? HELMET_FEE : 0;
+
   const baseRental = days * price;
-  const totalAmount = baseRental + distanceFee + helmetFee;
+
+  // Calculate discount
+  const discountAmount = applicableDiscount
+    ? applicableDiscount.discountType === "percentage"
+      ? (baseRental * applicableDiscount.discountValue) / 100
+      : Math.min(applicableDiscount.discountValue, baseRental)
+    : 0;
+  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+
+  const totalAmount = discountedBaseRental + distanceFee + helmetFee;
   const DOWNPAYMENT = 200;
   const dueAtPickup = Math.max(0, totalAmount - DOWNPAYMENT);
 
@@ -736,13 +1241,9 @@ const WalkInRentals = () => {
         setMotorcycle(null);
         return;
       }
-      if ((m.status || "").toLowerCase() !== "available") {
-        toast.error(
-          "This unit is not available for a new walk-in rental.",
-        );
-        setMotorcycle(null);
-        return;
-      }
+
+      // The unit will load, and the calendar booking logic will prevent
+      // overlapping dates based on active rentals and maintenance schedules.
       setMotorcycle(m);
       toast.success(`Loaded ${m.make || ""} ${m.model || ""}`.trim());
     } catch (err) {
@@ -803,16 +1304,6 @@ const WalkInRentals = () => {
     setAddress((p) => ({ ...p, barangayCode: code, barangayName: name }));
   };
 
-  const syncPickupToNow = () => {
-    setFormData((p) => ({
-      ...p,
-      pickupDate: todayISO(),
-      pickupTime: nowHHMM(),
-      returnTime: clampToReturnWindow(p.returnTime),
-    }));
-    toast.info("Pickup synced to current time.");
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!motorcycle?._id) {
@@ -851,10 +1342,6 @@ const WalkInRentals = () => {
       toast.error("Please select destination.");
       return;
     }
-    if (formData.pickupDate !== todayISO()) {
-      toast.error("Pickup date for walk-in rentals must be today.");
-      return;
-    }
     if (
       formData.returnTime < RETURN_TIME_MIN ||
       formData.returnTime > RETURN_TIME_MAX
@@ -875,6 +1362,38 @@ const WalkInRentals = () => {
     }
     if (ret > maxReturn) {
       toast.error("Return date must be within 6 months from pickup date.");
+      return;
+    }
+
+    const isDateBookedOrMaintenance = (dateStr) => {
+      const dk = dateStr;
+      const isBooked = bookingRanges.some(
+        (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+      );
+      const isMaint = currentMaintenanceRanges.some(
+        (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
+      );
+      return isBooked || isMaint;
+    };
+
+    if (isDateBookedOrMaintenance(formData.pickupDate)) {
+      toast.error(
+        "Selected pickup date is currently booked or under maintenance.",
+      );
+      return;
+    }
+    if (isDateBookedOrMaintenance(formData.returnDate)) {
+      toast.error(
+        "Selected return date is currently booked or under maintenance.",
+      );
+      return;
+    }
+
+    const nextUnavail = getNextUnavailableDate(formData.pickupDate);
+    if (nextUnavail && formData.returnDate > nextUnavail) {
+      toast.error(
+        "Selected dates overlap with an existing booking or maintenance.",
+      );
       return;
     }
 
@@ -905,6 +1424,7 @@ const WalkInRentals = () => {
         destination: formData.destination,
         paymentMethod: formData.paymentMethod,
         reservationPaymentMethod: formData.paymentMethod,
+        fullPaymentMethod: formData.paymentMethod,
         amount: totalAmount,
         details: {
           pickupLocation:
@@ -915,6 +1435,18 @@ const WalkInRentals = () => {
           helmetFee,
           destinationCity: formData.destinationCity,
           downpayment: 0,
+          appliedDiscount: applicableDiscount
+            ? {
+                id: applicableDiscount._id,
+                name: applicableDiscount.name,
+                code: applicableDiscount.code || "",
+                discountType: applicableDiscount.discountType,
+                discountValue: applicableDiscount.discountValue,
+                discountAmount: Math.round(discountAmount),
+                discountedBaseRental: Math.round(discountedBaseRental),
+                discountedTotalAmount: Math.round(totalAmount),
+              }
+            : null,
         },
         address: {
           barangay: address.barangayName,
@@ -924,6 +1456,14 @@ const WalkInRentals = () => {
           zipCode: address.zipCode,
         },
       });
+
+      // Increment discount usage if applicable
+      if (applicableDiscount?._id) {
+        api
+          .patch(`/api/discounts/${applicableDiscount._id}/increment-usage`)
+          .catch(() => {});
+      }
+
       toast.success("Walk-in booking created successfully.");
       setFormData((p) => ({
         ...p,
@@ -931,7 +1471,7 @@ const WalkInRentals = () => {
         renterEmail: "",
         phone: "",
         pickupDate: todayISO(),
-        pickupTime: nowHHMM(),
+        pickupTime: "08:00",
         returnDate: "",
         returnTime: RETURN_TIME_MIN,
         destination: "",
@@ -1089,17 +1629,47 @@ const WalkInRentals = () => {
                       <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
                         {motorcycle.unitId}
                       </p>
-                      <p className="font-black text-[#171717] text-[15px] leading-tight">
-                        {motorcycle.make} {motorcycle.model}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {motorcycle.year} · {motorcycle.category}
-                      </p>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-black text-[#171717] text-[15px] leading-tight">
+                            {motorcycle.make} {motorcycle.model}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {motorcycle.year} · {motorcycle.category}
+                          </p>
+                        </div>
+                        {applicableDiscount && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">
+                            {applicableDiscount.discountType === "percentage"
+                              ? `-${applicableDiscount.discountValue}% OFF`
+                              : `-${formatMoney(applicableDiscount.discountValue)} OFF`}
+                          </span>
+                        )}
+                      </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                         {[
                           {
                             icon: FaTachometerAlt,
-                            label: formatMoney(motorcycle.dailyRate) + "/day",
+                            label: applicableDiscount ? (
+                              <span className="flex items-center gap-1.5">
+                                <span className="line-through opacity-50">
+                                  {formatMoney(motorcycle.dailyRate)}
+                                </span>
+                                <span className="text-[#b50002] font-bold">
+                                  {formatMoney(
+                                    Math.round(
+                                      computeDiscountedPrice(
+                                        motorcycle.dailyRate,
+                                        applicableDiscount,
+                                      ),
+                                    ),
+                                  )}
+                                  /d
+                                </span>
+                              </span>
+                            ) : (
+                              formatMoney(motorcycle.dailyRate) + "/day"
+                            ),
                           },
                           {
                             icon: FaGasPump,
@@ -1307,25 +1877,19 @@ const WalkInRentals = () => {
                 <div>
                   <label className={labelCls}>Pickup</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <IconField icon={FaCalendarAlt}>
-                      <input
-                        type="date"
-                        value={formData.pickupDate}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            pickupDate: e.target.value || todayISO(),
-                          }))
-                        }
-                        min={todayISO()}
-                        max={todayISO()}
-                        className={fieldClsIcon}
-                      />
-                    </IconField>
-                    <IconField icon={FaClock}>
-                      <input
-                        type="time"
-                        step="60"
+                    <InlineDatePicker
+                      value={formData.pickupDate}
+                      onChange={handlePickupDateChange}
+                      minDate={todayISO()}
+                      maxDate={null}
+                      label="Pickup Date"
+                      mode="pickup"
+                      maintenanceRanges={currentMaintenanceRanges}
+                      bookingRanges={bookingRanges}
+                    />
+                    <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
+                      <FaClock className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
+                      <select
                         value={formData.pickupTime}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -1334,59 +1898,33 @@ const WalkInRentals = () => {
                           }))
                         }
                         className={fieldClsIcon}
-                      />
-                    </IconField>
+                      >
+                        {ALL_TIME_SLOTS.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                      <FaChevronDown className="absolute right-3 text-slate-300 text-[10px] pointer-events-none" />
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={syncPickupToNow}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
-                  >
-                    <FaClock className="text-[10px]" /> Sync to Now
-                  </button>
                 </div>
 
                 {/* Return */}
                 <div>
                   <label className={labelCls}>Return</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <IconField icon={FaCalendarAlt}>
-                      <input
-                        type="date"
-                        value={formData.returnDate}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (!value) {
-                            setFormData((p) => ({ ...p, returnDate: "" }));
-                            return;
-                          }
-                          const max = sixMonthsFrom(formData.pickupDate);
-                          const selected = new Date(value);
-                          if (selected > max) {
-                            toast.error(
-                              "Return date must be within 6 months from pickup date.",
-                            );
-                            return;
-                          }
-                          if (value < formData.pickupDate) {
-                            toast.error("Minimum rental duration is 24 hours.");
-                            return;
-                          }
-                          if (value === formData.pickupDate) {
-                            toast.error(
-                              "Same-day booking is disabled. Minimum is 24 hours.",
-                            );
-                            return;
-                          }
-                          setFormData((p) => ({ ...p, returnDate: value }));
-                        }}
-                        min={addDaysToISODate(formData.pickupDate, 1)}
-                        max={formatLocalDate(
-                          sixMonthsFrom(formData.pickupDate),
-                        )}
-                        className={fieldClsIcon}
-                      />
-                    </IconField>
+                    <InlineDatePicker
+                      value={formData.returnDate}
+                      onChange={handleReturnDateChange}
+                      minDate={addDaysToISODate(formData.pickupDate, 1)}
+                      maxDate={getNextUnavailableDate(formData.pickupDate)}
+                      label="Return Date"
+                      mode="return"
+                      pickupDateISO={formData.pickupDate}
+                      maintenanceRanges={currentMaintenanceRanges}
+                      bookingRanges={bookingRanges}
+                    />
                     <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
                       <FaClock className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
                       <select
@@ -1399,11 +1937,17 @@ const WalkInRentals = () => {
                         }
                         className={fieldClsIcon}
                       >
-                        {validReturnSlots.map((slot) => (
-                          <option key={slot.value} value={slot.value}>
-                            {slot.label}
+                        {validReturnSlots.length > 0 ? (
+                          validReturnSlots.map((slot) => (
+                            <option key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>
+                            No hours available
                           </option>
-                        ))}
+                        )}
                       </select>
                       <FaChevronDown className="absolute right-3 text-slate-300 text-[10px] pointer-events-none" />
                     </div>
@@ -1497,11 +2041,48 @@ const WalkInRentals = () => {
                 </h3>
                 <div className="space-y-2">
                   {[
-                    { label: "Daily Rate", value: formatMoney(price) },
+                    {
+                      label: "Daily Rate",
+                      value: applicableDiscount ? (
+                        <span className="flex items-center gap-2">
+                          <span className="line-through text-slate-400 font-normal">
+                            {formatMoney(price)}
+                          </span>
+                          <span className="text-[#b50002]">
+                            {formatMoney(
+                              Math.round(
+                                computeDiscountedPrice(
+                                  price,
+                                  applicableDiscount,
+                                ),
+                              ),
+                            )}
+                          </span>
+                        </span>
+                      ) : (
+                        formatMoney(price)
+                      ),
+                    },
                     { label: "Days", value: days },
                     {
                       label: "Rental Subtotal",
-                      value: formatMoney(baseRental),
+                      value: applicableDiscount ? (
+                        <span className="flex items-center gap-2">
+                          <span className="line-through text-slate-400 font-normal">
+                            {formatMoney(baseRental)}
+                          </span>
+                          <span>
+                            {formatMoney(Math.round(discountedBaseRental))}
+                          </span>
+                        </span>
+                      ) : (
+                        formatMoney(baseRental)
+                      ),
+                    },
+                    applicableDiscount && {
+                      label: `Promo (${applicableDiscount.code || applicableDiscount.name})`,
+                      value: `-${formatMoney(Math.round(discountAmount))}`,
+                      accent: "text-emerald-600",
                     },
                     {
                       label: "Distance Fee",
@@ -1519,21 +2100,23 @@ const WalkInRentals = () => {
                           : formatMoney(0),
                       accent: helmetFee > 0 ? "text-[#b50002]" : "",
                     },
-                  ].map(({ label, value, accent }) => (
-                    <div
-                      key={label}
-                      className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0"
-                    >
-                      <span className="text-[12px] text-slate-400">
-                        {label}
-                      </span>
-                      <span
-                        className={`text-[12px] font-bold ${accent || "text-[#171717]"}`}
+                  ]
+                    .filter(Boolean)
+                    .map(({ label, value, accent }) => (
+                      <div
+                        key={label}
+                        className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0"
                       >
-                        {value}
-                      </span>
-                    </div>
-                  ))}
+                        <span className="text-[12px] text-slate-400">
+                          {label}
+                        </span>
+                        <span
+                          className={`text-[12px] font-bold ${accent || "text-[#171717]"}`}
+                        >
+                          {value}
+                        </span>
+                      </div>
+                    ))}
                 </div>
                 <div className="mt-3 pt-3 border-t border-slate-100">
                   <div className="flex items-center justify-between">

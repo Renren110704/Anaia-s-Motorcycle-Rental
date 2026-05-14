@@ -189,7 +189,7 @@ const getAllowedNextStatuses = (currentStatus) => {
   }
 };
 
-// ── Confirm Modal (ManageMotorcycle style) ────────────────────────────────────
+// ── Modals ────────────────────────────────────────────────────────────────────
 const ConfirmModal = ({
   message,
   onConfirm,
@@ -231,6 +231,75 @@ const ConfirmModal = ({
     </div>
   </div>
 );
+
+const FullPaymentConfirmModal = ({
+  customer,
+  amount,
+  reservationFee,
+  onConfirm,
+  onCancel,
+}) => {
+  const [method, setMethod] = useState("Cash");
+  const due = Math.max(0, (amount || 0) - (reservationFee || 200));
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4 mx-auto">
+          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+        </div>
+        <h3 className="text-lg font-black text-[#171717] mb-2 text-center">
+          Confirm Full Payment
+        </h3>
+        <p className="text-slate-500 text-sm mb-6 text-center">
+          Confirm full payment for <strong>{customer}</strong>?
+          <br />
+          Amount Due:{" "}
+          <span className="text-[#171717] font-black">
+            ₱{due.toLocaleString()}
+          </span>
+        </p>
+
+        <div className="mb-6">
+          <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2">
+            Payment Method (Full)
+          </label>
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+          >
+            <option value="Cash">Cash</option>
+            <option value="GCash">GCash</option>
+            <option value="PayMaya">PayMaya</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+          </select>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(method)}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-sm shadow-md shadow-emerald-600/30 hover:brightness-110 transition-all"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AlertModal = ({ message, onClose, isError }) => (
   <div
@@ -355,7 +424,7 @@ const alertModal = (message, { isError = false } = {}) =>
     );
   });
 
-// ── Stat Card (identical to ManageMotorcycle) ─────────────────────────────────
+// ── Stat Card ─────────────────────────────────────────────────────────────────
 const StatCard = ({
   label,
   value,
@@ -423,7 +492,7 @@ const SkeletonRow = () => (
   </tr>
 );
 
-// ── Pagination (identical to ManageMotorcycle) ────────────────────────────────
+// ── Pagination ────────────────────────────────────────────────────────────────
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   if (totalPages <= 1) return null;
   const pages = [];
@@ -1103,8 +1172,15 @@ const DetailDrawer = ({
               {booking.reservationPaymentMethod && (
                 <Row
                   icon={FaCreditCard}
-                  label="Payment Method"
+                  label="Payment Method (Res)"
                   value={booking.reservationPaymentMethod}
+                />
+              )}
+              {booking.fullPaymentMethod && (
+                <Row
+                  icon={FaCreditCard}
+                  label="Payment Method (Full)"
+                  value={booking.fullPaymentMethod}
                 />
               )}
               {booking.isDeleted && booking.deletedAt && (
@@ -1425,6 +1501,9 @@ const MotorcycleBooking = () => {
     useState("");
   const [sendingReuploadRequest, setSendingReuploadRequest] = useState(false);
 
+  // Custom Modal Data for Full Payment
+  const [fullPaymentData, setFullPaymentData] = useState(null);
+
   const fetchBookings = useCallback(async () => {
     try {
       const res = await api.get("/api/motorcycle-bookings", {
@@ -1464,6 +1543,7 @@ const MotorcycleBooking = () => {
           reservationFeePaid: b.reservationFeePaid || false,
           paymentStatus: b.paymentStatus || "pending_verification",
           reservationPaymentMethod: b.reservationPaymentMethod || "",
+          fullPaymentMethod: b.fullPaymentMethod || "",
           paymentProofImage: b.paymentProofImage || "",
           paymentReferenceId: b.paymentReferenceId || "",
           paymentSentAmount: Number(b.paymentSentAmount || 0),
@@ -1503,6 +1583,7 @@ const MotorcycleBooking = () => {
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedStatus, colSort]);
@@ -1685,6 +1766,55 @@ const MotorcycleBooking = () => {
     }
   };
 
+  // Submits the Full Payment with chosen payment method
+  const submitFullPayment = async (method) => {
+    const { id, bookingId } = fullPaymentData;
+    try {
+      const response = await api.patch(
+        `/api/motorcycle-bookings/${id}/confirm-payment`,
+        { fullPaymentMethod: method },
+      );
+      const updated = response?.data?.booking || {};
+
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? {
+                ...b,
+                status: updated.status || b.status,
+                paymentStatus: updated.paymentStatus || b.paymentStatus,
+                reservationFeePaid:
+                  updated.reservationFeePaid ?? b.reservationFeePaid,
+                fullPaymentMethod: updated.fullPaymentMethod || method,
+              }
+            : b,
+        ),
+      );
+
+      if (drawerBooking?.id === bookingId) {
+        setDrawerBooking((prev) => ({
+          ...prev,
+          status: updated.status || prev.status,
+          paymentStatus: updated.paymentStatus || prev.paymentStatus,
+          reservationFeePaid:
+            updated.reservationFeePaid ?? prev.reservationFeePaid,
+          fullPaymentMethod: updated.fullPaymentMethod || method,
+        }));
+      }
+
+      await alertModal(
+        response?.data?.message || "Full payment confirmed successfully.",
+      );
+    } catch (err) {
+      await alertModal(
+        `Error: ${err.response?.data?.message || err.message || "Failed"}`,
+        { isError: true },
+      );
+    } finally {
+      setFullPaymentData(null);
+    }
+  };
+
   const handleConfirmPayment = async (e, bookingId) => {
     e.stopPropagation();
     const booking = bookings.find(
@@ -1694,16 +1824,29 @@ const MotorcycleBooking = () => {
       await alertModal("Booking not found", { isError: true });
       return;
     }
-    const isReservationStage = booking.status === "pending_reservation";
-    const confirmText = isReservationStage
-      ? `Confirm reservation payment for ${booking.customer}? This will move the booking to Pending Full Payment and send a digital receipt.`
-      : `Confirm full payment of ₱${booking.amount} for ${booking.customer}? This will activate the booking.`;
+
+    const isReservationStage =
+      booking.status === "pending_reservation" || booking.status === "pending";
+
+    // If it's a full payment, open our custom modal to choose payment method
+    if (!isReservationStage) {
+      setFullPaymentData({
+        id: booking._id,
+        bookingId: booking.id,
+        customer: booking.customer,
+        amount: booking.amount,
+        reservationFee: booking.reservationFee || 200,
+      });
+      return;
+    }
+
+    // Otherwise, confirm the reservation as usual
+    const confirmText = `Confirm reservation payment for ${booking.customer}? This will move the booking to Pending Full Payment and send a digital receipt.`;
     const confirmed = await confirmModal(confirmText, {
-      confirmLabel: isReservationStage
-        ? "Confirm Reservation"
-        : "Confirm Full Payment",
+      confirmLabel: "Confirm Reservation",
     });
     if (!confirmed) return;
+
     try {
       const response = await api.patch(
         `/api/motorcycle-bookings/${booking._id}/confirm-payment`,
@@ -2028,6 +2171,17 @@ const MotorcycleBooking = () => {
             setReuploadModalDefaultComment("");
           }}
           onSubmit={submitReuploadRequest}
+        />
+      )}
+
+      {/* Full Payment Modal */}
+      {fullPaymentData && (
+        <FullPaymentConfirmModal
+          customer={fullPaymentData.customer}
+          amount={fullPaymentData.amount}
+          reservationFee={fullPaymentData.reservationFee}
+          onCancel={() => setFullPaymentData(null)}
+          onConfirm={submitFullPayment}
         />
       )}
     </div>

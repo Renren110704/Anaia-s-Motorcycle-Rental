@@ -95,7 +95,7 @@ const computeEffectiveAvailability = (motorcycle) => {
 /* ─── constants ────────────────────────────────────────────────────── */
 const CATEGORY_TABS = [
   "All",
-  "New",
+  // "New",
   "Scooters",
   "Big Bikes",
   "Underbone",
@@ -221,9 +221,9 @@ const HomeMotorcycles = () => {
     .filter((m) => {
       if (activeTab === "All") return true;
 
-      if (activeTab === "New") {
-        return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
-      }
+      // if (activeTab === "New") {
+      //   return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
+      // }
 
       if (activeTab === "Top Rated") {
         // Make sure we check both averageRating and rating
@@ -437,7 +437,7 @@ const HomeMotorcycles = () => {
           -webkit-backdrop-filter: blur(8px);
         }
         .hm-avail.available {
-          background: rgba(220,252,231,0.9);
+          // background: rgba(220,252,231,0.9);
           color: #15803d;
         }
         .hm-avail.booked {

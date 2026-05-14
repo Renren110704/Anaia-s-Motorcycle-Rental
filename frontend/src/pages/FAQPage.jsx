@@ -46,12 +46,12 @@ const FAQS = [
   {
     question: "Do you provide a helmet for motorcycles when we rent?",
     answer:
-      "Absolutely! We offer one free helmet with each rental. Need an extra for your backride? Just add 100 pesos! While we've got you covered, we also encourage you to bring your own helmet for your safety and convenience. Please note: Our helmets are for public use, and due to hectic rental schedules, we can't wash them daily. However, rest assured that we sanitize them before handing them over to the next renter!",
+      "Absolutely! We offer one free helmet with each rental. Need an extra for your backride? Just add 50 pesos! While we've got you covered, we also encourage you to bring your own helmet for your safety and convenience. Please note: Our helmets are for public use, and due to hectic rental schedules, we can't wash them daily. However, rest assured that we sanitize them before handing them over to the next renter!",
   },
   {
     question: "Are there fuel or mileage limits?",
     answer:
-      "Good news — we offer unlimited fuel usage and unlimited mileage during your rental period! You can enjoy your trip without worrying about fuel or distance restrictions. We only ask that you return the motorcycle with the same fuel level as when you picked it up.",
+      "Good news — we offer unlimited fuel usage and unlimited mileage during your rental period! You can enjoy your trip without worrying about fuel or mileage restrictions.",
   },
   {
     question: "Can I extend my rental period?",

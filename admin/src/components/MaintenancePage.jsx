@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import ReactDOM from "react-dom/client";
 import {
   FaCog,
@@ -175,9 +175,324 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
   };
 };
 
+// ── Calendar Helpers ───────────────────────────────────────────────────────────
+const formatLocalDate = (date) => {
+  const y = date.getFullYear(),
+    m = String(date.getMonth() + 1).padStart(2, "0"),
+    d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+const todayISO = () => formatLocalDate(new Date());
+
+const toDateKey = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return formatLocalDate(date);
+};
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const calAddMonths = (date, amount) =>
+  new Date(date.getFullYear(), date.getMonth() + amount, 1);
+const getMonthGrid = (monthDate) => {
+  const firstDay = startOfMonth(monthDate);
+  const firstWeekday = firstDay.getDay();
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - firstWeekday);
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    return d;
+  });
+};
+
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+
+// ── InlineDatePicker Component ─────────────────────────────────────────────────
+const InlineDatePicker = ({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+  label,
+  disabled = false,
+  highlightRangeStart = null,
+  bookingRanges = [],
+}) => {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    if (value) return new Date(value + "T00:00:00");
+    return new Date();
+  });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const monthGrid = getMonthGrid(viewMonth);
+  const minD = minDate ? new Date(minDate + "T00:00:00") : null;
+  const maxD = maxDate ? new Date(maxDate + "T00:00:00") : null;
+
+  const isBookedDay = (date) => {
+    const dk = toDateKey(date);
+    return bookingRanges.some(
+      (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+  };
+
+  const handleDayClick = (date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (minD && d < minD) return;
+    if (maxD && d > maxD) return;
+    if (isBookedDay(date)) return;
+    onChange(formatLocalDate(d));
+    setOpen(false);
+  };
+
+  const displayValue = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none flex items-center justify-between transition-colors"
+        style={{
+          borderColor: open ? "#b50002" : "",
+          color: value ? "#171717" : "#94a3b8",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <FaCalendarAlt className="text-[#b50002] text-sm" />
+          <span>{displayValue || `Select ${label}`}</span>
+        </div>
+        <FaChevronDown
+          style={{
+            fontSize: 10,
+            color: "rgba(0,0,0,0.3)",
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 200,
+            background: "#fff",
+            borderRadius: 18,
+            border: "1.5px solid rgba(0,0,0,0.09)",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.14)",
+            padding: 16,
+            minWidth: 300,
+            width: "100%",
+            animation: "calFadeIn 0.18s ease",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => calAddMonths(v, -1))}
+              style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
+            >
+              <FaChevronLeft size={10} color="#0E0E0E" />
+            </button>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#0E0E0E" }}>
+              {monthLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => calAddMonths(v, 1))}
+              style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
+            >
+              <FaChevronRight size={10} color="#0E0E0E" />
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+              marginBottom: 4,
+            }}
+          >
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <div
+                key={d}
+                style={{
+                  textAlign: "center",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  color: "rgba(0,0,0,0.3)",
+                  padding: "4px 0",
+                }}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+            }}
+          >
+            {monthGrid.map((date) => {
+              const inMonth = date.getMonth() === viewMonth.getMonth();
+              const dk = toDateKey(date);
+              const isSelected = value === dk;
+              const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+              const tooEarly = minD && d < minD;
+              const tooLate = maxD && d > maxD;
+              const isBooked = isBookedDay(date);
+              const isDisabled = tooEarly || tooLate || isBooked;
+              const isToday = dk === todayISO();
+
+              const isRangeStart = highlightRangeStart === dk;
+              const isInRange = highlightRangeStart && value && dk > highlightRangeStart && dk < value;
+
+              let bg = "transparent";
+              let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
+              let border = "1.5px solid transparent";
+              let cursor = isDisabled ? "not-allowed" : "pointer";
+              let opacity = isDisabled ? (isBooked ? 0.8 : 0.3) : 1;
+
+              if (isSelected) {
+                bg = "#0E0E0E";
+                color = "#fff";
+                border = "1.5px solid #0E0E0E";
+              } else if (isRangeStart) {
+                bg = "#b50002";
+                color = "#fff";
+                border = "1.5px solid #b50002";
+              } else if (isInRange) {
+                bg = "rgba(181,0,2,0.07)";
+                border = "1.5px solid rgba(181,0,2,0.12)";
+              } else if (isBooked && !isSelected) {
+                bg = "rgba(181,0,2,0.05)";
+                border = "1.5px solid rgba(181,0,2,0.1)";
+              } else if (isToday && inMonth) {
+                border = "1.5px solid rgba(0,0,0,0.2)";
+              }
+
+              return (
+                <button
+                  key={dk}
+                  type="button"
+                  disabled={isDisabled || !inMonth}
+                  onClick={() => inMonth && !isDisabled && handleDayClick(date)}
+                  className="hover:bg-slate-50 transition-colors relative"
+                  style={{
+                    background: bg,
+                    color,
+                    border,
+                    borderRadius: 8,
+                    padding: "6px 2px",
+                    fontSize: 11,
+                    fontWeight: isSelected || isToday ? 800 : 600,
+                    cursor,
+                    opacity,
+                    minHeight: 30,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {date.getDate()}
+                  {isBooked && !isSelected && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "rgba(181,0,2,0.4)",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: "1px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 12px",
+            }}
+          >
+            {[
+              { dot: "rgba(181,0,2,0.4)", label: "Booked" },
+            ].map(({ dot, label }) => (
+              <div
+                key={label}
+                style={{ display: "flex", alignItems: "center", gap: 5 }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: dot,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "rgba(0,0,0,0.4)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
@@ -280,12 +595,13 @@ const ScheduleModal = ({
   motorcycle,
   initialStart,
   initialEnd,
+  bookingRanges,
   onConfirm,
   onCancel,
 }) => {
   const [start, setStart] = useState(initialStart || "");
   const [end, setEnd] = useState(initialEnd || initialStart || "");
-  const todayValue = toDateInputValue(new Date());
+  const todayValue = todayISO();
   const automaticValue = getAutomaticMaintenanceDate();
 
   const valid = () => {
@@ -319,25 +635,26 @@ const ScheduleModal = ({
           <div className="text-left grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Start date</label>
-              <input
-                type="date"
-                min={todayValue}
+              <InlineDatePicker
                 value={start}
-                onChange={(e) => {
-                  setStart(e.target.value);
-                  if (!end || e.target.value > end) setEnd(e.target.value);
+                onChange={(val) => {
+                  setStart(val);
+                  if (!end || val > end) setEnd(val);
                 }}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm focus:outline-none focus:border-[#b50002]/30"
+                minDate={todayValue}
+                label="Start date"
+                bookingRanges={bookingRanges}
               />
             </div>
             <div>
               <label className={labelCls}>End date</label>
-              <input
-                type="date"
-                min={start || todayValue}
+              <InlineDatePicker
                 value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm focus:outline-none focus:border-[#b50002]/30"
+                onChange={(val) => setEnd(val)}
+                minDate={start || todayValue}
+                highlightRangeStart={start}
+                label="End date"
+                bookingRanges={bookingRanges}
               />
             </div>
           </div>
@@ -377,12 +694,12 @@ const ScheduleModal = ({
   );
 };
 
-const scheduleModal = (motorcycle) =>
+const scheduleModal = (motorcycle, bookings) =>
   new Promise((resolve) => {
     const el = document.createElement("div");
     document.body.appendChild(el);
     const root = ReactDOM.createRoot(el);
-    const todayValue = toDateInputValue(new Date());
+    const todayValue = todayISO();
     const currentStart = toDateInputValue(
       motorcycle.maintenanceScheduleStartAt || motorcycle.maintenanceScheduleAt,
     );
@@ -396,6 +713,27 @@ const scheduleModal = (motorcycle) =>
     const initialEnd =
       currentEnd && currentEnd >= initialStart ? currentEnd : initialStart;
 
+    const currentMotoId = motorcycle._id || motorcycle.id;
+    const bookingRanges = (bookings || [])
+      .filter((b) => {
+        const id =
+          b.motorcycle?._id || b.motorcycle?.id || b.motorcycle || b.motorcycleId;
+        return String(id) === String(currentMotoId);
+      })
+      .map((b) => {
+        const status = String(b?.status || "").toLowerCase();
+        if (["completed", "inspection", "canceled", "cancelled"].includes(status))
+          return null;
+        const pd = new Date(b.pickupDate);
+        const rd = new Date(b.returnDate);
+        if (isNaN(pd.getTime()) || isNaN(rd.getTime())) return null;
+        return {
+          pickupDate: pd,
+          returnDate: rd,
+        };
+      })
+      .filter(Boolean);
+
     const cleanup = (value) => {
       root.unmount();
       document.body.removeChild(el);
@@ -407,6 +745,7 @@ const scheduleModal = (motorcycle) =>
         motorcycle={motorcycle}
         initialStart={initialStart}
         initialEnd={initialEnd}
+        bookingRanges={bookingRanges}
         onConfirm={(value) => cleanup(value)}
         onCancel={() => cleanup(null)}
       />,
@@ -539,7 +878,6 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 // ── Motorcycle Card (Grid View) ───────────────────────────────────────────────
 const MotorcycleCard = ({
   motorcycle: m,
-  onSetMaintenance,
   onSetAvailable,
   onReschedule,
   updating,
@@ -624,8 +962,8 @@ const MotorcycleCard = ({
           </button>
         </div>
 
-        <div className="pt-3 border-t border-slate-50">
-          {isMaintenance ? (
+        {isMaintenance && (
+          <div className="pt-3 border-t border-slate-50">
             <button
               onClick={() => onSetAvailable(m._id ?? m.id)}
               disabled={isUpdating}
@@ -634,17 +972,8 @@ const MotorcycleCard = ({
               <FaCheckCircle className="text-xs" />
               {isUpdating ? "Updating..." : "Mark as Available"}
             </button>
-          ) : (
-            <button
-              onClick={() => onSetMaintenance(m._id ?? m.id)}
-              disabled={isUpdating}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-amber-50 text-amber-600 font-bold text-xs hover:bg-amber-100 transition-colors disabled:opacity-60"
-            >
-              <Wrench className="w-3.5 h-3.5" />
-              {isUpdating ? "Updating..." : "Set to Maintenance"}
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -653,7 +982,6 @@ const MotorcycleCard = ({
 // ── Table View ────────────────────────────────────────────────────────────────
 const MotorcycleTable = ({
   motorcycles,
-  onSetMaintenance,
   onSetAvailable,
   onReschedule,
   colSort,
@@ -773,7 +1101,7 @@ const MotorcycleTable = ({
                         <FaCalendarAlt className="text-xs" />
                         Reschedule
                       </button>
-                      {isMaintenance ? (
+                      {isMaintenance && (
                         <button
                           onClick={() => onSetAvailable(m._id ?? m.id)}
                           disabled={isUpdating}
@@ -781,15 +1109,6 @@ const MotorcycleTable = ({
                         >
                           <FaCheckCircle className="text-xs" />
                           {isUpdating ? "Updating..." : "Mark Available"}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onSetMaintenance(m._id ?? m.id)}
-                          disabled={isUpdating}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 font-bold text-[11px] hover:bg-amber-100 transition-colors disabled:opacity-60 whitespace-nowrap"
-                        >
-                          <Wrench className="w-3 h-3" />
-                          {isUpdating ? "Updating..." : "Set Maintenance"}
                         </button>
                       )}
                     </div>
@@ -826,6 +1145,7 @@ const EmptyState = ({ onReset }) => (
 // ── Main Component ────────────────────────────────────────────────────────────
 const MaintenancePage = () => {
   const [motorcycles, setMotorcycles] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null); // id of unit being updated
   const [viewMode, setViewMode] = useState("list");
@@ -836,7 +1156,7 @@ const MaintenancePage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [colSort, setColSort] = useState({ key: null, dir: null });
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  // ── Fetch Motorcycles ──────────────────────────────────────────────────────
   const fetchMotorcycles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -847,7 +1167,9 @@ const MaintenancePage = () => {
       const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
       // Keep only non-deleted units that are available or in maintenance
       const filtered = raw.filter(
-        (m) => !m.isDeleted && ["available", "maintenance"].includes(m.status),
+        (m) =>
+          !m.isDeleted &&
+          ["available", "maintenance", "rented", "pending"].includes(m.status),
       );
       setMotorcycles(
         filtered.map((m, i) => ({
@@ -866,9 +1188,23 @@ const MaintenancePage = () => {
     }
   }, []);
 
+  // ── Fetch Bookings ──────────────────────────────────────────────────────────
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await api.get("/api/motorcycle-bookings", {
+        params: { limit: 1000 },
+      });
+      const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
+      setBookings(raw);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMotorcycles();
-  }, [fetchMotorcycles]);
+    fetchBookings();
+  }, [fetchMotorcycles, fetchBookings]);
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedStatus, selectedCategory, colSort]);
@@ -879,6 +1215,8 @@ const MaintenancePage = () => {
       all: motorcycles.length,
       available: motorcycles.filter((m) => m.status === "available").length,
       maintenance: motorcycles.filter((m) => m.status === "maintenance").length,
+      rented: motorcycles.filter((m) => m.status === "rented").length,
+      pending: motorcycles.filter((m) => m.status === "pending").length,
     }),
     [motorcycles],
   );
@@ -1019,31 +1357,58 @@ const MaintenancePage = () => {
     }
   };
 
-  const handleSetMaintenance = (id) => updateStatus(id, "maintenance");
   const handleSetAvailable = (id) => updateStatus(id, "available");
 
   const updateMaintenanceDate = async (motorcycle) => {
-    const selected = await scheduleModal(motorcycle);
+    const selected = await scheduleModal(motorcycle, bookings);
     if (!selected) return;
 
     const start = selected.start;
     const end = selected.end || selected.start;
 
+    // Determine if the start date is today (or in the past)
+    const todayStr = toDateInputValue(new Date());
+    const isToday = start <= todayStr;
+    const newStatus = isToday ? "maintenance" : motorcycle.status;
+
     const targetId = motorcycle._id ?? motorcycle.id;
     setUpdating(targetId);
+
+    // Optimistic update if status is changing to maintenance
+    if (isToday && motorcycle.status !== "maintenance") {
+      setMotorcycles((prev) =>
+        prev.map((x) =>
+          (x._id ?? x.id) === targetId ? { ...x, status: "maintenance" } : x,
+        ),
+      );
+    }
 
     try {
       const fd = buildMotorcycleFormData(motorcycle, {
         maintenanceScheduleAt: start,
         maintenanceScheduleStartAt: start,
         maintenanceScheduleEndAt: end,
+        status: newStatus,
       });
       await api.put(`/api/motorcycles/${motorcycle._id}`, fd);
+      
       toast.success(
-        `${motorcycle.make} ${motorcycle.model} maintenance rescheduled`,
+        isToday
+          ? `${motorcycle.make} ${motorcycle.model} maintenance rescheduled and set to In Maintenance`
+          : `${motorcycle.make} ${motorcycle.model} maintenance rescheduled`,
       );
       fetchMotorcycles(true);
     } catch (err) {
+      // Revert optimistic update
+      if (isToday && motorcycle.status !== "maintenance") {
+        setMotorcycles((prev) =>
+          prev.map((x) =>
+            (x._id ?? x.id) === targetId
+              ? { ...x, status: motorcycle.status }
+              : x,
+          ),
+        );
+      }
       toast.error(
         err.response?.data?.message || "Failed to reschedule maintenance",
       );
@@ -1055,6 +1420,12 @@ const MaintenancePage = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
+      <style>{`
+        @keyframes calFadeIn { 
+          from { opacity:0; transform:translateY(6px) scale(0.97); } 
+          to { opacity:1; transform:translateY(0) scale(1); } 
+        }
+      `}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
@@ -1077,26 +1448,6 @@ const MaintenancePage = () => {
             accent="bg-slate-400"
             loading={loading}
           />
-          {/* <StatCard
-            label="Available"
-            value={counts.available}
-            sub="Ready to rent"
-            subColor="text-emerald-500"
-            icon={Bike}
-            accent="bg-emerald-500"
-            loading={loading}
-          /> */}
-          {/* <StatCard
-            label="In Maintenance"
-            value={counts.maintenance}
-            sub={counts.maintenance > 0 ? "Needs attention" : "All clear"}
-            subColor={
-              counts.maintenance > 0 ? "text-amber-500" : "text-slate-400"
-            }
-            icon={Wrench}
-            accent="bg-amber-500"
-            loading={loading}
-          /> */}
         </div>
 
         {/* Status Tab Filter */}
@@ -1104,6 +1455,8 @@ const MaintenancePage = () => {
           {[
             { key: "all", label: "All Units", count: counts.all },
             { key: "available", label: "Available", count: counts.available },
+            { key: "rented", label: "Rented", count: counts.rented },
+            { key: "pending", label: "Pending", count: counts.pending },
             {
               key: "maintenance",
               label: "In Maintenance",
@@ -1259,7 +1612,6 @@ const MaintenancePage = () => {
               <MotorcycleCard
                 key={m.id}
                 motorcycle={m}
-                onSetMaintenance={handleSetMaintenance}
                 onSetAvailable={handleSetAvailable}
                 onReschedule={updateMaintenanceDate}
                 updating={updating}
@@ -1269,7 +1621,6 @@ const MaintenancePage = () => {
         ) : (
           <MotorcycleTable
             motorcycles={paginated}
-            onSetMaintenance={handleSetMaintenance}
             onSetAvailable={handleSetAvailable}
             onReschedule={updateMaintenanceDate}
             colSort={colSort}

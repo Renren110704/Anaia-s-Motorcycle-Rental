@@ -2603,54 +2603,160 @@ const BookingRow = ({
             </div>
 
             {/* Inspection Section */}
-            {booking.status === "inspection" && booking.returnInspection && (
-              <div
-                style={{
-                  background: "#ede9fe",
-                  border: "1.5px solid #c4b5fd",
-                  borderRadius: 14,
-                  padding: 16,
-                  marginBottom: 12,
-                }}
-              >
+            {(booking.status === "inspection" ||
+              (booking.returnInspection &&
+                ["penalty_required", "damage_found"].includes(
+                  booking.returnInspection.clearanceStatus,
+                ))) &&
+              booking.returnInspection && (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 10,
+                    background: "#ede9fe",
+                    border: "1.5px solid #c4b5fd",
+                    borderRadius: 14,
+                    padding: 16,
+                    marginBottom: 12,
                   }}
                 >
-                  <FaExclamationTriangle style={{ color: "#7c3aed" }} />
-                  <span
+                  <div
                     style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 800,
-                      color: "#5b21b6",
-                      fontSize: 14,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 10,
                     }}
                   >
-                    Return Inspection Status
-                  </span>
-                </div>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#5b21b6",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Your motorcycle is under inspection. Please wait for the admin
-                  to settle any penalties.
-                </p>
-                {booking.returnInspection.clearanceStatus ===
-                  "penalty_required" &&
-                  booking.returnInspection.penaltyAmount > 0 && (
+                    <FaExclamationTriangle style={{ color: "#7c3aed" }} />
+                    <span
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 800,
+                        color: "#5b21b6",
+                        fontSize: 14,
+                      }}
+                    >
+                      Return Inspection Status
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#5b21b6",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {booking.status === "inspection"
+                      ? "Your motorcycle is under inspection. Please wait for the admin to settle any penalties or repair estimates."
+                      : "Return inspection details and settled fees."}
+                  </p>
+
+                  {/* PENALTY REQUIRED BLOCK */}
+                  {booking.returnInspection.clearanceStatus ===
+                    "penalty_required" &&
+                    booking.returnInspection.penaltyAmount > 0 && (
+                      <div
+                        style={{
+                          background: "#fee2e2",
+                          border: "1.5px solid #fecaca",
+                          borderRadius: 10,
+                          padding: 12,
+                          marginTop: 10,
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: "1.5px",
+                            textTransform: "uppercase",
+                            color: "#991b1b",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Penalty Amount
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 800,
+                            color: "#b50002",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          ₱
+                          {booking.returnInspection.penaltyAmount.toLocaleString()}
+                        </p>
+                        {booking.returnInspection.penaltySummary && (
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#991b1b",
+                              marginTop: 6,
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {booking.returnInspection.penaltySummary}
+                          </p>
+                        )}
+
+                        {/* Display Penalty Photos */}
+                        {Array.isArray(
+                          booking.returnInspection.penaltyPhotos,
+                        ) &&
+                          booking.returnInspection.penaltyPhotos.length > 0 && (
+                            <div style={{ marginTop: 12 }}>
+                              <p
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  letterSpacing: "1.5px",
+                                  textTransform: "uppercase",
+                                  color: "#991b1b",
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                Evidence Photos
+                              </p>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  overflowX: "auto",
+                                  paddingBottom: 4,
+                                }}
+                              >
+                                {booking.returnInspection.penaltyPhotos.map(
+                                  (photo, i) => (
+                                    <img
+                                      key={i}
+                                      src={resolveImageUrl(photo)}
+                                      alt="Penalty evidence"
+                                      style={{
+                                        height: 60,
+                                        width: 80,
+                                        objectFit: "cover",
+                                        borderRadius: 8,
+                                        border: "1.5px solid #fecaca",
+                                      }}
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
+
+                  {/* DAMAGE FOUND BLOCK */}
+                  {booking.returnInspection.clearanceStatus ===
+                    "damage_found" && (
                     <div
                       style={{
-                        background: "#fee2e2",
-                        border: "1.5px solid #fecaca",
+                        background: "#fffbeb",
+                        border: "1.5px solid #fde68a",
                         borderRadius: 10,
                         padding: 12,
                         marginTop: 10,
@@ -2662,40 +2768,158 @@ const BookingRow = ({
                           fontWeight: 700,
                           letterSpacing: "1.5px",
                           textTransform: "uppercase",
-                          color: "#991b1b",
+                          color: "#b45309",
                           fontFamily: "'Space Grotesk', sans-serif",
-                          marginBottom: 4,
+                          marginBottom: 8,
                         }}
                       >
-                        Penalty Amount
+                        Damage Found
                       </p>
-                      <p
-                        style={{
-                          fontSize: 22,
-                          fontWeight: 800,
-                          color: "#b50002",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                        }}
-                      >
-                        ₱
-                        {booking.returnInspection.penaltyAmount.toLocaleString()}
-                      </p>
-                      {booking.returnInspection.penaltySummary && (
-                        <p
+
+                      {booking.returnInspection.damageNotes && (
+                        <div style={{ marginBottom: 6 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#b45309",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Notes:{" "}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#92400e",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {booking.returnInspection.damageNotes}
+                          </span>
+                        </div>
+                      )}
+
+                      {booking.returnInspection.mechanicNotes && (
+                        <div style={{ marginBottom: 6 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#b45309",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Mechanic:{" "}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#92400e",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {booking.returnInspection.mechanicNotes}
+                          </span>
+                        </div>
+                      )}
+
+                      {booking.returnInspection.repairEstimateAmount > 0 && (
+                        <div
                           style={{
-                            fontSize: 12,
-                            color: "#991b1b",
-                            marginTop: 6,
-                            fontFamily: "'Space Grotesk', sans-serif",
+                            marginTop: 10,
+                            paddingTop: 10,
+                            borderTop: "1px solid #fde68a",
                           }}
                         >
-                          {booking.returnInspection.penaltySummary}
-                        </p>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              letterSpacing: "1.5px",
+                              textTransform: "uppercase",
+                              color: "#b45309",
+                              display: "block",
+                              marginBottom: 4,
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Repair Estimate
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 22,
+                              fontWeight: 800,
+                              color: "#d97706",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            ₱
+                            {booking.returnInspection.repairEstimateAmount.toLocaleString()}
+                          </span>
+                          {booking.returnInspection.repairEstimateNotes && (
+                            <p
+                              style={{
+                                fontSize: 12,
+                                color: "#92400e",
+                                marginTop: 4,
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {booking.returnInspection.repairEstimateNotes}
+                            </p>
+                          )}
+                        </div>
                       )}
+
+                      {/* Display Damage Photos */}
+                      {Array.isArray(booking.returnInspection.damagePhotos) &&
+                        booking.returnInspection.damagePhotos.length > 0 && (
+                          <div style={{ marginTop: 12 }}>
+                            <p
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                letterSpacing: "1.5px",
+                                textTransform: "uppercase",
+                                color: "#b45309",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                                marginBottom: 6,
+                              }}
+                            >
+                              Damage Photos
+                            </p>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                overflowX: "auto",
+                                paddingBottom: 4,
+                              }}
+                            >
+                              {booking.returnInspection.damagePhotos.map(
+                                (photo, i) => (
+                                  <img
+                                    key={i}
+                                    src={resolveImageUrl(photo)}
+                                    alt="Damage evidence"
+                                    style={{
+                                      height: 60,
+                                      width: 80,
+                                      objectFit: "cover",
+                                      borderRadius: 8,
+                                      border: "1.5px solid #fde68a",
+                                    }}
+                                  />
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        )}
                     </div>
                   )}
-              </div>
-            )}
+                </div>
+              )}
 
             {/* Re-upload Proof */}
             {needsReupload && !booking.isDeleted && (

@@ -55,6 +55,7 @@ const returnInspectionSchema = new Schema(
     repairEstimateNotes: { type: String, default: "" },
     repairAttachments: { type: [String], default: [] },
     damagePhotos: { type: [String], default: [] },
+    penaltyPhotos: { type: [String], default: [] },
     penaltyAmount: { type: Number, default: 0 },
     penaltySummary: { type: String, default: "" },
     penaltySettled: { type: Boolean, default: false },
@@ -167,6 +168,7 @@ const motorcycleBookingSchema = new Schema(
       default: "Cash",
     },
     reservationPaymentMethod: { type: String, default: "" },
+    fullPaymentMethod: { type: String, default: "" },
 
     paymentProofImage: { type: String, default: "" },
     paymentReferenceId: { type: String, default: "" },

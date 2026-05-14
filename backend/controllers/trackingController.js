@@ -164,6 +164,12 @@ const fetchTraccarLiveSnapshot = async ({
 
   const lat = Number(position.latitude ?? position.lat);
   const lng = Number(position.longitude ?? position.lng);
+  
+  // Traccar provides speed in knots and distance in meters
+  const speedKmh = Number(position.speed ? position.speed * 1.852 : 0);
+  const totalDistanceKm = Number(position.attributes?.totalDistance ? position.attributes.totalDistance / 1000 : 0);
+  const averageSpeed = Number(position.attributes?.averageSpeed ? position.attributes.averageSpeed * 1.852 : speedKmh);
+  const stopsMade = Number(position.attributes?.stops || 0);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error("Could not normalize the live GPS coordinates");
@@ -196,6 +202,10 @@ const fetchTraccarLiveSnapshot = async ({
     lastUpdatedAt: timestamp,
     source: "Traccar Live",
     resolvedLocation: address,
+    speed: speedKmh,
+    averageSpeed,
+    totalDistance: totalDistanceKm,
+    stopsMade,
     device,
     position,
   };

@@ -37,6 +37,7 @@ motorcycleBookingRouter.patch(
   '/:id/return-inspection',
   uploads.fields([
     { name: 'damagePhotos', maxCount: 8 },
+    { name: 'penaltyPhotos', maxCount: 5 },
     { name: 'repairAttachments', maxCount: 5 },
   ]),
   updateReturnInspection,

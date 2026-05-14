@@ -1089,6 +1089,7 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
       reservationFeePaid: true,
       reservationPaymentMethod: selectedPaymentMethod,
       paymentMethod: selectedPaymentMethod,
+      fullPaymentMethod: selectedPaymentMethod,
       details: tryParseJSON(details),
       address: tryParseJSON(address),
       paymentStatus: "fully_paid",
@@ -1352,6 +1353,8 @@ export const updateMotorcycleBooking = async (req, res, next) => {
       "requiresProofReupload",
       "adminReviewComment",
       "adminReviewedAt",
+      "reservationPaymentMethod", // <-- Added
+      "fullPaymentMethod", // <-- Added
     ];
     for (const f of updatable) {
       if (req.body[f] === undefined) continue;
@@ -1427,23 +1430,19 @@ export const extendMotorcycleBooking = async (req, res, next) => {
     }
 
     if (booking.status !== "active") {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Only active bookings can be extended.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Only active bookings can be extended.",
+      });
     }
 
     const returnDate = req.body?.returnDate;
     const returnTime = String(req.body?.returnTime || "").trim();
     if (!returnDate || !returnTime) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "returnDate and returnTime are required.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "returnDate and returnTime are required.",
+      });
     }
 
     const currentReturnAt = combineDateAndTime(
@@ -1466,12 +1465,10 @@ export const extendMotorcycleBooking = async (req, res, next) => {
 
     const motorcycleId = booking.motorcycle?.id;
     if (!motorcycleId) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Booking has no motorcycle assigned.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Booking has no motorcycle assigned.",
+      });
     }
 
     const overlappingCount = await MotorcycleBooking.countDocuments({
@@ -1926,6 +1923,7 @@ export const updateReturnInspection = async (req, res, next) => {
     }
 
     const damageFiles = req.files?.damagePhotos || [];
+    const penaltyFiles = req.files?.penaltyPhotos || []; // <--- 1. Extract the penalty files
 
     // Only upload damage photos for damage_found status
     if (inspection.clearanceStatus === "damage_found") {
@@ -1938,6 +1936,20 @@ export const updateReturnInspection = async (req, res, next) => {
         inspection.damagePhotos = [
           ...(inspection.damagePhotos || []),
           ...damageUrls,
+        ];
+      }
+    }
+    // <--- 2. Add this block to handle penalty photos!
+    else if (inspection.clearanceStatus === "penalty_required") {
+      const penaltyUrls = await getUploadedInspectionUrls(
+        penaltyFiles,
+        CLOUDINARY_RETURN_INSPECTION_FOLDER,
+      );
+
+      if (penaltyUrls.length) {
+        inspection.penaltyPhotos = [
+          ...(inspection.penaltyPhotos || []),
+          ...penaltyUrls,
         ];
       }
     }
@@ -2125,6 +2137,12 @@ export const confirmFullPayment = async (req, res, next) => {
     booking.paymentStatus = "fully_paid";
     booking.status = "active";
     booking.fullPaymentConfirmedAt = new Date();
+
+    // 👉 THIS IS THE MISSING FIX: Save the payment method from the request
+    if (req.body.fullPaymentMethod) {
+      booking.fullPaymentMethod = req.body.fullPaymentMethod;
+    }
+
     const updated = await booking.save();
 
     if (motorcycleId) {
@@ -2153,6 +2171,7 @@ export const confirmFullPayment = async (req, res, next) => {
       metadata: {
         status: updated.status,
         paymentStatus: updated.paymentStatus,
+        fullPaymentMethod: updated.fullPaymentMethod, // Log it too
       },
     });
 

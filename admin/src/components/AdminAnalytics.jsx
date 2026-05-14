@@ -22,7 +22,7 @@ import {
   CreditCard,
   BarChart3,
 } from "lucide-react";
-import ExportCSVModal from "./ExportCSVModal"; 
+import ExportCSVModal from "./ExportCSVModal";
 import PrintReportModal from "./PrintReportModal";
 
 const baseURL = API_BASE_URL;
@@ -157,13 +157,13 @@ const DonutChart = ({ items }) => {
     .join(", ");
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-5 items-center">
+    <div className="flex flex-col items-center gap-5">
       <div className="flex items-center justify-center">
         <div
-          className="relative h-32 w-32 rounded-full"
+          className="relative h-28 w-28 rounded-full"
           style={{ background: `conic-gradient(${stops})` }}
         >
-          <div className="absolute inset-5 rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
+          <div className="absolute inset-4 rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
             <div>
               <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
                 Total
@@ -175,7 +175,7 @@ const DonutChart = ({ items }) => {
           </div>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="w-full space-y-2">
         {items.map((item, idx) => {
           const count = Number(item.count || 0);
           const pct = total ? Math.round((count / total) * 100) : 0;
@@ -292,8 +292,8 @@ const AdminAnalytics = () => {
   const [error, setError] = useState("");
 
   // ── Modal state ─────────────────────────────────────────────────────────────
-  const [csvModalOpen, setCsvModalOpen] = useState(false); // ← added
-  const [printModalOpen, setPrintModalOpen] = useState(false); // ← added
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
@@ -533,11 +533,35 @@ const AdminAnalytics = () => {
       .sort((a, b) => b.count - a.count);
   }, [filteredBookings]);
 
-  const paymentMethodData = useMemo(() => {
+  const reservationPaymentMethodData = useMemo(() => {
     const map = new Map();
     filteredBookings.forEach((b) => {
       const k = b.reservationPaymentMethod || "Unspecified";
       map.set(k, (map.get(k) || 0) + 1);
+    });
+    return [...map.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [filteredBookings]);
+
+  const fullPaymentMethodData = useMemo(() => {
+    const map = new Map();
+    filteredBookings.forEach((b) => {
+      // only count if actually recorded or status shows it passed
+      if (
+        b.paymentStatus === "fully_paid" ||
+        b.fullPaymentMethod ||
+        b.details?.fullPaymentMethod
+      ) {
+        // Check for fullPaymentMethod, fallback to details, then fallback to general paymentMethod (for past walk-ins)
+        let k = b.fullPaymentMethod || b.details?.fullPaymentMethod;
+
+        if (!k) {
+          k = b.paymentMethod || b.reservationPaymentMethod || "Unspecified";
+        }
+
+        map.set(k, (map.get(k) || 0) + 1);
+      }
     });
     return [...map.entries()]
       .map(([label, count]) => ({ label, count }))
@@ -836,12 +860,18 @@ const AdminAnalytics = () => {
             </SectionCard>
 
             {/* Donut grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <SectionCard title="Booking Status" icon={BarChart3}>
                 <DonutChart items={bookingStatusData} />
               </SectionCard>
-              <SectionCard title="Payment Methods" icon={CreditCard}>
-                <DonutChart items={paymentMethodData} />
+              <SectionCard
+                title="Payment Method (Res)"
+                icon={CreditCard}
+              >
+                <DonutChart items={reservationPaymentMethodData} />
+              </SectionCard>
+              <SectionCard title="Payment Method (Full)" icon={CreditCard}>
+                <DonutChart items={fullPaymentMethodData} />
               </SectionCard>
             </div>
 

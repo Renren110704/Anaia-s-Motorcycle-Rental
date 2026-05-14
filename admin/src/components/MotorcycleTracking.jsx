@@ -108,7 +108,14 @@ const distanceToSegment = (pLat, pLng, aLat, aLng, bLat, bLng) => {
 
 const CORRIDOR_WIDTH = 5000;
 
-const isOutsideGeofence = (lat, lng, destinationStr) => {
+const isOutsideGeofence = (lat, lng, destinationStr = "") => {
+  // Free roaming for CALABARZON and NCR (Allow up to 150km radius from Bacoor)
+  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  if (isFreeRegion) {
+    if (haversineDistance(lat, lng, ORIGIN.lat, ORIGIN.lng) <= 150000) return false;
+    return true; 
+  }
+
   const dest = resolveDestinationCoords(destinationStr);
   if (!dest) return false;
   if (haversineDistance(lat, lng, dest.lat, dest.lng) <= dest.radius)
@@ -375,21 +382,29 @@ const LiveTrackerCard = ({ tracker, loading, error, onRetry }) => {
           <p className="text-xs text-slate-400 mb-3">
             {buildTrackerLocationText(tracker)}
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 mb-2">
             <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>
-                Latitude
-              </p>
+              <p className={labelCls} style={{ marginBottom: "2px" }}>Current Speed</p>
               <p className="text-xs font-bold text-[#171717]">
-                {Number(tracker.lat).toFixed(6)}
+                {tracker.speed ? tracker.speed.toFixed(1) : "0.0"} km/h
               </p>
             </div>
             <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>
-                Longitude
-              </p>
+              <p className={labelCls} style={{ marginBottom: "2px" }}>Total Distance</p>
               <p className="text-xs font-bold text-[#171717]">
-                {Number(tracker.lng).toFixed(6)}
+                {tracker.totalDistance ? tracker.totalDistance.toFixed(1) : "0.0"} km
+              </p>
+            </div>
+            <div className="bg-slate-50 rounded-xl px-3 py-2">
+              <p className={labelCls} style={{ marginBottom: "2px" }}>Avg Speed</p>
+              <p className="text-xs font-bold text-[#171717]">
+                {tracker.averageSpeed ? tracker.averageSpeed.toFixed(1) : "0.0"} km/h
+              </p>
+            </div>
+            <div className="bg-slate-50 rounded-xl px-3 py-2">
+              <p className={labelCls} style={{ marginBottom: "2px" }}>Stops Made</p>
+              <p className="text-xs font-bold text-[#171717]">
+                {tracker.stopsMade || 0}
               </p>
             </div>
           </div>

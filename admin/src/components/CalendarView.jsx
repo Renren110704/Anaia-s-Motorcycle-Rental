@@ -427,7 +427,7 @@ const CalendarView = () => {
               if (end < now) return null;
               start.setHours(0, 0, 0, 0);
               end.setHours(0, 0, 0, 0);
-              if (m.status === "maintenance") return null;
+              // if (m.status === "maintenance") return null;
               return {
                 id: `auto-${m._id}`,
                 motorcycleId: m._id,

@@ -39,6 +39,14 @@ const TIMEOUT = 30000;
 const ITEMS_PER_PAGE = 8;
 const DOWNPAYMENT = 200;
 const BOOKINGS_CACHE_KEY = "my-bookings-cache-v1";
+const MAINTENANCE_STORAGE_KEY = "moto_maintenance_schedules";
+const loadMaintenanceSchedules = () => {
+  try {
+    return JSON.parse(localStorage.getItem(MAINTENANCE_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
 const ALL_TIME_SLOTS = [
   { value: "08:00", label: "8:00 AM" },
   { value: "09:00", label: "9:00 AM" },
@@ -54,6 +62,472 @@ const ALL_TIME_SLOTS = [
   { value: "19:00", label: "7:00 PM" },
   { value: "20:00", label: "8:00 PM" },
 ];
+
+/* ── Calendar Helpers (ported from MotorcycleDetail) ─────────────────────── */
+const toDateKey = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const addMonths = (date, amount) =>
+  new Date(date.getFullYear(), date.getMonth() + amount, 1);
+const getMonthGrid = (monthDate) => {
+  const firstDay = startOfMonth(monthDate);
+  const firstWeekday = firstDay.getDay();
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - firstWeekday);
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    return d;
+  });
+};
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const addDaysHelper = (date, n) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+};
+const formatLocalDate = (date) => {
+  const y = date.getFullYear(),
+    m = String(date.getMonth() + 1).padStart(2, "0"),
+    d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/* ── InlineDatePicker (ported from MotorcycleDetail) ─────────────────────── */
+const InlineDatePicker = ({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+  label,
+  mode = "pickup",
+  pickupDateISO,
+  maintenanceRanges = [],
+  bookingRanges = [],
+  disabled = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    if (value) return new Date(value + "T00:00:00");
+    return new Date();
+  });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Sync viewMonth when value changes externally
+  useEffect(() => {
+    if (value) setViewMonth(new Date(value + "T00:00:00"));
+  }, [value]);
+
+  const monthGrid = getMonthGrid(viewMonth);
+  const minD = minDate ? new Date(minDate + "T00:00:00") : null;
+  const maxD = maxDate ? new Date(maxDate + "T00:00:00") : null;
+
+  const isMaintenanceDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some(
+      (s) => dk >= toDateKey(s.startDate) && dk <= toDateKey(s.endDate),
+    );
+  };
+  const isBufferDay = (date) => {
+    const dk = toDateKey(date);
+    return maintenanceRanges.some((s) => {
+      const buf = addDaysHelper(s.startDate, -1);
+      return dk === toDateKey(buf);
+    });
+  };
+  const isBookedDay = (date) => {
+    const dk = toDateKey(date);
+    return bookingRanges.some(
+      (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+  };
+
+  const handleDayClick = (date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (minD && d < minD) return;
+    if (maxD && d > maxD) return;
+    if (isMaintenanceDay(date)) return;
+    if (mode === "return" && isBufferDay(date)) return;
+    onChange(formatLocalDate(d));
+    setOpen(false);
+  };
+
+  const displayValue = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const S_picker = {
+    btnSecondary: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 600,
+      color: "rgba(0,0,0,0.4)",
+      fontFamily: "'Space Grotesk',sans-serif",
+    },
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "9px 12px 9px 36px",
+          borderRadius: 8,
+          border: `1.5px solid ${open ? "#b50002" : "rgba(0,0,0,0.1)"}`,
+          background: disabled ? "rgba(245,245,243,0.6)" : "#F5F5F3",
+          fontSize: 13,
+          fontFamily: "'Space Grotesk',sans-serif",
+          color: value ? "#0E0E0E" : "rgba(0,0,0,0.35)",
+          outline: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          transition: "border-color 0.2s",
+          position: "relative",
+        }}
+      >
+        <FaCalendarAlt
+          style={{
+            position: "absolute",
+            left: 11,
+            color: "#b50002",
+            fontSize: 12,
+            pointerEvents: "none",
+          }}
+        />
+        <span style={{ flex: 1 }}>{displayValue || `Select ${label}`}</span>
+        <FaChevronDown
+          style={{
+            fontSize: 10,
+            color: "rgba(0,0,0,0.3)",
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            flexShrink: 0,
+          }}
+        />
+      </button>
+
+      {/* Dropdown calendar */}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 500,
+            background: "#fff",
+            borderRadius: 18,
+            border: "1.5px solid rgba(0,0,0,0.09)",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.14)",
+            padding: 16,
+            minWidth: 300,
+            width: "100%",
+            maxWidth: 340,
+            animation: "calFadeIn 0.18s ease",
+          }}
+        >
+          {/* Month navigation */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, -1))}
+              style={{
+                ...S_picker.btnSecondary,
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                color: "#0E0E0E",
+              }}
+            >
+              <FaChevronLeft size={10} />
+            </button>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                fontFamily: "'Space Grotesk',sans-serif",
+                color: "#0E0E0E",
+              }}
+            >
+              {monthLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMonth((v) => addMonths(v, 1))}
+              style={{
+                ...S_picker.btnSecondary,
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                color: "#0E0E0E",
+              }}
+            >
+              <FaChevronRight size={10} />
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+              marginBottom: 4,
+            }}
+          >
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <div
+                key={d}
+                style={{
+                  textAlign: "center",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  color: "rgba(0,0,0,0.3)",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  padding: "4px 0",
+                }}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7,1fr)",
+              gap: 2,
+            }}
+          >
+            {monthGrid.map((date) => {
+              const inMonth = date.getMonth() === viewMonth.getMonth();
+              const dk = toDateKey(date);
+              const isSelected = value === dk;
+              const d = new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+              );
+              const tooEarly = minD && d < minD;
+              const tooLate = maxD && d > maxD;
+              const isMaint = isMaintenanceDay(date);
+              const isBuf = isBufferDay(date);
+              const isBooked = isBookedDay(date);
+              const isDisabled =
+                tooEarly ||
+                tooLate ||
+                isMaint ||
+                (mode === "return" && isBuf) ||
+                isBooked;
+              const isToday = dk === todayISO();
+
+              const isPickupDate = mode === "return" && pickupDateISO === dk;
+              const isInRange =
+                mode === "return" &&
+                pickupDateISO &&
+                value &&
+                dk > pickupDateISO &&
+                dk < value;
+
+              let bg = "transparent";
+              let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
+              let border = "1.5px solid transparent";
+              let cursor = isDisabled ? "not-allowed" : "pointer";
+              let opacity = isDisabled
+                ? isMaint || (mode === "return" && isBuf)
+                  ? 1
+                  : 0.3
+                : 1;
+
+              if (isSelected) {
+                bg = "#0E0E0E";
+                color = "#fff";
+                border = "1.5px solid #0E0E0E";
+              } else if (isPickupDate) {
+                bg = "#b50002";
+                color = "#fff";
+                border = "1.5px solid #b50002";
+              } else if (isInRange) {
+                bg = "rgba(181,0,2,0.07)";
+                border = "1.5px solid rgba(181,0,2,0.12)";
+              } else if (isMaint) {
+                bg = "rgba(124,58,237,0.08)";
+                color = "#7c3aed";
+                border = "1.5px solid rgba(124,58,237,0.2)";
+              } else if (isBuf && mode === "return") {
+                bg = "rgba(245,158,11,0.08)";
+                color = "#b45309";
+                border = "1.5px solid rgba(245,158,11,0.25)";
+              } else if (isBooked && !isSelected) {
+                bg = "rgba(181,0,2,0.05)";
+                border = "1.5px solid rgba(181,0,2,0.1)";
+              } else if (isToday && inMonth) {
+                border = "1.5px solid rgba(0,0,0,0.2)";
+              }
+
+              return (
+                <button
+                  key={dk}
+                  type="button"
+                  disabled={isDisabled || !inMonth}
+                  onClick={() => inMonth && !isDisabled && handleDayClick(date)}
+                  title={
+                    isMaint
+                      ? "Under maintenance"
+                      : isBuf && mode === "return"
+                        ? "Buffer day — maintenance starts tomorrow"
+                        : undefined
+                  }
+                  style={{
+                    background: bg,
+                    color,
+                    border,
+                    borderRadius: 8,
+                    padding: "6px 2px",
+                    fontSize: 11,
+                    fontWeight: isSelected || isToday ? 800 : 600,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    cursor,
+                    opacity,
+                    minHeight: 30,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    transition: "all 0.15s",
+                    position: "relative",
+                  }}
+                >
+                  {date.getDate()}
+                  {isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: isSelected ? "#fff" : "#7c3aed",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {isBuf && !isMaint && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "#f59e0b",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {isBooked && !isMaint && !isBuf && !isSelected && inMonth && (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "rgba(181,0,2,0.4)",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: "1px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 12px",
+            }}
+          >
+            {[
+              { dot: "#7c3aed", label: "Maintenance" },
+              { dot: "#f59e0b", label: "Buffer day" },
+              { dot: "rgba(181,0,2,0.4)", label: "Booked" },
+            ].map(({ dot, label: lbl }) => (
+              <div
+                key={lbl}
+                style={{ display: "flex", alignItems: "center", gap: 5 }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: dot,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "rgba(0,0,0,0.4)",
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  {lbl}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 const ModalShell = ({ onBackdropClick, children }) => (
@@ -368,11 +842,11 @@ const sevenDaysFromToday = () => {
   d.setDate(d.getDate() + 7);
   return d;
 };
-const sixMonthsFromToday = () => {
-  const d = getTodayStart();
-  d.setMonth(d.getMonth() + 6);
-  return d;
-};
+// const sixMonthsFromToday = () => {
+//   const d = getTodayStart();
+//   d.setMonth(d.getMonth() + 6);
+//   return d;
+// };
 const combineLocalDateTime = (dateStr, timeStr) => {
   const dateObj = parseLocalDateOnly(dateStr);
   if (!dateObj || !timeStr) return null;
@@ -882,6 +1356,8 @@ const BookingRow = ({
   onReschedule,
   onExtend,
   onDownloadAgreement,
+  calBookings = [],
+  maintenanceRanges = [],
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [reuploadRef, setReuploadRef] = useState(
@@ -913,6 +1389,88 @@ const BookingRow = ({
   const dueAtPickup = Math.max(0, grossTotal - downpayment);
   const needsReupload =
     booking.requiresProofReupload || booking.paymentStatus === "rejected";
+
+  const currentMotoId =
+    booking.raw?.motorcycle?._id ||
+    booking.raw?.motorcycle?.id ||
+    booking.raw?.motorcycle ||
+    booking.motorcycle?._id ||
+    booking.motorcycle?.id;
+
+  const currentMaintenanceRanges = maintenanceRanges.filter((m) => {
+    const id = m.motorcycleId || m.motorcycle?._id || m.motorcycle?.id;
+    return String(id) === String(currentMotoId);
+  });
+
+  const bookingRanges = calBookings
+    .filter((b) => {
+      if (String(b._id || b.id) === String(booking.id)) return false;
+      const id =
+        b.motorcycle?._id || b.motorcycle?.id || b.motorcycle || b.motorcycleId;
+      return String(id) === String(currentMotoId);
+    })
+    .map((b) => {
+      const status = String(b?.status || "").toLowerCase();
+      if (
+        [
+          "completed",
+          "inspection",
+          "canceled",
+          "cancelled",
+          "rejected",
+        ].includes(status)
+      )
+        return null;
+      const pickupDate = new Date(b.pickupDate);
+      const returnDate = new Date(b.returnDate);
+      if (isNaN(pickupDate.getTime()) || isNaN(returnDate.getTime()))
+        return null;
+      return {
+        ...b,
+        pickupDate: new Date(
+          pickupDate.getFullYear(),
+          pickupDate.getMonth(),
+          pickupDate.getDate(),
+        ),
+        returnDate: new Date(
+          returnDate.getFullYear(),
+          returnDate.getMonth(),
+          returnDate.getDate(),
+        ),
+      };
+    })
+    .filter(Boolean);
+
+  const getNextUnavailableDate = (pickupDateISO) => {
+    if (!pickupDateISO) return null;
+    const pickup = new Date(pickupDateISO + "T00:00:00");
+    let earliest = null;
+
+    const checkDate = (d) => {
+      if (d > pickup) {
+        if (!earliest || d < earliest) earliest = d;
+      }
+    };
+
+    bookingRanges.forEach((b) => checkDate(b.pickupDate));
+    currentMaintenanceRanges.forEach((m) => checkDate(m.startDate));
+
+    if (earliest) {
+      return formatDateInput(earliest);
+    }
+    return null;
+  };
+
+  const isDateBookedOrMaintenance = (dateStr) => {
+    const dk = dateStr;
+    const isBooked = bookingRanges.some(
+      (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+    const isMaint = currentMaintenanceRanges.some(
+      (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
+    );
+    return isBooked || isMaint;
+  };
 
   const originalPickupDateInput = toDateInput(booking.dates.pickup);
   const originalReturnDateInput = toDateInput(booking.dates.return);
@@ -993,6 +1551,7 @@ const BookingRow = ({
     : "";
   const proofPreviewSrc = reuploadPreviewUrl || existingProofPreview;
 
+  // ── Reschedule: valid return time slots (same logic as MotorcycleDetail) ──
   const validReturnTimeSlots =
     rescheduleForm.returnDate &&
     rescheduleForm.pickupDate &&
@@ -1037,14 +1596,42 @@ const BookingRow = ({
   const originalReturnTimeFromExtension =
     latestExtension?.previousReturnTime || "";
 
+  // ── Calendar min/max dates ──
   const minPickupDate = useMemo(() => {
     const today = getTodayStart(),
       originalPickup = parseLocalDateOnly(originalPickupDateInput);
     if (!originalPickup) return formatDateInput(today);
     return formatDateInput(originalPickup > today ? originalPickup : today);
   }, [originalPickupDateInput]);
-  const maxPickupDate = formatDateInput(sevenDaysFromToday());
-  const maxReturnDate = formatDateInput(sixMonthsFromToday());
+  const maxPickupDate = null;
+  const maxReturnDate = null;
+  // Min return date for reschedule = day after pickup
+  const rescheduleMinReturnDate = addDaysToDateInput(
+    rescheduleForm.pickupDate || minPickupDate,
+    1,
+  );
+
+  // Min return date for extension = day after original pickup
+  const extensionMinReturnDate = addDaysToDateInput(originalReturnDateInput, 0); // same or later
+
+  // ── Handle reschedule pickup date change (clears return if needed) ──
+  const handleReschedulePickupDateChange = (dateISO) => {
+    setRescheduleForm((p) => {
+      const newReturn =
+        p.returnDate && p.returnDate > dateISO ? p.returnDate : "";
+      return { ...p, pickupDate: dateISO, returnDate: newReturn };
+    });
+  };
+
+  // ── Handle reschedule return date change ──
+  const handleRescheduleReturnDateChange = (dateISO) => {
+    setRescheduleForm((p) => ({ ...p, returnDate: dateISO }));
+  };
+
+  // ── Handle extension return date change ──
+  const handleExtensionReturnDateChange = (dateISO) => {
+    setExtensionForm((p) => ({ ...p, returnDate: dateISO }));
+  };
 
   const validateReschedule = async () => {
     const { pickupDate, pickupTime, returnDate, returnTime } = rescheduleForm;
@@ -1071,8 +1658,7 @@ const BookingRow = ({
       return false;
     }
     const today = getTodayStart(),
-      sevenDayLimit = sevenDaysFromToday(),
-      sixMonthLimit = sixMonthsFromToday();
+      sevenDayLimit = sevenDaysFromToday();
     const minAllowedPickup =
       originalPickupObj > today ? originalPickupObj : today;
     if (pickupDateObj < minAllowedPickup) {
@@ -1082,20 +1668,20 @@ const BookingRow = ({
       );
       return false;
     }
-    if (pickupDateObj > sevenDayLimit) {
-      await alertModal(
-        "Pickup date can only be rescheduled within the next 7 days.",
-        { isError: true },
-      );
-      return false;
-    }
-    if (returnDateObj > sixMonthLimit) {
-      await alertModal(
-        "Return date can only be rescheduled up to 6 months from today.",
-        { isError: true },
-      );
-      return false;
-    }
+    // if (pickupDateObj > sevenDayLimit) {
+    //   await alertModal(
+    //     "Pickup date can only be rescheduled within the next 7 days.",
+    //     { isError: true },
+    //   );
+    //   return false;
+    // }
+    // if (returnDateObj > sixMonthLimit) {
+    //   await alertModal(
+    //     "Return date can only be rescheduled up to 6 months from today.",
+    //     { isError: true },
+    //   );
+    //   return false;
+    // }
     const pickupDateTime = combineLocalDateTime(pickupDate, pickupTime),
       returnDateTime = combineLocalDateTime(returnDate, returnTime);
     if (!pickupDateTime || !returnDateTime) {
@@ -1108,6 +1694,28 @@ const BookingRow = ({
       await alertModal("Minimum rental duration is 24 hours.", {
         isError: true,
       });
+      return false;
+    }
+    if (isDateBookedOrMaintenance(pickupDate)) {
+      await alertModal(
+        "Selected pickup date is currently booked or under maintenance.",
+        { isError: true },
+      );
+      return false;
+    }
+    if (isDateBookedOrMaintenance(returnDate)) {
+      await alertModal(
+        "Selected return date is currently booked or under maintenance.",
+        { isError: true },
+      );
+      return false;
+    }
+    const nextUnavail = getNextUnavailableDate(pickupDate);
+    if (returnDate > nextUnavail) {
+      await alertModal(
+        "Selected dates overlap with an existing booking or maintenance.",
+        { isError: true },
+      );
       return false;
     }
     return true;
@@ -1146,6 +1754,21 @@ const BookingRow = ({
       await alertModal("Please select a valid extension duration.", {
         isError: true,
       });
+      return false;
+    }
+    if (isDateBookedOrMaintenance(returnDate)) {
+      await alertModal(
+        "Selected return date is currently booked or under maintenance.",
+        { isError: true },
+      );
+      return false;
+    }
+    const extNextUnavail = getNextUnavailableDate(originalReturnDateInput);
+    if (returnDate > extNextUnavail) {
+      await alertModal(
+        "Extension overlaps with an existing booking or maintenance.",
+        { isError: true },
+      );
       return false;
     }
     return true;
@@ -2196,7 +2819,7 @@ const BookingRow = ({
               </div>
             )}
 
-            {/* Reschedule */}
+            {/* ── RESCHEDULE (with InlineDatePicker) ── */}
             {canReschedule && (
               <div
                 style={{
@@ -2255,99 +2878,189 @@ const BookingRow = ({
                     {isRescheduling ? "Hide" : "Reschedule"}
                   </button>
                 </div>
+
                 {isRescheduling && (
                   <div style={{ marginTop: 14 }}>
                     <div
                       style={{
                         display: "grid",
                         gridTemplateColumns:
-                          "repeat(auto-fit, minmax(180px, 1fr))",
+                          "repeat(auto-fit, minmax(200px, 1fr))",
                         gap: 10,
                         marginBottom: 12,
                       }}
                     >
+                      {/* Pickup Date — InlineDatePicker */}
                       <div>
                         <label style={labelStyle}>Pickup Date</label>
-                        <input
-                          type="date"
+                        <InlineDatePicker
                           value={rescheduleForm.pickupDate}
-                          min={minPickupDate}
-                          max={maxPickupDate}
-                          onChange={(e) =>
-                            setRescheduleForm((p) => ({
-                              ...p,
-                              pickupDate: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
+                          onChange={handleReschedulePickupDateChange}
+                          minDate={minPickupDate}
+                          maxDate={maxPickupDate}
+                          maintenanceRanges={currentMaintenanceRanges}
+                          bookingRanges={bookingRanges}
+                          label="Pickup Date"
+                          mode="pickup"
                         />
                       </div>
+
+                      {/* Pickup Time */}
                       <div>
                         <label style={labelStyle}>Pickup Time</label>
-                        <select
-                          value={rescheduleForm.pickupTime}
-                          onChange={(e) =>
-                            setRescheduleForm((p) => {
-                              const sameDay = p.returnDate === p.pickupDate;
-                              return {
-                                ...p,
-                                pickupTime: e.target.value,
-                                returnTime:
-                                  sameDay && p.returnTime <= e.target.value
-                                    ? ""
-                                    : p.returnTime,
-                              };
-                            })
-                          }
-                          style={selectStyle}
-                        >
-                          {ALL_TIME_SLOTS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={rescheduleForm.pickupTime}
+                            onChange={(e) =>
+                              setRescheduleForm((p) => {
+                                const sameDay = p.returnDate === p.pickupDate;
+                                return {
+                                  ...p,
+                                  pickupTime: e.target.value,
+                                  returnTime:
+                                    sameDay && p.returnTime <= e.target.value
+                                      ? ""
+                                      : p.returnTime,
+                                };
+                              })
+                            }
+                            style={selectStyle}
+                          >
+                            {ALL_TIME_SLOTS.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 10,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
                       </div>
+
+                      {/* Return Date — InlineDatePicker */}
                       <div>
                         <label style={labelStyle}>Return Date</label>
-                        <input
-                          type="date"
+                        <InlineDatePicker
                           value={rescheduleForm.returnDate}
-                          min={addDaysToDateInput(
-                            rescheduleForm.pickupDate || minPickupDate,
-                            1,
+                          onChange={handleRescheduleReturnDateChange}
+                          minDate={rescheduleMinReturnDate}
+                          maxDate={getNextUnavailableDate(
+                            rescheduleForm.pickupDate,
                           )}
-                          max={maxReturnDate}
-                          onChange={(e) =>
-                            setRescheduleForm((p) => ({
-                              ...p,
-                              returnDate: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
+                          maintenanceRanges={currentMaintenanceRanges}
+                          bookingRanges={bookingRanges}
+                          label="Return Date"
+                          mode="return"
+                          pickupDateISO={rescheduleForm.pickupDate}
                         />
                       </div>
+
+                      {/* Return Time */}
                       <div>
                         <label style={labelStyle}>Return Time</label>
-                        <select
-                          value={rescheduleForm.returnTime}
-                          onChange={(e) =>
-                            setRescheduleForm((p) => ({
-                              ...p,
-                              returnTime: e.target.value,
-                            }))
-                          }
-                          style={selectStyle}
-                        >
-                          <option value="">Select time</option>
-                          {validReturnTimeSlots.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={rescheduleForm.returnTime}
+                            onChange={(e) =>
+                              setRescheduleForm((p) => ({
+                                ...p,
+                                returnTime: e.target.value,
+                              }))
+                            }
+                            style={selectStyle}
+                          >
+                            <option value="">Select time</option>
+                            {validReturnTimeSlots.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 10,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Selected range summary pill */}
+                    {rescheduleForm.pickupDate && rescheduleForm.returnDate && (
+                      <div
+                        style={{
+                          background: "#fff",
+                          border: "1.5px solid #bfdbfe",
+                          borderRadius: 10,
+                          padding: "8px 14px",
+                          marginBottom: 10,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#1e40af",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <FaCalendarAlt style={{ fontSize: 11 }} />
+                          {new Date(
+                            rescheduleForm.pickupDate + "T00:00:00",
+                          ).toLocaleDateString("en-PH", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          {" → "}
+                          {new Date(
+                            rescheduleForm.returnDate + "T00:00:00",
+                          ).toLocaleDateString("en-PH", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#2563eb",
+                            background: "rgba(37,99,235,0.1)",
+                            borderRadius: 999,
+                            padding: "3px 10px",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {rescheduledDays} day
+                          {rescheduledDays !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Price preview */}
                     <div
                       style={{
                         background: "#fff",
@@ -2375,9 +3088,9 @@ const BookingRow = ({
                         ],
                       ]
                         .filter(Boolean)
-                        .map(([label, value]) => (
+                        .map(([lbl, val]) => (
                           <div
-                            key={label}
+                            key={lbl}
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
@@ -2391,7 +3104,7 @@ const BookingRow = ({
                                 fontFamily: "'Space Grotesk', sans-serif",
                               }}
                             >
-                              {label}
+                              {lbl}
                             </span>
                             <span
                               style={{
@@ -2401,7 +3114,7 @@ const BookingRow = ({
                                 fontFamily: "'Space Grotesk', sans-serif",
                               }}
                             >
-                              {value}
+                              {val}
                             </span>
                           </div>
                         ))}
@@ -2465,7 +3178,7 @@ const BookingRow = ({
               </div>
             )}
 
-            {/* Extension */}
+            {/* ── EXTENSION (with InlineDatePicker) ── */}
             {canExtend && (
               <div
                 style={{
@@ -2524,6 +3237,7 @@ const BookingRow = ({
                     {isExtending ? "Hide" : "Extend"}
                   </button>
                 </div>
+
                 {isExtending && (
                   <div style={{ marginTop: 14 }}>
                     <div
@@ -2547,52 +3261,71 @@ const BookingRow = ({
                         booking.times.return) &&
                         ` · ${formatTime(originalReturnTimeFromExtension || booking.times.return)}`}
                     </div>
+
                     <div
                       style={{
                         display: "grid",
                         gridTemplateColumns:
-                          "repeat(auto-fit, minmax(180px, 1fr))",
+                          "repeat(auto-fit, minmax(200px, 1fr))",
                         gap: 10,
                         marginBottom: 12,
                       }}
                     >
+                      {/* New Return Date — InlineDatePicker */}
                       <div>
                         <label style={labelStyle}>New Return Date</label>
-                        <input
-                          type="date"
+                        <InlineDatePicker
                           value={extensionForm.returnDate}
-                          min={originalReturnDateInput}
-                          max={formatDateInput(sixMonthsFromToday())}
-                          onChange={(e) =>
-                            setExtensionForm((p) => ({
-                              ...p,
-                              returnDate: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
+                          onChange={handleExtensionReturnDateChange}
+                          minDate={extensionMinReturnDate}
+                          maxDate={getNextUnavailableDate(
+                            originalReturnDateInput,
+                          )}
+                          maintenanceRanges={currentMaintenanceRanges}
+                          bookingRanges={bookingRanges}
+                          label="New Return Date"
+                          mode="return"
+                          pickupDateISO={originalPickupDateInput}
                         />
                       </div>
+
+                      {/* New Return Time */}
                       <div>
                         <label style={labelStyle}>New Return Time</label>
-                        <select
-                          value={extensionForm.returnTime}
-                          onChange={(e) =>
-                            setExtensionForm((p) => ({
-                              ...p,
-                              returnTime: e.target.value,
-                            }))
-                          }
-                          style={selectStyle}
-                        >
-                          <option value="">Select time</option>
-                          {ALL_TIME_SLOTS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={extensionForm.returnTime}
+                            onChange={(e) =>
+                              setExtensionForm((p) => ({
+                                ...p,
+                                returnTime: e.target.value,
+                              }))
+                            }
+                            style={selectStyle}
+                          >
+                            <option value="">Select time</option>
+                            {ALL_TIME_SLOTS.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 10,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Extension price preview */}
                     <div
                       style={{
                         background: "#fff",
@@ -2946,6 +3679,80 @@ const MyBookings = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [calBookings, setCalBookings] = useState([]);
+  const [maintenanceRanges, setMaintenanceRanges] = useState([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const [bookingsRes, motoRes] = await Promise.allSettled([
+          axios.get(`${API_BASE}/api/motorcycle-bookings`, {
+            signal: controller.signal,
+            params: { limit: 1000 },
+          }),
+          axios.get(`${API_BASE}/api/motorcycles`, {
+            signal: controller.signal,
+            params: { limit: 1000, includeDeleted: "false" },
+          }),
+        ]);
+        if (bookingsRes.status === "fulfilled") {
+          const payload = bookingsRes.value.data;
+          setCalBookings(
+            Array.isArray(payload)
+              ? payload
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : [],
+          );
+        }
+        if (motoRes.status === "fulfilled") {
+          const payload = motoRes.value.data;
+          const data = Array.isArray(payload)
+            ? payload
+            : payload?.data || payload?.motorcycles || [];
+          const now = new Date();
+          const autoMaint = data
+            .map((m) => {
+              const rawStart =
+                m.maintenanceScheduleStartAt || m.maintenanceScheduleAt || null;
+              const rawEnd =
+                m.maintenanceScheduleEndAt || m.maintenanceScheduleAt || null;
+              if (!rawStart || !rawEnd) return null;
+              const start = new Date(rawStart),
+                end = new Date(rawEnd);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              if (end < now) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return {
+                id: `auto-${m._id}`,
+                motorcycleId: m._id,
+                motorcycle: m,
+                startDate: start,
+                endDate: end,
+                auto: true,
+              };
+            })
+            .filter(Boolean);
+          const stored = loadMaintenanceSchedules()
+            .filter((s) => !s.cancelled && !s.completed)
+            .map((s) => {
+              const moto = data.find((m) => m._id === s.motorcycleId);
+              const start = new Date(s.startDate),
+                end = new Date(s.endDate);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+              start.setHours(0, 0, 0, 0);
+              end.setHours(0, 0, 0, 0);
+              return { ...s, startDate: start, endDate: end, motorcycle: moto };
+            })
+            .filter(Boolean);
+          setMaintenanceRanges([...autoMaint, ...stored]);
+        }
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, []);
 
   const isMounted = useRef(true);
   const topRef = useRef(null);
@@ -3276,6 +4083,10 @@ const MyBookings = () => {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+        @keyframes calFadeIn {
+          from { opacity:0; transform:translateY(6px) scale(0.97); }
+          to { opacity:1; transform:translateY(0) scale(1); }
+        }
 
         .booking-card-enter {
           animation: fadeUp 0.3s ease forwards;
@@ -3324,7 +4135,6 @@ const MyBookings = () => {
           <div
             style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 0" }}
           >
-            
             <div
               style={{
                 display: "flex",
@@ -3439,7 +4249,6 @@ const MyBookings = () => {
             padding: "28px 24px 64px",
           }}
         >
-          {/* Loading */}
           {loading && (
             <div
               style={{
@@ -3472,7 +4281,6 @@ const MyBookings = () => {
             </div>
           )}
 
-          {/* Error */}
           {!loading && error && (
             <div
               style={{
@@ -3530,7 +4338,6 @@ const MyBookings = () => {
             </div>
           )}
 
-          {/* Empty */}
           {!loading && !error && filteredBookings.length === 0 && (
             <div
               style={{
@@ -3619,7 +4426,6 @@ const MyBookings = () => {
             </div>
           )}
 
-          {/* Booking list */}
           {!loading && !error && paginatedBookings.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {paginatedBookings.map((booking, idx) => (
@@ -3635,13 +4441,14 @@ const MyBookings = () => {
                     onReschedule={rescheduleBooking}
                     onExtend={extendBooking}
                     onDownloadAgreement={downloadRentalAgreement}
+                    calBookings={calBookings}
+                    maintenanceRanges={maintenanceRanges}
                   />
                 </div>
               ))}
             </div>
           )}
 
-          {/* Pagination */}
           {!loading && !error && filteredBookings.length > 0 && (
             <Pagination
               currentPage={currentPage}

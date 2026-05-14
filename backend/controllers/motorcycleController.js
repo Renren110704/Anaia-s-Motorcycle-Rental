@@ -412,7 +412,7 @@ export const getMotorcycles = async (req, res, next) => {
 
     if (!includeDeleted) {
       query.isDeleted = false;
-      query.status = "available";
+      // query.status = "available";
     }
 
     if (search) {

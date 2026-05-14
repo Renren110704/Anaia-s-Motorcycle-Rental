@@ -437,7 +437,7 @@ const Motorcycles = () => {
   const abortControllerRef = useRef(null);
   const topRef = useRef(null);
   const base = "https://anaias-motorcycle-rental.onrender.com";
-  const fallbackImage = `${base}/uploads/default-motorcycle.png`;
+  const fallbackImage = `${API_BASE_URL}/uploads/default-motorcycle.png`;
 
   const fetchMotorcycles = useCallback(async () => {
     setLoading(true);
@@ -450,7 +450,7 @@ const Motorcycles = () => {
     const controller = new AbortController();
     abortControllerRef.current = controller;
     try {
-      const res = await axios.get(`${base}/api/motorcycles`, {
+      const res = await axios.get(`${API_BASE_URL}/api/motorcycles`, {
         params: { limit: 100 },
         signal: controller.signal,
         headers: { Accept: "application/json" },
@@ -481,7 +481,7 @@ const Motorcycles = () => {
     } finally {
       setLoading(false);
     }
-  }, [base]);
+  }, []);
 
   const computeEffectiveAvailability = useCallback((motorcycle) => {
     const today = new Date();
@@ -557,7 +557,7 @@ const Motorcycles = () => {
   );
 
   const applyFiltersAndSort = useCallback(() => {
-    let filtered = [...motorcycles].filter((m) => !isMotorcycleUnavailable(m));
+    let filtered = [...motorcycles];
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -726,10 +726,10 @@ const Motorcycles = () => {
     if (t.startsWith("dxta0nmdy/")) return "https://res.cloudinary.com/" + t;
     if (t.startsWith("/")) return "https://res.cloudinary.com" + t;
     if (t.startsWith("local/"))
-      return `${base}/uploads/${t.replace("local/", "")}`;
+      return `${API_BASE_URL}/uploads/${t.replace("local/", "")}`;
     const cn = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
     if (cn) return `https://res.cloudinary.com/${cn}/image/upload/${t}`;
-    return `${base}/uploads/${t}`;
+    return `${API_BASE_URL}/uploads/${t}`;
   };
 
   const handleImageError = (e) => {
@@ -741,7 +741,7 @@ const Motorcycles = () => {
 
   const renderAvailabilityBadge = (_, motorcycle) => {
     if (motorcycle?.status && motorcycle.status !== "available")
-      return <span style={badgeStyle("red")}>Unavailable</span>;
+      return <span></span>;
     const eff = computeEffectiveAvailability(motorcycle);
     if (!eff || eff.state === "fully_available")
       // return <span style={badgeStyle("green")}>Available</span>;
@@ -768,7 +768,7 @@ const Motorcycles = () => {
     return eff?.state === "booked";
   };
   const handleBook = (motorcycle, id) => {
-    if (isBookDisabled(motorcycle)) return;
+    // if (isBookDisabled(motorcycle)) return;
     navigate(`/motorcycles/${id}`, { state: { motorcycle } });
   };
 
@@ -1021,7 +1021,7 @@ const Motorcycles = () => {
               fontFamily: "'Space Grotesk',sans-serif",
             }}
           >
-            {filteredMotorcycles.length} available unit
+            {filteredMotorcycles.length} unit
             {filteredMotorcycles.length !== 1 ? "s" : ""}
             {totalPages > 1 && (
               <span style={{ color: "rgba(0,0,0,0.3)" }}>
@@ -1161,10 +1161,9 @@ const Motorcycles = () => {
                         <button
                           className="mc-rent-btn"
                           onClick={() => handleBook(motorcycle, id)}
-                          disabled={disabled}
                         >
-                          {disabled ? "Unavailable" : "Rent Now"}
-                          {!disabled && <FaArrowRight size={10} />}
+                          {disabled ? "Check Availability" : "Rent Now"}
+                          <FaArrowRight size={10} />
                         </button>
                       </div>
                     </div>

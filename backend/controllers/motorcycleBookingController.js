@@ -46,14 +46,15 @@ const INSPECTION_VEHICLE_STATUSES = [
 ];
 
 // ── Cloudinary Configuration ──────────────────────────────────────────
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_FOLDER =
+  process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
 const CLOUDINARY_PAYMENT_PROOF_FOLDER = "paymentproof";
 const CLOUDINARY_RETURN_INSPECTION_FOLDER = "returninspection";
 const CLOUDINARY_REPAIR_ESTIMATE_FOLDER = "repair-estimates";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET,
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET,
 );
 
 if (CLOUDINARY_ENABLED) {
@@ -69,9 +70,17 @@ const normalizeUrl = (value = "") => {
   return normalized.replace(/^http:\/\//i, "https://");
 };
 
-const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_FOLDER) => {
+const uploadFileToCloudinary = async (
+  filePath,
+  targetFolder = CLOUDINARY_FOLDER,
+) => {
   if (!filePath || !CLOUDINARY_ENABLED) {
-    console.error("[CLOUDINARY] Upload skipped - filePath:", !!filePath, "enabled:", CLOUDINARY_ENABLED);
+    console.error(
+      "[CLOUDINARY] Upload skipped - filePath:",
+      !!filePath,
+      "enabled:",
+      CLOUDINARY_ENABLED,
+    );
     return null;
   }
 
@@ -80,7 +89,9 @@ const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_FOLDER
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath} to folder: ${targetFolder}`);
+      console.log(
+        `[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath} to folder: ${targetFolder}`,
+      );
       const result = await cloudinary.uploader.upload(filePath, {
         folder: targetFolder,
         resource_type: "image",
@@ -92,7 +103,9 @@ const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_FOLDER
         timeout: 30000,
       });
 
-      const url = normalizeUrl(result.secure_url || result.url || result.secureUrl || "");
+      const url = normalizeUrl(
+        result.secure_url || result.url || result.secureUrl || "",
+      );
       if (!url) {
         console.error("[CLOUDINARY] No URL in response:", result);
         lastError = new Error("No URL in Cloudinary response");
@@ -104,10 +117,13 @@ const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_FOLDER
       return url;
     } catch (err) {
       lastError = err;
-      console.error(`[CLOUDINARY] Attempt ${attempt} failed:`, err?.message || err);
+      console.error(
+        `[CLOUDINARY] Attempt ${attempt} failed:`,
+        err?.message || err,
+      );
       if (attempt < MAX_RETRIES) {
         const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }
@@ -124,22 +140,30 @@ const getUploadedPaymentProofUrl = async (file) => {
 
   const absolutePath = path.resolve(file.path);
   console.log("[PAYMENTPROOF] Resolving file:", absolutePath);
-  
+
   const exists = fs.existsSync(absolutePath);
   if (!exists) {
     console.error("[PAYMENTPROOF] File does not exist:", absolutePath);
     return null;
   }
 
-  console.log("[PAYMENTPROOF] File exists, uploading to Cloudinary folder:", CLOUDINARY_PAYMENT_PROOF_FOLDER);
-  const cloudUrl = await uploadFileToCloudinary(absolutePath, CLOUDINARY_PAYMENT_PROOF_FOLDER);
-  
+  console.log(
+    "[PAYMENTPROOF] File exists, uploading to Cloudinary folder:",
+    CLOUDINARY_PAYMENT_PROOF_FOLDER,
+  );
+  const cloudUrl = await uploadFileToCloudinary(
+    absolutePath,
+    CLOUDINARY_PAYMENT_PROOF_FOLDER,
+  );
+
   if (cloudUrl) {
     console.log("[PAYMENTPROOF] Got Cloudinary URL:", cloudUrl);
     return cloudUrl;
   }
 
-  console.error("[PAYMENTPROOF] Cloudinary upload failed, using local fallback");
+  console.error(
+    "[PAYMENTPROOF] Cloudinary upload failed, using local fallback",
+  );
   const filename = path.basename(absolutePath);
   const localPath = `/uploads/${filename}`;
   console.log("[PAYMENTPROOF] Returning local path:", localPath);
@@ -283,7 +307,9 @@ const hasMinimumRentalDuration = (
   const pickupAt = combineDateAndTime(pickupDate, pickupTime);
   const returnAt = combineDateAndTime(returnDate, returnTime);
   if (!pickupAt || !returnAt) return false;
-  return returnAt.getTime() - pickupAt.getTime() >= minimumHours * 60 * 60 * 1000;
+  return (
+    returnAt.getTime() - pickupAt.getTime() >= minimumHours * 60 * 60 * 1000
+  );
 };
 
 const computeRentalDays = (pickupDate, pickupTime, returnDate, returnTime) => {
@@ -334,7 +360,9 @@ const verifyReceiptWithTimeout = async (payload) => {
       };
     }
 
-    return result || pendingReceiptVerification("Receipt verification deferred.");
+    return (
+      result || pendingReceiptVerification("Receipt verification deferred.")
+    );
   } catch {
     return pendingReceiptVerification(
       "Receipt verification failed temporarily; queued for manual review.",
@@ -364,9 +392,10 @@ const updateMotorcycleStatus = async (motorcycleId) => {
 
     const hasPendingBooking = bookings.some((b) => {
       const status = (b.status || "").toLowerCase();
-      return ["pending_reservation", "pending_full_payment"].includes(
-        status,
-      ) || status === "pending";
+      return (
+        ["pending_reservation", "pending_full_payment"].includes(status) ||
+        status === "pending"
+      );
     });
     const hasActiveCheckoutLock = isCheckoutLockActive(motorcycle);
 
@@ -398,9 +427,13 @@ const updateMotorcycleStatus = async (motorcycleId) => {
       !hasActiveBooking &&
       !hasPendingBooking &&
       !hasActiveCheckoutLock &&
-      ["rented", "pending", "inspection", "under_review", "repair_needed"].includes(
-        motorcycle.status,
-      )
+      [
+        "rented",
+        "pending",
+        "inspection",
+        "under_review",
+        "repair_needed",
+      ].includes(motorcycle.status)
     ) {
       motorcycle.status = "available";
       await motorcycle.save();
@@ -412,7 +445,8 @@ const updateMotorcycleStatus = async (motorcycleId) => {
 
 export const acquireCheckoutLock = async (req, res) => {
   try {
-    const motorcycleId = req.body?.motorcycleId;
+    // 1. Accept pickupDate and returnDate from the frontend request
+    const { motorcycleId, pickupDate, returnDate } = req.body;
     const userId = getRequesterUserId(req);
 
     if (!motorcycleId || !mongoose.Types.ObjectId.isValid(motorcycleId)) {
@@ -421,40 +455,50 @@ export const acquireCheckoutLock = async (req, res) => {
         .json({ success: false, message: "Invalid motorcycle ID" });
     }
 
-    if (!userId) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    // 2. NEW: Explicitly check if the requested dates overlap with existing bookings
+    if (pickupDate && returnDate) {
+      const pickup = new Date(pickupDate);
+      const ret = new Date(returnDate);
+
+      const overlappingCount = await MotorcycleBooking.countDocuments({
+        "motorcycle.id": motorcycleId,
+        status: { $in: BLOCKING_STATUSES },
+        pickupDate: { $lte: ret },
+        returnDate: { $gte: pickup },
+        isDeleted: { $ne: true },
+      });
+
+      if (overlappingCount > 0) {
+        return res.status(409).json({
+          success: false,
+          code: "MOTORCYCLE_NOT_AVAILABLE",
+          message: "This motorcycle is already booked for your selected dates.",
+        });
+      }
     }
 
     const requesterObjectId = new mongoose.Types.ObjectId(userId);
-
     const { now, expiresAt } = getLockWindow();
+
+    // 3. FIXED: Removed the global `{ status: "available" }` constraint.
+    // Now you can lock it for future dates even if it is currently rented today.
     const updated = await Motorcycle.findOneAndUpdate(
       {
         _id: motorcycleId,
         isDeleted: false,
-        $and: [
-          {
-            $or: [
-              { "checkoutLock.userId": requesterObjectId },
-              { checkoutLock: null },
-              { "checkoutLock.expiresAt": { $exists: false } },
-              { "checkoutLock.expiresAt": { $lte: now } },
-            ],
-          },
-          {
-            $or: [
-              { status: "available" },
-              { "checkoutLock.userId": requesterObjectId },
-            ],
-          },
+        $or: [
+          { "checkoutLock.userId": requesterObjectId },
+          { checkoutLock: null },
+          { "checkoutLock.expiresAt": { $exists: false } },
+          { "checkoutLock.expiresAt": { $lte: now } },
         ],
       },
       {
         $set: {
-          status: "pending",
           checkoutLock: {
             userId: requesterObjectId,
             acquiredAt: now,
@@ -467,7 +511,7 @@ export const acquireCheckoutLock = async (req, res) => {
 
     if (!updated) {
       const current = await Motorcycle.findById(motorcycleId)
-        .select("status checkoutLock")
+        .select("checkoutLock")
         .lean();
 
       if (!current) {
@@ -485,7 +529,7 @@ export const acquireCheckoutLock = async (req, res) => {
           success: false,
           code: "MOTORCYCLE_LOCKED",
           message:
-            "This motorcycle is currently being rented by someone else. Please choose another one.",
+            "Another user is currently checking out this motorcycle. Please wait a few minutes.",
           lockExpiresAt: current.checkoutLock.expiresAt,
         });
       }
@@ -493,7 +537,7 @@ export const acquireCheckoutLock = async (req, res) => {
       return res.status(409).json({
         success: false,
         code: "MOTORCYCLE_NOT_AVAILABLE",
-        message: "This motorcycle is not available right now.",
+        message: "This motorcycle cannot be locked right now.",
       });
     }
 
@@ -607,12 +651,7 @@ export const createMotorcycleBooking = async (req, res) => {
     }
 
     if (
-      !hasMinimumRentalDuration(
-        pickupDate,
-        pickupTime,
-        returnDate,
-        returnTime,
-      )
+      !hasMinimumRentalDuration(pickupDate, pickupTime, returnDate, returnTime)
     ) {
       return res.status(400).json({
         success: false,
@@ -732,12 +771,23 @@ export const createMotorcycleBooking = async (req, res) => {
 
     // ── Check for scheduled maintenance conflicts ────────────────────────
     const motorcycleWithMaintenance = await Motorcycle.findById(motorcycleId)
-      .select("maintenanceScheduleAt maintenanceScheduleStartAt maintenanceScheduleEndAt status")
+      .select(
+        "maintenanceScheduleAt maintenanceScheduleStartAt maintenanceScheduleEndAt status",
+      )
       .lean();
 
-    if (motorcycleWithMaintenance && motorcycleWithMaintenance.status !== "maintenance") {
-      const rawStart = motorcycleWithMaintenance.maintenanceScheduleStartAt || motorcycleWithMaintenance.maintenanceScheduleAt || null;
-      const rawEnd = motorcycleWithMaintenance.maintenanceScheduleEndAt || motorcycleWithMaintenance.maintenanceScheduleAt || null;
+    if (
+      motorcycleWithMaintenance &&
+      motorcycleWithMaintenance.status !== "maintenance"
+    ) {
+      const rawStart =
+        motorcycleWithMaintenance.maintenanceScheduleStartAt ||
+        motorcycleWithMaintenance.maintenanceScheduleAt ||
+        null;
+      const rawEnd =
+        motorcycleWithMaintenance.maintenanceScheduleEndAt ||
+        motorcycleWithMaintenance.maintenanceScheduleAt ||
+        null;
       if (rawStart && rawEnd) {
         const maintenanceStart = new Date(rawStart);
         maintenanceStart.setHours(0, 0, 0, 0);
@@ -960,12 +1010,7 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
     }
 
     if (
-      !hasMinimumRentalDuration(
-        pickupDate,
-        pickupTime,
-        returnDate,
-        returnTime,
-      )
+      !hasMinimumRentalDuration(pickupDate, pickupTime, returnDate, returnTime)
     ) {
       return res.status(400).json({
         success: false,
@@ -1243,13 +1288,14 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
       })
       .sort({ bookingDate: -1 })
       .lean();
-    
+
     // Ensure motorcycleImage is set from motorcycle.image if not present
-    const enrichedBookings = bookings.map(booking => ({
+    const enrichedBookings = bookings.map((booking) => ({
       ...booking,
-      motorcycleImage: booking.motorcycleImage || (booking.motorcycle?.image || ""),
+      motorcycleImage:
+        booking.motorcycleImage || booking.motorcycle?.image || "",
     }));
-    
+
     res.json(enrichedBookings);
   } catch (err) {
     next(err);
@@ -1362,32 +1408,53 @@ export const extendMotorcycleBooking = async (req, res, next) => {
 
     const booking = await MotorcycleBooking.findById(req.params.id);
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
     const userId = String(req.user._id || req.user.id);
     if (!booking.userId || String(booking.userId) !== userId) {
-      return res.status(403).json({ success: false, message: "You cannot extend this booking." });
+      return res
+        .status(403)
+        .json({ success: false, message: "You cannot extend this booking." });
     }
 
     if (booking.isDeleted) {
-      return res.status(400).json({ success: false, message: "This booking is not active." });
+      return res
+        .status(400)
+        .json({ success: false, message: "This booking is not active." });
     }
 
     if (booking.status !== "active") {
-      return res.status(400).json({ success: false, message: "Only active bookings can be extended." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Only active bookings can be extended.",
+        });
     }
 
     const returnDate = req.body?.returnDate;
     const returnTime = String(req.body?.returnTime || "").trim();
     if (!returnDate || !returnTime) {
-      return res.status(400).json({ success: false, message: "returnDate and returnTime are required." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "returnDate and returnTime are required.",
+        });
     }
 
-    const currentReturnAt = combineDateAndTime(booking.returnDate, booking.returnTime);
+    const currentReturnAt = combineDateAndTime(
+      booking.returnDate,
+      booking.returnTime,
+    );
     const newReturnAt = combineDateAndTime(returnDate, returnTime);
     if (!currentReturnAt || !newReturnAt) {
-      return res.status(400).json({ success: false, message: "Invalid return date/time." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid return date/time." });
     }
 
     if (newReturnAt.getTime() <= currentReturnAt.getTime()) {
@@ -1399,7 +1466,12 @@ export const extendMotorcycleBooking = async (req, res, next) => {
 
     const motorcycleId = booking.motorcycle?.id;
     if (!motorcycleId) {
-      return res.status(400).json({ success: false, message: "Booking has no motorcycle assigned." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Booking has no motorcycle assigned.",
+        });
     }
 
     const overlappingCount = await MotorcycleBooking.countDocuments({
@@ -1414,7 +1486,8 @@ export const extendMotorcycleBooking = async (req, res, next) => {
     if (overlappingCount > 0) {
       return res.status(409).json({
         success: false,
-        message: "Extension conflicts with another booking for this motorcycle.",
+        message:
+          "Extension conflicts with another booking for this motorcycle.",
       });
     }
 
@@ -1425,16 +1498,19 @@ export const extendMotorcycleBooking = async (req, res, next) => {
       returnTime,
     );
     if (!days) {
-      return res.status(400).json({ success: false, message: "Invalid extension duration." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid extension duration." });
     }
 
     const dailyRate = Number(booking.motorcycle?.dailyRate || 0);
     const distanceFee = Number(booking.details?.distanceFee || 0);
     const helmetFee = Number(booking.details?.helmetFee || 0);
     const previousAmount = Number(booking.amount || 0);
-    const newAmount = dailyRate > 0
-      ? dailyRate * days + distanceFee + helmetFee
-      : previousAmount;
+    const newAmount =
+      dailyRate > 0
+        ? dailyRate * days + distanceFee + helmetFee
+        : previousAmount;
     const additionalAmount = Math.max(0, newAmount - previousAmount);
 
     const previousReturnDate = booking.returnDate;
@@ -1588,11 +1664,17 @@ export const reuploadBookingPaymentProof = async (req, res, next) => {
       });
     }
 
-    const paymentReferenceId = String(req.body?.paymentReferenceId || "").trim();
+    const paymentReferenceId = String(
+      req.body?.paymentReferenceId || "",
+    ).trim();
     const paymentSentAt = req.body?.paymentSentAt;
     const paymentSentAmount = Number(req.body?.paymentSentAmount);
 
-    if (!paymentReferenceId || !paymentSentAt || !Number.isFinite(paymentSentAmount)) {
+    if (
+      !paymentReferenceId ||
+      !paymentSentAt ||
+      !Number.isFinite(paymentSentAmount)
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required re-upload fields.",
@@ -1792,14 +1874,14 @@ export const updateReturnInspection = async (req, res, next) => {
     const inspection = {
       ...(booking.returnInspection || {}),
     };
-    const wasRepairAdded = Boolean(booking.returnInspection?.repairEstimateAdded);
+    const wasRepairAdded = Boolean(
+      booking.returnInspection?.repairEstimateAdded,
+    );
     const wasPenaltySettled = Boolean(booking.returnInspection?.penaltySettled);
 
     if (clearanceStatus) {
       if (!CLEARANCE_STATUSES.includes(clearanceStatus)) {
-        return res
-          .status(400)
-          .json({ message: "Invalid clearance status." });
+        return res.status(400).json({ message: "Invalid clearance status." });
       }
       inspection.clearanceStatus = clearanceStatus;
     }
@@ -1807,7 +1889,8 @@ export const updateReturnInspection = async (req, res, next) => {
     // Only include fields relevant to clearance status
     if (inspection.clearanceStatus === "damage_found") {
       if (typeof damageNotes === "string") inspection.damageNotes = damageNotes;
-      if (typeof mechanicNotes === "string") inspection.mechanicNotes = mechanicNotes;
+      if (typeof mechanicNotes === "string")
+        inspection.mechanicNotes = mechanicNotes;
       if (typeof repairEstimateNotes === "string")
         inspection.repairEstimateNotes = repairEstimateNotes;
       if (repairEstimateAmount !== undefined) {
@@ -1816,7 +1899,8 @@ export const updateReturnInspection = async (req, res, next) => {
       }
       inspection.vehicleStatus = "maintenance";
     } else if (inspection.clearanceStatus === "penalty_required") {
-      if (typeof penaltySummary === "string") inspection.penaltySummary = penaltySummary;
+      if (typeof penaltySummary === "string")
+        inspection.penaltySummary = penaltySummary;
       if (penaltyAmount !== undefined) {
         const parsed = Number(penaltyAmount);
         if (!Number.isNaN(parsed)) inspection.penaltyAmount = parsed;
@@ -1837,7 +1921,8 @@ export const updateReturnInspection = async (req, res, next) => {
 
     if (penaltySettled !== undefined) {
       inspection.penaltySettled =
-        String(penaltySettled).toLowerCase() === "true" || penaltySettled === true;
+        String(penaltySettled).toLowerCase() === "true" ||
+        penaltySettled === true;
     }
 
     const damageFiles = req.files?.damagePhotos || [];
@@ -1866,7 +1951,9 @@ export const updateReturnInspection = async (req, res, next) => {
       Number(inspection.repairEstimateAmount || 0) > 0 &&
       !wasRepairAdded
     ) {
-      booking.amount = Number(booking.amount || 0) + Number(inspection.repairEstimateAmount || 0);
+      booking.amount =
+        Number(booking.amount || 0) +
+        Number(inspection.repairEstimateAmount || 0);
       inspection.repairEstimateAdded = true;
     }
 
@@ -1894,7 +1981,9 @@ export const updateReturnInspection = async (req, res, next) => {
         Number(inspection.repairEstimateAmount || 0) > 0 &&
         !wasRepairAdded
       ) {
-        booking.amount = Number(booking.amount || 0) + Number(inspection.repairEstimateAmount || 0);
+        booking.amount =
+          Number(booking.amount || 0) +
+          Number(inspection.repairEstimateAmount || 0);
         inspection.repairEstimateAdded = true;
       }
 
@@ -1991,12 +2080,16 @@ export const confirmFullPayment = async (req, res, next) => {
       sendBookingReceiptEmail(updated.email, {
         customerName: updated.customer,
         bookingId: updated._id?.toString(),
-        motorcycleName: `${updated.motorcycle?.make || ""} ${updated.motorcycle?.model || ""}`.trim(),
+        motorcycleName:
+          `${updated.motorcycle?.make || ""} ${updated.motorcycle?.model || ""}`.trim(),
         motorcycleYear: updated.motorcycle?.year || new Date().getFullYear(),
         pickupDate: updated.pickupDate?.toISOString?.().split("T")[0] || "—",
         returnDate: updated.returnDate?.toISOString?.().split("T")[0] || "—",
-        destination: updated.destination || updated.details?.destinationCity || "—",
-        pickupLocation: updated.details?.pickupLocation || "Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite",
+        destination:
+          updated.destination || updated.details?.destinationCity || "—",
+        pickupLocation:
+          updated.details?.pickupLocation ||
+          "Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite",
         referenceId: updated.paymentReferenceId,
         downpayment: updated.reservationFee || 200,
         totalAmount: updated.amount || 0,
@@ -2106,7 +2199,9 @@ export const deleteMotorcycleBookingLocationLog = async (req, res, next) => {
     const bookingId = req.params.id;
 
     if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      return res.status(400).json({ success: false, message: "Invalid booking ID." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid booking ID." });
     }
 
     const updated = await MotorcycleBooking.findByIdAndUpdate(
@@ -2125,7 +2220,9 @@ export const deleteMotorcycleBookingLocationLog = async (req, res, next) => {
     );
 
     if (!updated) {
-      return res.status(404).json({ success: false, message: "Booking not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found." });
     }
 
     await LocationSnapshot.deleteMany({
@@ -2144,7 +2241,8 @@ export const deleteMotorcycleBookingLocationLog = async (req, res, next) => {
       targetId: updated._id,
       summary: `Location log deleted: ${buildBookingLabel(updated)}`,
       metadata: {
-        locationLogDeletedAt: updated.details?.locationLogDeletedAt || new Date(),
+        locationLogDeletedAt:
+          updated.details?.locationLogDeletedAt || new Date(),
       },
     });
 
@@ -2230,7 +2328,7 @@ export const downloadRentalAgreement = async (req, res, next) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="RentalAgreement_${booking.customer.replace(/\s+/g, "_")}_${booking._id}.pdf"`
+      `attachment; filename="RentalAgreement_${booking.customer.replace(/\s+/g, "_")}_${booking._id}.pdf"`,
     );
 
     // Pipe the PDF to response

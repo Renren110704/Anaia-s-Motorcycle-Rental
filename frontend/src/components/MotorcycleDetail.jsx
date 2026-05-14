@@ -195,11 +195,11 @@ const getTodayStart = () => {
   return d;
 };
 const formatDate = (date) => formatLocalDate(date);
-const sixMonthsFromToday = () => {
-  const d = getTodayStart();
-  d.setMonth(d.getMonth() + 6);
-  return d;
-};
+// const sixMonthsFromToday = () => {
+//   const d = getTodayStart();
+//   d.setMonth(d.getMonth() + 6);
+//   return d;
+// };
 const sevenDaysFromToday = () => {
   const d = getTodayStart();
   d.setDate(d.getDate() + 7);
@@ -639,7 +639,11 @@ const InlineDatePicker = ({
               const isBuf = isBufferDay(date);
               const isBooked = isBookedDay(date);
               const isDisabled =
-                tooEarly || tooLate || isMaint || (mode === "return" && isBuf);
+                tooEarly ||
+                tooLate ||
+                isMaint ||
+                (mode === "return" && isBuf) ||
+                isBooked;
               const isToday = dk === todayISO();
 
               // Pickup range highlight (show range between pickup and return)
@@ -1937,6 +1941,26 @@ const MotorcycleDetail = () => {
     paymentProofImage: null,
   });
 
+  const getNextUnavailableDate = (pickupDateISO) => {
+    if (!pickupDateISO) return null;
+    const pickup = new Date(pickupDateISO + "T00:00:00");
+    let earliest = null;
+
+    const checkDate = (d) => {
+      if (d > pickup) {
+        if (!earliest || d < earliest) earliest = d;
+      }
+    };
+
+    bookingRanges.forEach((b) => checkDate(b.pickupDate));
+    currentMaintenanceRanges.forEach((m) => checkDate(m.startDate));
+
+    if (earliest) {
+      return formatDate(earliest);
+    }
+    return null;
+  };
+
   const availablePickupSlots = getAvailablePickupSlots(formData.pickupDate);
   const noSlotsAvailable = availablePickupSlots.length === 0;
   const selectedQrPath =
@@ -1955,7 +1979,13 @@ const MotorcycleDetail = () => {
   const applicableDiscount = useApplicableDiscount(motorcycle, days);
 
   // Build booking ranges for the calendar
+  const currentMotoId = motorcycle?._id || motorcycle?.id;
   const bookingRanges = calBookings
+    .filter((b) => {
+      const id =
+        b.motorcycle?._id || b.motorcycle?.id || b.motorcycle || b.motorcycleId;
+      return String(id) === String(currentMotoId);
+    })
     .map((b) => {
       const status = String(b?.status || "").toLowerCase();
       if (["completed", "inspection", "canceled", "cancelled"].includes(status))
@@ -1979,6 +2009,11 @@ const MotorcycleDetail = () => {
       };
     })
     .filter(Boolean);
+
+  const currentMaintenanceRanges = maintenanceRanges.filter((m) => {
+    const id = m.motorcycleId || m.motorcycle?._id || m.motorcycle?.id;
+    return String(id) === String(currentMotoId);
+  });
 
   // Load calendar data (bookings + motorcycle maintenance)
   useEffect(() => {
@@ -2442,8 +2477,7 @@ const MotorcycleDetail = () => {
   const handlePickupDateChange = (dateISO) => {
     const selected = new Date(dateISO);
     const todayStart = getTodayStart();
-    const maxDate = sevenDaysFromToday();
-    if (selected < todayStart || selected > maxDate) return;
+    if (selected < todayStart) return; // Removed maxDate condition here
     const newReturnDate =
       formData.returnDate && new Date(formData.returnDate) <= selected
         ? ""
@@ -2463,7 +2497,7 @@ const MotorcycleDetail = () => {
       return;
     }
     const selected = new Date(dateISO);
-    if (selected < getTodayStart() || selected > sixMonthsFromToday()) return;
+    if (selected < getTodayStart()) return; // Removed six months condition here
     if (selected <= new Date(formData.pickupDate)) {
       toast.error("Minimum rental duration is 24 hours.");
       return;
@@ -2561,6 +2595,38 @@ const MotorcycleDetail = () => {
     }
     if (returnAt.getTime() - pickupAt.getTime() < 24 * 60 * 60 * 1000) {
       toast.error("Minimum rental duration is 24 hours.");
+      return;
+    }
+
+    const isDateBookedOrMaintenance = (dateStr) => {
+      const dk = dateStr;
+      const isBooked = bookingRanges.some(
+        (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+      );
+      const isMaint = currentMaintenanceRanges.some(
+        (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
+      );
+      return isBooked || isMaint;
+    };
+
+    if (isDateBookedOrMaintenance(formData.pickupDate)) {
+      toast.error(
+        "Selected pickup date is currently booked or under maintenance.",
+      );
+      return;
+    }
+    if (isDateBookedOrMaintenance(formData.returnDate)) {
+      toast.error(
+        "Selected return date is currently booked or under maintenance.",
+      );
+      return;
+    }
+
+    const nextUnavail = getNextUnavailableDate(formData.pickupDate);
+    if (formData.returnDate > nextUnavail) {
+      toast.error(
+        "Selected dates overlap with an existing booking or maintenance.",
+      );
       return;
     }
     if (motorcycle) {
@@ -3445,17 +3511,17 @@ const MotorcycleDetail = () => {
                           fontFamily: "'Space Grotesk',sans-serif",
                         }}
                       >
-                        Today up to 7 days from now
+                        Select available dates
                       </p>
                       <div style={{ marginTop: "auto" }}>
                         <InlineDatePicker
                           value={formData.pickupDate}
                           onChange={handlePickupDateChange}
                           minDate={todayISO()}
-                          maxDate={formatDate(sevenDaysFromToday())}
+                          maxDate={null}
                           label="Pickup Date"
                           mode="pickup"
-                          maintenanceRanges={maintenanceRanges}
+                          maintenanceRanges={currentMaintenanceRanges}
                           bookingRanges={bookingRanges}
                         />
                       </div>
@@ -3542,11 +3608,11 @@ const MotorcycleDetail = () => {
                           value={formData.returnDate}
                           onChange={handleReturnDateChange}
                           minDate={addDaysToISODate(formData.pickupDate, 1)}
-                          maxDate={formatDate(sixMonthsFromToday())}
+                          maxDate={getNextUnavailableDate(formData.pickupDate)}
                           label="Return Date"
                           mode="return"
                           pickupDateISO={formData.pickupDate}
-                          maintenanceRanges={maintenanceRanges}
+                          maintenanceRanges={currentMaintenanceRanges}
                           bookingRanges={bookingRanges}
                         />
                       </div>

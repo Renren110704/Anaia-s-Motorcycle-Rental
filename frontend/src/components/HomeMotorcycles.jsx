@@ -85,7 +85,7 @@ const CATEGORY_TABS = [
 ];
 const BASE = "https://anaias-motorcycle-rental.onrender.com";
 const LIMIT = 6;
-const FALLBACK_IMG = `${BASE}/uploads/default-motorcycle.png`;
+const FALLBACK_IMG = `${API_BASE_URL}/uploads/default-motorcycle.png`;
 
 /* ─── component ────────────────────────────────────────────────────── */
 /* ─── scroll-reveal hook ──────────────────────────────────────────── */
@@ -133,7 +133,7 @@ const HomeMotorcycles = () => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
-      const res = await axios.get(`${BASE}/api/motorcycles`, {
+      const res = await axios.get(`${API_BASE_URL}/api/motorcycles`, {
         params: { limit: LIMIT },
         headers: { Accept: "application/json" },
         signal: ctrl.signal,
@@ -233,7 +233,7 @@ const HomeMotorcycles = () => {
     if (/^https?:\/\//i.test(t)) return t;
     if (t.startsWith("res.cloudinary.com/")) return "https://" + t;
     if (t.startsWith("/")) return "https://res.cloudinary.com" + t;
-    return `${BASE}/uploads/` + t;
+    return `${API_BASE_URL}/uploads/` + t;
   };
 
   const handleImageError = (e) => {
@@ -259,10 +259,10 @@ const HomeMotorcycles = () => {
 
   const getAvailabilityInfo = (motorcycle) => {
     if (motorcycle?.status && motorcycle.status !== "available")
-      return { label: "Unavailable", color: "booked" };
+      return { label: "", color: "booked" };
     const eff = computeEffectiveAvailability(motorcycle);
     if (!eff || eff.state === "fully_available")
-      return { label: "Available", color: "available" };
+      return { label: "", color: "available" };
     if (eff.state === "booked") {
       if (eff.until) {
         const avail = new Date(eff.until);
@@ -281,7 +281,7 @@ const HomeMotorcycles = () => {
   };
 
   const handleBook = (motorcycle) => {
-    if (isBookDisabled(motorcycle)) return;
+    // if (isBookDisabled(motorcycle)) return;
     navigate(`/motorcycles/${motorcycle._id || motorcycle.id}`, {
       state: { motorcycle },
     });
@@ -703,9 +703,7 @@ const HomeMotorcycles = () => {
 
           {/* Empty */}
           {!loading && !error && displayed.length === 0 && (
-            <div className="hm-empty">
-              No vehicles found for this category.
-            </div>
+            <div className="hm-empty">No vehicles found for this category.</div>
           )}
 
           {/* Cards */}
@@ -824,14 +822,15 @@ const HomeMotorcycles = () => {
                     {/* CTA */}
                     <button
                       className="hm-btn"
-                      disabled={disabled}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleBook(m);
                       }}
                     >
                       {disabled ? (
-                        "Unavailable"
+                        <>
+                          Check Availability <ArrowRight size={13} />
+                        </>
                       ) : (
                         <>
                           Rent Now <ArrowRight size={13} />

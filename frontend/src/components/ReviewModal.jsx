@@ -16,14 +16,6 @@ const ReviewModal = ({ booking, onClose, onSuccess }) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [feedbackDescription, setFeedbackDescription] = useState("");
-  const [rideComfort, setRideComfort] = useState(0);
-  const [hoverRideComfort, setHoverRideComfort] = useState(0);
-  const [condition, setCondition] = useState(0);
-  const [hoverCondition, setHoverCondition] = useState(0);
-  const [performance, setPerformance] = useState(0);
-  const [hoverPerformance, setHoverPerformance] = useState(0);
-  const [customerService, setCustomerService] = useState(0);
-  const [hoverCustomerService, setHoverCustomerService] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -85,12 +77,6 @@ const ReviewModal = ({ booking, onClose, onSuccess }) => {
       formData.append("rating", rating);
       formData.append("feedbackDescription", feedbackDescription);
       formData.append("isRenterPublic", isRenterPublic);
-
-      if (rideComfort > 0) formData.append("rideComfort", rideComfort);
-      if (condition > 0) formData.append("condition", condition);
-      if (performance > 0) formData.append("performance", performance);
-      if (customerService > 0)
-        formData.append("customerService", customerService);
 
       selectedFiles.forEach((file) => {
         formData.append("reviewImages", file);

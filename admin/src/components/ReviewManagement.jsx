@@ -15,9 +15,7 @@ import {
 import {
   AlertTriangle,
   MessageSquare,
-  CheckCircle2,
   XCircle,
-  Clock,
   Sparkles,
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";

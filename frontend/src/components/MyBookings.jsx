@@ -29,6 +29,7 @@ import {
   FaChevronDown,
   FaChevronUp,
   FaFileDownload,
+  FaStar,
 } from "react-icons/fa";
 import Navbar from "../components/Navbar";
 import API_BASE_URL from "../apiBase";
@@ -3471,24 +3472,53 @@ const BookingRow = ({
                   </p>
                 ) : bookingReview ? (
                   <div>
-                    <p
+                    <div
                       style={{
-                        fontSize: 13,
-                        color: "rgba(14,14,14,0.6)",
-                        fontFamily: "'Space Grotesk', sans-serif",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        marginBottom: 8,
                       }}
                     >
-                      Status:{" "}
-                      <span
+                      {[...Array(5)].map((_, i) => (
+                        <FaStar
+                          key={i}
+                          style={{
+                            color:
+                              i < (bookingReview.rating || 5)
+                                ? "#f59e0b"
+                                : "#e5e7eb",
+                            fontSize: 14,
+                          }}
+                        />
+                      ))}
+                      {/* <span
                         style={{
-                          fontWeight: 800,
-                          color: "#0E0E0E",
-                          textTransform: "capitalize",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          marginLeft: 4,
+                          color: "rgba(14,14,14,0.45)",
+                          fontFamily: "'Space Grotesk', sans-serif",
                         }}
                       >
-                        {bookingReview.status || "pending"}
-                      </span>
-                    </p>
+                        ({bookingReview.status || "pending"})
+                      </span> */}
+                    </div>
+                    {bookingReview.feedbackDescription && (
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "#0E0E0E",
+                          lineHeight: 1.6,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          marginBottom: bookingReview.adminReplyMessage
+                            ? 12
+                            : 0,
+                        }}
+                      >
+                        "{bookingReview.feedbackDescription}"
+                      </p>
+                    )}
                     {bookingReview.adminReplyMessage && (
                       <div
                         style={{
@@ -3595,34 +3625,30 @@ const BookingRow = ({
                       Cancel Booking
                     </button>
                   )}
-                {booking.status === "completed" && !booking.isDeleted && (
-                  <button
-                    onClick={() => {
-                      if (bookingReview) {
-                        setExpanded(true);
-                        return;
-                      }
-                      setShowReviewModal(true);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "8px 16px",
-                      borderRadius: 9,
-                      background: "#fef3c7",
-                      color: "#92400e",
-                      border: "1.5px solid #fde68a",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      transition: "all 0.18s",
-                    }}
-                  >
-                    {bookingReview ? "View Review" : "⭐ Leave Review"}
-                  </button>
-                )}
+                {booking.status === "completed" &&
+                  !booking.isDeleted &&
+                  !bookingReview && (
+                    <button
+                      onClick={() => setShowReviewModal(true)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 16px",
+                        borderRadius: 9,
+                        background: "#fef3c7",
+                        color: "#92400e",
+                        border: "1.5px solid #fde68a",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        transition: "all 0.18s",
+                      }}
+                    >
+                      ⭐ Leave Review
+                    </button>
+                  )}
                 <Link
                   to="/motorcycles"
                   style={{

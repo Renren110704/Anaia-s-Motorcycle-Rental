@@ -42,6 +42,19 @@ const summarizeHelpfulVotes = (helpfulVotes = []) => {
   return summary;
 };
 
+const censorName = (name) => {
+  if (!name) return "Verified Renter";
+  return name
+    .split(" ")
+    .map((word) => {
+      if (word.length <= 1) return word;
+      if (word.length === 2) return word[0] + "*";
+      // Keeps the first and last letter, replaces the middle with asterisks
+      return word[0] + "*".repeat(word.length - 2) + word[word.length - 1];
+    })
+    .join(" ");
+};
+
 const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_REVIEWS_FOLDER) => {
   if (!filePath || !CLOUDINARY_ENABLED) {
     console.error("[CLOUDINARY] Upload skipped - filePath:", !!filePath, "enabled:", CLOUDINARY_ENABLED);
@@ -457,7 +470,9 @@ export const getFeaturedTestimonials = async (req, res) => {
 
     const mapped = reviews.map((review) => ({
       id: review._id,
-      name: review.isRenterPublic ? (review.renterName || "Verified Renter") : "Anonymous",
+      name: review.isRenterPublic 
+        ? (review.renterName || "Verified Renter") 
+        : censorName(review.renterName),
       role: "Verified Renter",
       comment: review.feedbackDescription || "",
       rating: Number(review.rating || 0),
@@ -571,10 +586,17 @@ export const getMotorcycleReviews = async (req, res) => {
       totalReviews: 0,
     };
 
-    const reviewList = reviews.map((review) => ({
-      ...review.toObject(),
-      ...summarizeHelpfulVotes(review.helpfulVotes || []),
-    }));
+   const reviewList = reviews.map((review) => {
+      const reviewObj = review.toObject();
+      return {
+        ...reviewObj,
+        // Override the renterName with the censored version if they chose private
+        renterName: reviewObj.isRenterPublic 
+          ? reviewObj.renterName 
+          : censorName(reviewObj.renterName),
+        ...summarizeHelpfulVotes(reviewObj.helpfulVotes || []),
+      };
+    });
 
     res.json({
       reviews: reviewList,

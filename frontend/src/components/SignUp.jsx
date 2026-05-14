@@ -161,9 +161,10 @@ const usePHAddress = () => {
   };
 };
 
-/* ── OTP Box Input (same as Login) ──────────────────────────────── */
+/* ── OTP Box Input (Professional Clean Style) ────────────────────── */
 const OtpBoxInput = ({ value, onChange, length = 6 }) => {
   const inputsRef = React.useRef([]);
+
   const digits = value
     .split("")
     .concat(Array(length).fill(""))
@@ -171,6 +172,7 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
 
   const handleKey = (e, idx) => {
     const key = e.key;
+
     if (key === "Backspace") {
       e.preventDefault();
       const next = value.split("");
@@ -184,6 +186,7 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
       }
       return;
     }
+
     if (key === "ArrowLeft" && idx > 0) {
       inputsRef.current[idx - 1]?.focus();
       return;
@@ -192,6 +195,7 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
       inputsRef.current[idx + 1]?.focus();
       return;
     }
+
     if (/^\d$/.test(key)) {
       e.preventDefault();
       const next = value
@@ -229,37 +233,36 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
             value={filled ? digit : ""}
             onKeyDown={(e) => handleKey(e, idx)}
             onPaste={handlePaste}
-            onChange={() => {}}
+            onChange={() => {}} 
             onFocus={(e) => e.target.select()}
             style={{
-              width: 46,
-              height: 54,
+              width: 48,
+              height: 56,
               borderRadius: 12,
               border: filled
-                ? "2px solid #b50002"
+                ? "1.5px solid rgba(0,0,0,0.4)"
                 : "1.5px solid rgba(0,0,0,0.12)",
-              background: filled ? "rgba(181,0,2,0.04)" : "#fff",
-              fontSize: 22,
-              fontWeight: 800,
+              background: "#fff",
+              fontSize: 20,
+              fontWeight: 600,
               fontFamily: "'Space Grotesk', sans-serif",
               color: "#0E0E0E",
               textAlign: "center",
               outline: "none",
-              transition:
-                "border-color 0.15s, background 0.15s, transform 0.12s",
+              transition: "all 0.2s ease-in-out",
               cursor: "text",
-              caretColor: "transparent",
-              transform: filled ? "scale(1.04)" : "scale(1)",
-              boxShadow: filled ? "0 2px 12px rgba(181,0,2,0.12)" : "none",
+              caretColor: "#0E0E0E",
             }}
             onFocusCapture={(e) => {
-              e.target.style.borderColor = "#b50002";
-              e.target.style.background = "rgba(181,0,2,0.03)";
+              e.target.style.borderColor = "#0E0E0E";
+              e.target.style.boxShadow = "none";
             }}
             onBlurCapture={(e) => {
+              e.target.style.boxShadow = "none";
               if (!e.target.value) {
                 e.target.style.borderColor = "rgba(0,0,0,0.12)";
-                e.target.style.background = "#fff";
+              } else {
+                e.target.style.borderColor = "rgba(0,0,0,0.4)";
               }
             }}
           />

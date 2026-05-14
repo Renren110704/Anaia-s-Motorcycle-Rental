@@ -18,6 +18,9 @@ import {
   FaFilter,
   FaChevronLeft,
   FaChevronRight,
+  FaStar,
+  FaStarHalfAlt,
+  FaRegStar,
 } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
@@ -411,6 +414,30 @@ const SidebarContent = ({
     </div>
   </>
 );
+
+const renderStars = (rating) => {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) {
+      // Full star
+      stars.push(<FaStar key={i} style={{ color: "#f59e0b", fontSize: 13 }} />);
+    } else if (rating >= i - 0.5) {
+      // Half star for decimals like 4.5
+      stars.push(
+        <FaStarHalfAlt key={i} style={{ color: "#f59e0b", fontSize: 13 }} />,
+      );
+    } else {
+      // Empty star
+      stars.push(
+        <FaRegStar
+          key={i}
+          style={{ color: "rgba(0,0,0,0.15)", fontSize: 13 }}
+        />,
+      );
+    }
+  }
+  return stars;
+};
 
 /* ── Main ───────────────────────────────────────────────────────── */
 const Motorcycles = () => {
@@ -1138,6 +1165,62 @@ const Motorcycles = () => {
                             {motorcycle.hasABS ? "ABS" : "Standard"}
                           </span>
                         </div>
+                        {/* --- NEW RATINGS SECTION --- */}
+                        <div
+                          style={{
+                            marginTop: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          {motorcycle.reviewCount > 0 ||
+                          motorcycle.totalReviews > 0 ? (
+                            <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 2,
+                                  alignItems: "center",
+                                }}
+                              >
+                                {renderStars(
+                                  Number(
+                                    motorcycle.averageRating ||
+                                      motorcycle.rating ||
+                                      0,
+                                  ),
+                                )}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "rgba(0,0,0,0.4)",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                  fontWeight: 600,
+                                  marginTop: 1,
+                                }}
+                              >
+                                (
+                                {motorcycle.reviewCount ||
+                                  motorcycle.totalReviews}
+                                )
+                              </span>
+                            </>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color: "rgba(0,0,0,0.4)",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                                fontWeight: 500,
+                              }}
+                            >
+                              No reviews yet.
+                            </span>
+                          )}
+                        </div>
+                        {/* --- END NEW RATINGS SECTION --- */}
                       </div>
 
                       <div className="mc-card-action">

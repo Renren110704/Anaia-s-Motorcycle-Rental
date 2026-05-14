@@ -12,11 +12,7 @@ import API_BASE_URL from "../apiBase";
 
 const API_BASE = API_BASE_URL;
 
-const ReviewModal = ({
-  booking,
-  onClose,
-  onSuccess,
-}) => {
+const ReviewModal = ({ booking, onClose, onSuccess }) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [feedbackDescription, setFeedbackDescription] = useState("");
@@ -46,7 +42,9 @@ const ReviewModal = ({
     const remaining = maxFiles - selectedFiles.length;
 
     if (files.length > remaining) {
-      setError(`Maximum ${maxFiles} images allowed. You can select ${remaining} more.`);
+      setError(
+        `Maximum ${maxFiles} images allowed. You can select ${remaining} more.`,
+      );
       return;
     }
 
@@ -87,11 +85,12 @@ const ReviewModal = ({
       formData.append("rating", rating);
       formData.append("feedbackDescription", feedbackDescription);
       formData.append("isRenterPublic", isRenterPublic);
-      
+
       if (rideComfort > 0) formData.append("rideComfort", rideComfort);
       if (condition > 0) formData.append("condition", condition);
       if (performance > 0) formData.append("performance", performance);
-      if (customerService > 0) formData.append("customerService", customerService);
+      if (customerService > 0)
+        formData.append("customerService", customerService);
 
       selectedFiles.forEach((file) => {
         formData.append("reviewImages", file);
@@ -102,11 +101,9 @@ const ReviewModal = ({
         ...(token && { Authorization: `Bearer ${token}` }),
       };
 
-      await axios.post(
-        `${API_BASE}/api/reviews/${booking._id}`,
-        formData,
-        { headers }
-      );
+      await axios.post(`${API_BASE}/api/reviews/${booking._id}`, formData, {
+        headers,
+      });
 
       setSubmitted(true);
       setTimeout(() => {
@@ -116,7 +113,8 @@ const ReviewModal = ({
     } catch (err) {
       console.error("Error submitting review:", err);
       setError(
-        err.response?.data?.message || "Error submitting review. Please try again."
+        err.response?.data?.message ||
+          "Error submitting review. Please try again.",
       );
       setSubmitting(false);
     }
@@ -172,7 +170,7 @@ const ReviewModal = ({
             Review Submitted!
           </h3>
           <p className="text-[#171717]/70 mb-4 text-sm">
-            Thank you for your feedback. Your review will be published after admin approval.
+            Thank you for your feedback.
           </p>
           <div className="text-xs text-[#171717]/50">
             Redirecting in a moment...
@@ -188,7 +186,9 @@ const ReviewModal = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#171717]/10">
           <div>
-            <h2 className="text-2xl font-bold text-[#171717]">Review Your Rental</h2>
+            <h2 className="text-2xl font-bold text-[#171717]">
+              Review Your Rental
+            </h2>
             <p className="text-sm text-[#171717]/60 mt-1">{motorcycleName}</p>
           </div>
           <button
@@ -201,7 +201,10 @@ const ReviewModal = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <form
+          onSubmit={handleSubmit}
+          className="px-6 py-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto"
+        >
           {/* Overall Rating */}
           <StarRating
             rating={rating}
@@ -212,7 +215,7 @@ const ReviewModal = ({
           />
 
           {/* Category Ratings */}
-          <div className="border-t border-[#171717]/10 pt-4">
+          {/* <div className="border-t border-[#171717]/10 pt-4">
             <p className="text-sm font-semibold text-[#171717] uppercase tracking-wide mb-4">
               Category Ratings (Optional)
             </p>
@@ -246,7 +249,7 @@ const ReviewModal = ({
                 label="Customer Service"
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Feedback Description */}
           <div className="border-t border-[#171717]/10 pt-4">
@@ -274,7 +277,9 @@ const ReviewModal = ({
                   onChange={(e) => setIsRenterPublic(e.target.checked)}
                   className="w-4 h-4 rounded"
                 />
-                <span className="text-sm text-[#171717]">Show my name publicly in testimonials</span>
+                <span className="text-sm text-[#171717]">
+                  Show my name publicly
+                </span>
               </label>
             </div>
           </div>
@@ -355,7 +360,9 @@ const ReviewModal = ({
             </button>
             <button
               type="submit"
-              disabled={submitting || rating === 0 || !feedbackDescription.trim()}
+              disabled={
+                submitting || rating === 0 || !feedbackDescription.trim()
+              }
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#b50002] text-white text-sm font-bold rounded-xl
                        shadow-lg shadow-[#b50002]/30 hover:brightness-110 disabled:opacity-60 transition-all"
             >

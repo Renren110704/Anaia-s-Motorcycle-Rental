@@ -14,8 +14,8 @@ import {
   Menu,
   X,
   LogOut,
-  TagIcon, 
-  Wrench
+  TagIcon,
+  Wrench,
 } from "lucide-react";
 import { FaMotorcycle } from "react-icons/fa";
 import axios from "axios";
@@ -28,22 +28,28 @@ const api = axios.create({
 
 const navLinks = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  
   { path: "/manage-motorcycles", icon: FaMotorcycle, label: "Manage Fleet" },
   { path: "/analytics", icon: BarChart3, label: "Analytics" },
   { path: "/walk-in-rentals", icon: Store, label: "Walk-In" },
   { path: "/return-inspection", icon: ClipboardCheck, label: "Inspection" },
-  { path: "/reviews", icon: MessageSquare, label: "Reviews" },
+  {
+    path: "/reviews",
+    icon: MessageSquare,
+    label: "Reviews",
+    showBadge: true,
+    badgeKey: "reviews",
+  },
   { path: "/system-log", icon: FileText, label: "System Logs" },
   {
     path: "/bookings",
     icon: CalendarCheck,
     label: "Bookings",
     showBadge: true,
+    badgeKey: "bookings",
   },
   { path: "/discounts", icon: TagIcon, label: "Discounts" },
   { path: "/maintenance", icon: Wrench, label: "Maintenance" },
-  { path: "/contact", icon: MessageSquare, label: "Contact" }
+  { path: "/contact", icon: MessageSquare, label: "Contact" },
 ];
 
 const PendingBadge = ({ count, floating }) =>
@@ -126,7 +132,7 @@ const LogoutModal = ({ onConfirm, onCancel }) =>
 const SidebarInner = ({
   collapsed,
   setCollapsed,
-  pendingCount,
+  pendingCounts,
   onLogout,
   onClose,
   isMobile,
@@ -141,10 +147,7 @@ const SidebarInner = ({
         className={`flex items-center border-b border-slate-100 h-20
         ${collapsed && !isMobile ? "justify-center px-2" : "px-4"}`}
       >
-        <Link
-          to="/"
-          className="flex-1 flex items-center justify-center"
-        >
+        <Link to="/" className="flex-1 flex items-center justify-center">
           <img
             src={logo}
             alt="Logo"
@@ -177,7 +180,7 @@ const SidebarInner = ({
             link={link}
             active={location.pathname === link.path}
             collapsed={collapsed && !isMobile}
-            pendingCount={pendingCount}
+            pendingCount={link.badgeKey ? pendingCounts[link.badgeKey] : 0}
             onClick={isMobile ? onClose : undefined}
           />
         ))}
@@ -233,21 +236,44 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCounts, setPendingCounts] = useState({
+    bookings: 0,
+    reviews: 0,
+  });
   const intervalRef = useRef(null);
 
   const fetchPending = useCallback(async () => {
     try {
-      const res = await api.get("/api/motorcycle-bookings", {
-        params: { limit: 200, includeDeleted: "false" },
+      // Fetch both endpoints concurrently
+      const [resBookings, resReviews] = await Promise.all([
+        api.get("/api/motorcycle-bookings", {
+          params: { limit: 200, includeDeleted: "false" },
+        }),
+        api.get("/api/reviews", {
+          params: { limit: 200 },
+        }),
+      ]);
+
+      // Calculate bookings
+      const rawBookings = Array.isArray(resBookings.data)
+        ? resBookings.data
+        : resBookings.data.data || resBookings.data.bookings || [];
+      const pendingBookings = rawBookings.filter(
+        (b) => !b.isDeleted && b.status === "pending_reservation",
+      ).length;
+
+      // Calculate reviews (status === "pending" or missing status)
+      const rawReviews = Array.isArray(resReviews.data)
+        ? resReviews.data
+        : resReviews.data.reviews || [];
+      const pendingReviews = rawReviews.filter(
+        (r) => r.status === "pending" || !r.status,
+      ).length;
+
+      setPendingCounts({
+        bookings: pendingBookings,
+        reviews: pendingReviews,
       });
-      const raw = Array.isArray(res.data)
-        ? res.data
-        : res.data.data || res.data.bookings || [];
-      setPendingCount(
-        raw.filter((b) => !b.isDeleted && b.status === "pending_reservation")
-          .length,
-      );
     } catch {
       /* silent */
     }
@@ -270,6 +296,8 @@ const Sidebar = ({
     navigate("/login", { replace: true });
   }, [navigate, onLogout]);
 
+  const totalPending = pendingCounts.bookings + pendingCounts.reviews;
+
   return (
     <>
       {/* Desktop sidebar */}
@@ -281,7 +309,7 @@ const Sidebar = ({
         <SidebarInner
           collapsed={collapsed}
           setCollapsed={setCollapsed}
-          pendingCount={pendingCount}
+          pendingCounts={pendingCounts}
           onLogout={handleLogout}
           isMobile={false}
         />
@@ -296,9 +324,9 @@ const Sidebar = ({
           <Menu className="w-5 h-5" />
         </button>
         <img src={logo} alt="Logo" className="h-8 w-auto object-contain" />
-        {pendingCount > 0 && (
+        {totalPending > 0 && (
           <span className="ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-[#b50002] text-white text-[10px] font-black animate-pulse">
-            {pendingCount > 99 ? "99+" : pendingCount}
+            {totalPending > 99 ? "99+" : totalPending}
           </span>
         )}
       </header>
@@ -315,7 +343,7 @@ const Sidebar = ({
               <SidebarInner
                 collapsed={false}
                 setCollapsed={setCollapsed}
-                pendingCount={pendingCount}
+                pendingCounts={pendingCounts}
                 onLogout={handleLogout}
                 isMobile={true}
                 onClose={() => setMobileOpen(false)}

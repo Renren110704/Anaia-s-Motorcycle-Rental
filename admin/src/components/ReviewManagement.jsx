@@ -32,7 +32,7 @@ const api = axios.create({
 const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 
-const STATUS_OPTIONS = ["pending", "approved", "rejected"];
+const STATUS_OPTIONS = ["approved", "rejected"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const formatDateTime = (value) => {
@@ -145,7 +145,7 @@ const StatusBadge = ({ status }) => {
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cls}`}
     >
-      {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Pending"}
+      {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Approved"}
     </span>
   );
 };
@@ -222,14 +222,38 @@ const ReviewManagement = () => {
     try {
       const params = { limit: 200 };
       if (activeStatus !== "all") params.status = activeStatus;
-      const { data } = await api.get("/api/reviews", { params });
-      const rows = Array.isArray(data) ? data : data.reviews || [];
+      let { data } = await api.get("/api/reviews", { params });
+      let rows = Array.isArray(data) ? data : data.reviews || [];
+
+      // ── Auto-Approve Interceptor ───────────────────────────────────────
+      // Find any reviews that are pending or have no status
+      const pendingReviews = rows.filter(
+        (r) => r.status === "pending" || !r.status,
+      );
+
+      if (pendingReviews.length > 0) {
+        // Automatically patch them all to "approved" on the backend
+        await Promise.all(
+          pendingReviews.map((r) =>
+            api.patch(`/api/reviews/${r._id}/status`, { status: "approved" }),
+          ),
+        );
+
+        // Re-fetch the freshly approved data so the UI reflects the true DB state
+        const updatedReq = await api.get("/api/reviews", { params });
+        rows = Array.isArray(updatedReq.data)
+          ? updatedReq.data
+          : updatedReq.data.reviews || [];
+        // toast.success(`Auto-approved ${pendingReviews.length} new review(s)`);
+      }
+      // ───────────────────────────────────────────────────────────────────
+
       setReviews(rows);
       const nextReplies = {};
       const nextStatuses = {};
       rows.forEach((row) => {
         nextReplies[row._id] = row.adminReplyMessage || "";
-        nextStatuses[row._id] = row.status || "pending";
+        nextStatuses[row._id] = row.status || "approved";
       });
       setReplyDrafts(nextReplies);
       setStatusDrafts(nextStatuses);
@@ -276,7 +300,7 @@ const ReviewManagement = () => {
   }, [reviews, searchTerm]);
 
   const handleSetStatus = async (reviewId) => {
-    const status = statusDrafts[reviewId] || "pending";
+    const status = statusDrafts[reviewId] || "approved";
     setSavingId(reviewId + "_status");
     try {
       await api.patch(`/api/reviews/${reviewId}/status`, { status });
@@ -356,24 +380,24 @@ const ReviewManagement = () => {
       accent: "bg-slate-500",
       status: "all",
     },
-    {
-      label: "Pending",
-      value: counts.pending,
-      sub: "Awaiting review",
-      subColor: "text-violet-500",
-      icon: Clock,
-      accent: "bg-violet-500",
-      status: "pending",
-    },
-    {
-      label: "Approved",
-      value: counts.approved,
-      sub: "Published reviews",
-      subColor: "text-emerald-500",
-      icon: CheckCircle2,
-      accent: "bg-emerald-500",
-      status: "approved",
-    },
+    // {
+    //   label: "Pending",
+    //   value: counts.pending,
+    //   sub: "Auto-approving...",
+    //   subColor: "text-violet-500",
+    //   icon: Clock,
+    //   accent: "bg-violet-500",
+    //   status: "pending",
+    // },
+    // {
+    //   label: "Approved",
+    //   value: counts.approved,
+    //   sub: "Published reviews",
+    //   subColor: "text-emerald-500",
+    //   icon: CheckCircle2,
+    //   accent: "bg-emerald-500",
+    //   status: "approved",
+    // },
     {
       label: "Rejected",
       value: counts.rejected,
@@ -404,7 +428,7 @@ const ReviewManagement = () => {
           </h1>
           <p className="text-slate-400 text-sm mt-1">
             Moderate renter feedback and choose which approved reviews appear in
-            testimonials.
+            testimonials. (New reviews are automatically approved).
           </p>
         </div>
 
@@ -491,7 +515,7 @@ const ReviewManagement = () => {
                 isSavingFeatured ||
                 isSavingDelete;
               const replyDraft = replyDrafts[review._id] || "";
-              const statusDraft = statusDrafts[review._id] || "pending";
+              const statusDraft = statusDrafts[review._id] || "approved";
               const replyOpen = expandedReply[review._id];
               const motorcycleName =
                 `${review.motorcycleId?.make || review.motorcycleId?.name || ""} ${review.motorcycleId?.model || ""}`.trim();

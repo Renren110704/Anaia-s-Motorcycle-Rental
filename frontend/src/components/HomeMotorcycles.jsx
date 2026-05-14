@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import {
@@ -14,6 +15,27 @@ const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+};
+
+const renderStars = (rating) => {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) {
+      stars.push(<FaStar key={i} style={{ color: "#f59e0b", fontSize: 11 }} />);
+    } else if (rating >= i - 0.5) {
+      stars.push(
+        <FaStarHalfAlt key={i} style={{ color: "#f59e0b", fontSize: 11 }} />,
+      );
+    } else {
+      stars.push(
+        <FaRegStar
+          key={i}
+          style={{ color: "rgba(0,0,0,0.15)", fontSize: 11 }}
+        />,
+      );
+    }
+  }
+  return stars;
 };
 
 const computeEffectiveAvailability = (motorcycle) => {
@@ -134,7 +156,7 @@ const HomeMotorcycles = () => {
     abortRef.current = ctrl;
     try {
       const res = await axios.get(`${API_BASE_URL}/api/motorcycles`, {
-        params: { limit: LIMIT },
+        params: { limit: 100 },
         headers: { Accept: "application/json" },
         signal: ctrl.signal,
       });
@@ -195,32 +217,35 @@ const HomeMotorcycles = () => {
 
   /* filter by tab */
   /* filter by tab */
-  const displayed = motorcycles.filter((m) => {
-    if (activeTab === "All") return true;
+  const displayed = motorcycles
+    .filter((m) => {
+      if (activeTab === "All") return true;
 
-    if (activeTab === "New") {
-      return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
-    }
+      if (activeTab === "New") {
+        return m.isNew || (m.year && m.year >= new Date().getFullYear() - 1);
+      }
 
-    if (activeTab === "Top Rated") {
-      return (m.rating ?? 0) >= 4.5;
-    }
+      if (activeTab === "Top Rated") {
+        // Make sure we check both averageRating and rating
+        return (m.averageRating ?? m.rating ?? 0) >= 4.0;
+      }
 
-    const cat = (m.category || "").toLowerCase();
-    const tab = activeTab.toLowerCase();
+      const cat = (m.category || "").toLowerCase();
+      const tab = activeTab.toLowerCase();
 
-    if (tab === "scooters") return cat.includes("scooter");
-    if (tab === "big bikes") return cat.includes("big bike");
-    if (tab === "underbone") return cat.includes("underbone");
+      if (tab === "scooters") return cat.includes("scooter");
+      if (tab === "big bikes") return cat.includes("big bike");
+      if (tab === "underbone") return cat.includes("underbone");
 
-    // NEW VEHICLE CATEGORY FILTERS
-    if (tab === "pickup") return cat.includes("pickup");
-    if (tab === "sedan") return cat.includes("sedan");
-    if (tab === "mpv") return cat.includes("mpv");
-    if (tab === "suv") return cat.includes("suv");
+      // NEW VEHICLE CATEGORY FILTERS
+      if (tab === "pickup") return cat.includes("pickup");
+      if (tab === "sedan") return cat.includes("sedan");
+      if (tab === "mpv") return cat.includes("mpv");
+      if (tab === "suv") return cat.includes("suv");
 
-    return true;
-  });
+      return true;
+    })
+    .slice(0, LIMIT);
 
   /* image helper */
   const buildImageSrc = (image) => {
@@ -769,7 +794,63 @@ const HomeMotorcycles = () => {
                   {/* Body */}
                   <div className="hm-body">
                     <div className="hm-name-row">
-                      <div className="hm-name">{name}</div>
+                      {/* Name & Stars Column */}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <div className="hm-name">{name}</div>
+
+                        {/* Ratings */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          {m.reviewCount > 0 || m.totalReviews > 0 ? (
+                            <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 2,
+                                  alignItems: "center",
+                                }}
+                              >
+                                {renderStars(
+                                  Number(m.averageRating || m.rating || 0),
+                                )}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: "rgba(0,0,0,0.4)",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                  fontWeight: 600,
+                                  marginTop: 1,
+                                }}
+                              >
+                                ({m.reviewCount || m.totalReviews})
+                              </span>
+                            </>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "rgba(0,0,0,0.4)",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                                fontWeight: 500,
+                              }}
+                            >
+                              No reviews yet.
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Price */}
                       <div className="hm-price-block">

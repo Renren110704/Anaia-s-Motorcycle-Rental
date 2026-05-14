@@ -1,4 +1,5 @@
 import Motorcycle from "../models/motorcycleModel.js";
+import Review from "../models/reviewModel.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -437,6 +438,35 @@ export const getMotorcycles = async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
+    // --- NEW: Fetch review aggregations for the fetched motorcycles ---
+    const motorcycleIds = motorcycles.map((m) => m._id);
+    const reviewStats = await Review.aggregate([
+      {
+        $match: {
+          motorcycleId: { $in: motorcycleIds },
+          status: "approved",
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$motorcycleId",
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Map stats for quick lookup
+    const statsMap = {};
+    reviewStats.forEach((stat) => {
+      statsMap[stat._id.toString()] = {
+        averageRating: stat.averageRating,
+        totalReviews: stat.totalReviews,
+      };
+    });
+    // --- END NEW ---
+
     const DEFAULT_IMAGE =
       process.env.DEFAULT_MOTORCYCLE_IMAGE ||
       "https://res.cloudinary.com/demo/image/upload/v1710000000/default-motorcycle.png";
@@ -444,6 +474,7 @@ export const getMotorcycles = async (req, res, next) => {
     const motorcyclesWithAvailability = motorcycles.map((m) => {
       const plain = m.toObject ? m.toObject() : m;
       plain.availability = m.getAvailabilitySummary();
+
       if (
         !plain.image ||
         typeof plain.image !== "string" ||
@@ -459,6 +490,14 @@ export const getMotorcycles = async (req, res, next) => {
       if (m.status !== "maintenance") {
         plain.status = deriveStatusFromBookings(m);
       }
+
+      // --- NEW: Attach stats to the motorcycle object ---
+      const mId = plain._id ? plain._id.toString() : plain.id;
+      plain.averageRating = statsMap[mId]?.averageRating || 0;
+      plain.totalReviews = statsMap[mId]?.totalReviews || 0;
+      plain.reviewCount = plain.totalReviews; // Fallback alias
+      // --- END NEW ---
+
       return plain;
     });
 
@@ -494,6 +533,29 @@ export const getMotorcycleById = async (req, res, next) => {
     if (motorcycle.status !== "maintenance") {
       plain.status = deriveStatusFromBookings(motorcycle);
     }
+
+    // --- NEW: Fetch review aggregations for the single motorcycle ---
+    const reviewStats = await Review.aggregate([
+      {
+        $match: {
+          motorcycleId: motorcycle._id,
+          status: "approved",
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    plain.averageRating = reviewStats[0]?.averageRating || 0;
+    plain.totalReviews = reviewStats[0]?.totalReviews || 0;
+    plain.reviewCount = plain.totalReviews;
+    // --- END NEW ---
 
     res.json(plain);
   } catch (err) {

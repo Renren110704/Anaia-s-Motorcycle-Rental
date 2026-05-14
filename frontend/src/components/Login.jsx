@@ -62,7 +62,7 @@ const iconBase = {
   pointerEvents: "none",
 };
 
-/* ── OTP Box Input ───────────────────────────────────────────────── */
+/* ── OTP Box Input (Professional Clean Style) ────────────────────── */
 const OtpBoxInput = ({ value, onChange, length = 6 }) => {
   const inputsRef = React.useRef([]);
 
@@ -124,7 +124,6 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
     <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
       {digits.map((digit, idx) => {
         const filled = digit && digit !== " ";
-        // const isFocused = false; 
         return (
           <input
             key={idx}
@@ -135,37 +134,36 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
             value={filled ? digit : ""}
             onKeyDown={(e) => handleKey(e, idx)}
             onPaste={handlePaste}
-            onChange={() => {}} // controlled via onKeyDown
+            onChange={() => {}}
             onFocus={(e) => e.target.select()}
             style={{
-              width: 46,
-              height: 54,
-              borderRadius: 12,
+              width: 48,
+              height: 56,
+              borderRadius: 12, // Keeps consistency with your other inputs
               border: filled
-                ? "2px solid #b50002"
-                : "1.5px solid rgba(0,0,0,0.12)",
-              background: filled ? "rgba(181,0,2,0.04)" : "#fff",
-              fontSize: 22,
-              fontWeight: 800,
+                ? "1.5px solid rgba(0,0,0,0.4)" // Subtle dark gray when filled
+                : "1.5px solid rgba(0,0,0,0.12)", // Faint gray when empty
+              background: "#fff", // Always pure white
+              fontSize: 20, // Slightly reduced for elegance
+              fontWeight: 600, // Slightly less bold
               fontFamily: "'Space Grotesk', sans-serif",
               color: "#0E0E0E",
               textAlign: "center",
               outline: "none",
-              transition:
-                "border-color 0.15s, background 0.15s, transform 0.12s",
+              transition: "all 0.2s ease-in-out",
               cursor: "text",
-              caretColor: "transparent",
-              transform: filled ? "scale(1.04)" : "scale(1)",
-              boxShadow: filled ? "0 2px 12px rgba(181,0,2,0.12)" : "none",
+              caretColor: "#0E0E0E", // Show the caret so they know it's active
             }}
             onFocusCapture={(e) => {
-              e.target.style.borderColor = "#b50002";
-              e.target.style.background = "rgba(181,0,2,0.03)";
+              e.target.style.borderColor = "#0E0E0E";
+              e.target.style.boxShadow = "none"; // <-- Change this to "none" (or just delete this line)
             }}
             onBlurCapture={(e) => {
+              e.target.style.boxShadow = "none"; // Remove focus ring when clicking away
               if (!e.target.value) {
                 e.target.style.borderColor = "rgba(0,0,0,0.12)";
-                e.target.style.background = "#fff";
+              } else {
+                e.target.style.borderColor = "rgba(0,0,0,0.4)";
               }
             }}
           />

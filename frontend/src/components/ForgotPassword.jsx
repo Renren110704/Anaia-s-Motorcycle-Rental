@@ -291,6 +291,117 @@ const LeftPanel = ({ step }) => {
   );
 };
 
+/* ── OTP Box Input (Professional Clean Style) ────────────────────── */
+const OtpBoxInput = ({ value, onChange, length = 6 }) => {
+  const inputsRef = React.useRef([]);
+
+  const digits = value
+    .split("")
+    .concat(Array(length).fill(""))
+    .slice(0, length);
+
+  const handleKey = (e, idx) => {
+    const key = e.key;
+
+    if (key === "Backspace") {
+      e.preventDefault();
+      const next = value.split("");
+      if (next[idx]) {
+        next[idx] = "";
+        onChange(next.join(""));
+      } else if (idx > 0) {
+        next[idx - 1] = "";
+        onChange(next.join(""));
+        inputsRef.current[idx - 1]?.focus();
+      }
+      return;
+    }
+
+    if (key === "ArrowLeft" && idx > 0) {
+      inputsRef.current[idx - 1]?.focus();
+      return;
+    }
+    if (key === "ArrowRight" && idx < length - 1) {
+      inputsRef.current[idx + 1]?.focus();
+      return;
+    }
+
+    if (/^\d$/.test(key)) {
+      e.preventDefault();
+      const next = value
+        .split("")
+        .concat(Array(length).fill(""))
+        .slice(0, length);
+      next[idx] = key;
+      onChange(next.join("").replace(/\s/g, ""));
+      if (idx < length - 1) inputsRef.current[idx + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, length);
+    onChange(pasted.padEnd(length, " ").slice(0, length).trimEnd());
+    const focusIdx = Math.min(pasted.length, length - 1);
+    inputsRef.current[focusIdx]?.focus();
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+      {digits.map((digit, idx) => {
+        const filled = digit && digit !== " ";
+        return (
+          <input
+            key={idx}
+            ref={(el) => (inputsRef.current[idx] = el)}
+            type="tel"
+            inputMode="numeric"
+            maxLength={1}
+            value={filled ? digit : ""}
+            onKeyDown={(e) => handleKey(e, idx)}
+            onPaste={handlePaste}
+            onChange={() => {}}
+            onFocus={(e) => e.target.select()}
+            style={{
+              width: 48,
+              height: 56,
+              borderRadius: 12,
+              border: filled
+                ? "1.5px solid rgba(0,0,0,0.4)"
+                : "1.5px solid rgba(0,0,0,0.12)",
+              background: "#fff",
+              fontSize: 20,
+              fontWeight: 600,
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "#0E0E0E",
+              textAlign: "center",
+              outline: "none",
+              transition: "all 0.2s ease-in-out",
+              cursor: "text",
+              caretColor: "#0E0E0E",
+            }}
+            onFocusCapture={(e) => {
+              e.target.style.borderColor = "#0E0E0E";
+              e.target.style.boxShadow = "none";
+            }}
+            onBlurCapture={(e) => {
+              e.target.style.boxShadow = "none";
+              if (!e.target.value) {
+                e.target.style.borderColor = "rgba(0,0,0,0.12)";
+              } else {
+                e.target.style.borderColor = "rgba(0,0,0,0.4)";
+              }
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 /* ── Main Component ──────────────────────────────────────────────── */
 const ForgotPassword = () => {
   const API_BASE = API_BASE_URL;
@@ -397,7 +508,8 @@ const ForgotPassword = () => {
   //   textAlign: "left",
   // });
 
-  const BG_URL = "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
+  const BG_URL =
+    "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
   // const BG_URL = typeof bgImage === "string" ? bgImage : "";
 
   return (
@@ -587,21 +699,19 @@ const ForgotPassword = () => {
                     </span>
                   </div>
 
-                  <Field icon={FaLock} label="One-Time Code">
-                    <input
-                      type="tel"
-                      value={otp}
-                      onChange={(e) =>
-                        setOtp(e.target.value.replace(/\D/g, ""))
-                      }
-                      placeholder="Enter 6-digit OTP"
-                      required
-                      maxLength={6}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      style={inputBase}
-                    />
-                  </Field>
+                  <div>
+                    <label
+                      style={{
+                        ...labelStyle,
+                        textAlign: "center",
+                        display: "block",
+                        marginBottom: 12,
+                      }}
+                    >
+                      One-Time Code
+                    </label>
+                    <OtpBoxInput value={otp} onChange={setOtp} length={6} />
+                  </div>
 
                   {/* New Password */}
                   <div>

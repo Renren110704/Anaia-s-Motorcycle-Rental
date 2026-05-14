@@ -15,11 +15,14 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import axios from "axios";
-// import bgImage from "../assets/bgImage2.jpg";
 import API_BASE_URL from "../apiBase";
 import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
+import anaialogo from "../assets/anaialogo.png";
 
-/* ── Shared style tokens (same as Login) ─────────────────────────── */
+const BG_IMAGE =
+  "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
+
+/* ── Shared style tokens ─────────────────────────────────────────── */
 const labelStyle = {
   display: "block",
   fontSize: 10,
@@ -30,6 +33,7 @@ const labelStyle = {
   marginBottom: 6,
   fontFamily: "'Space Grotesk', sans-serif",
 };
+
 const inputWrapBase = {
   position: "relative",
   display: "flex",
@@ -39,6 +43,7 @@ const inputWrapBase = {
   borderRadius: 12,
   transition: "border-color 0.2s, background 0.2s",
 };
+
 const inputBase = {
   width: "100%",
   padding: "11px 12px 11px 38px",
@@ -49,6 +54,7 @@ const inputBase = {
   fontFamily: "'Space Grotesk', sans-serif",
   color: "#0E0E0E",
 };
+
 const iconBase = {
   position: "absolute",
   left: 12,
@@ -57,6 +63,7 @@ const iconBase = {
   pointerEvents: "none",
 };
 
+/* ── Field wrapper ───────────────────────────────────────────────── */
 const Field = ({ icon: Icon, label, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
@@ -76,220 +83,6 @@ const Field = ({ icon: Icon, label, children }) => (
     </div>
   </div>
 );
-
-/* ── Left Panel ──────────────────────────────────────────────────── */
-const FEATURES = [
-  { icon: FaMotorcycle, text: "Wide selection of vehicles" },
-  { icon: FaCheckCircle, text: "Easy & secure booking process" },
-  { icon: FaMapMarkerAlt, text: "Pickup in Bacoor, Cavite" },
-  { icon: FaIdCard, text: "Transparent pricing, no hidden fees" },
-];
-
-const PANEL_COPY = {
-  1: {
-    heading: ["Forgot your", "password?"],
-    sub: "No worries! Enter your email and we'll send you a one-time reset code.",
-  },
-  2: {
-    heading: ["Create a new", "password."],
-    sub: "Enter the OTP from your email and set your new password below.",
-  },
-};
-
-const LeftPanel = ({ step }) => {
-  const { heading, sub } = PANEL_COPY[step] || PANEL_COPY[1];
-  return (
-    <div
-      style={{
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        height: "100%",
-        padding: "36px 32px",
-        overflow: "hidden",
-      }}
-    >
-      {/* Red radial glow */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: -60,
-          right: -60,
-          width: 220,
-          height: 220,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(181,0,2,0.4) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      {/* Dot grid accent */}
-      <div
-        style={{
-          position: "absolute",
-          top: 20,
-          right: 20,
-          width: 80,
-          height: 80,
-          backgroundImage:
-            "radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px)",
-          backgroundSize: "12px 12px",
-          pointerEvents: "none",
-        }}
-      />
-
-      <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Brand */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 36,
-          }}
-        >
-          <FaMotorcycle
-            style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}
-          />
-          <div>
-            <p
-              style={{
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 13,
-                fontFamily: "'Space Grotesk', sans-serif",
-                letterSpacing: "-0.2px",
-                lineHeight: 1,
-              }}
-            >
-              Anaia's Motorcycle Rental
-            </p>
-            <p
-              style={{
-                color: "rgba(255,255,255,0.35)",
-                fontSize: 10,
-                fontFamily: "'Space Grotesk', sans-serif",
-                marginTop: 2,
-              }}
-            >
-              Bacoor, Cavite
-            </p>
-          </div>
-        </div>
-
-        {/* Step badge */}
-        <div style={{ marginBottom: 8 }}>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "3px",
-              textTransform: "uppercase",
-              color: "rgba(255,255,255,0.45)",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            Step {step} of 2
-          </span>
-        </div>
-
-        <h2
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "clamp(28px, 3.5vw, 38px)",
-            fontWeight: 800,
-            color: "#fff",
-            letterSpacing: "-1px",
-            lineHeight: 1.05,
-            marginBottom: 14,
-          }}
-        >
-          {heading[0]}
-          <br />
-          {heading[1]}
-        </h2>
-        <p
-          style={{
-            fontSize: 13,
-            color: "rgba(255,255,255,0.45)",
-            fontFamily: "'Space Grotesk', sans-serif",
-            lineHeight: 1.7,
-            maxWidth: 240,
-            marginBottom: 20,
-          }}
-        >
-          {sub}
-        </p>
-
-        {/* Step dots */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {[1, 2].map((s) => (
-            <div
-              key={s}
-              style={{
-                borderRadius: 9999,
-                transition: "all 0.3s",
-                width: s === step ? 28 : 10,
-                height: 10,
-                background:
-                  s === step
-                    ? "#b50002"
-                    : s < step
-                      ? "rgba(255,255,255,0.6)"
-                      : "rgba(255,255,255,0.2)",
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Features */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-        }}
-      >
-        {FEATURES.map(({ icon: Icon, text }) => (
-          <div
-            key={text}
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 9,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Icon style={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }} />
-            </div>
-            <span
-              style={{
-                color: "rgba(255,255,255,0.55)",
-                fontSize: 12,
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              {text}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 /* ── OTP Box Input (Professional Clean Style) ────────────────────── */
 const OtpBoxInput = ({ value, onChange, length = 6 }) => {
@@ -402,6 +195,160 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
   );
 };
 
+/* ── Left Panel ──────────────────────────────────────────────────── */
+const FEATURES = [
+  { icon: FaMotorcycle, text: "Wide selection of vehicles" },
+  { icon: FaCheckCircle, text: "Easy & secure booking process" },
+  { icon: FaMapMarkerAlt, text: "Pickup in Bacoor, Cavite" },
+  { icon: FaIdCard, text: "Transparent pricing, no hidden fees" },
+];
+
+const PANEL_COPY = {
+  1: {
+    heading: ["", ""],
+    sub: "Forgot your password? No worries! Enter your email and we'll send you a one-time reset code.",
+  },
+  2: {
+    heading: ["", ""],
+    sub: "Enter the OTP from your email and set your new password below.",
+  },
+};
+
+const LeftPanel = ({ step }) => {
+  const { heading, sub } = PANEL_COPY[step] || PANEL_COPY[1];
+  const LOGO_URL = anaialogo;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        height: "100%",
+        padding: "36px 32px",
+        overflow: "hidden",
+        background: "#ffffff",
+      }}
+    >
+      {/* Light theme dot grid accent */}
+      <div
+        style={{
+          position: "absolute",
+          top: 20,
+          right: 20,
+          width: 80,
+          height: 80,
+          backgroundImage:
+            "radial-gradient(circle, rgba(0,0,0,0.15) 1px, transparent 1px)",
+          backgroundSize: "12px 12px",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Top Section: Brand & Logo */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          marginBottom: "24px",
+        }}
+      >
+        {heading[0] && (
+          <h2
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(28px, 3.5vw, 38px)",
+              fontWeight: 800,
+              color: "#0E0E0E",
+              letterSpacing: "-1px",
+              lineHeight: 1.05,
+              marginBottom: "28px",
+            }}
+          >
+            {heading[0]}
+            <br />
+            {heading[1]}
+          </h2>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <img
+            src={LOGO_URL}
+            alt="Anaia's Motorcycle Rental Logo"
+            style={{
+              width: "180px",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "12px",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Bottom Section: Text & Features */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <p
+          style={{
+            fontSize: 13,
+            color: "rgba(0,0,0,0.55)",
+            fontFamily: "'Space Grotesk', sans-serif",
+            lineHeight: 1.7,
+            maxWidth: 260,
+          }}
+        >
+          {sub}
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {FEATURES.map(({ icon: Icon, text }) => (
+            <div
+              key={text}
+              style={{ display: "flex", alignItems: "center", gap: 12 }}
+            >
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 9,
+                  background: "rgba(0,0,0,0.03)",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon style={{ color: "#b50002", fontSize: 11 }} />
+              </div>
+              <span
+                style={{
+                  color: "rgba(0,0,0,0.42)",
+                  fontSize: 12,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 600,
+                }}
+              >
+                {text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Main Component ──────────────────────────────────────────────── */
 const ForgotPassword = () => {
   const API_BASE = API_BASE_URL;
@@ -496,22 +443,6 @@ const ForgotPassword = () => {
     }
   };
 
-  // const resendBtnStyle = (canResend) => ({
-  //   fontSize: 12,
-  //   fontWeight: 600,
-  //   fontFamily: "'Space Grotesk', sans-serif",
-  //   background: "none",
-  //   border: "none",
-  //   padding: 0,
-  //   cursor: canResend ? "pointer" : "not-allowed",
-  //   color: canResend ? "#b50002" : "rgba(0,0,0,0.3)",
-  //   textAlign: "left",
-  // });
-
-  const BG_URL =
-    "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
-  // const BG_URL = typeof bgImage === "string" ? bgImage : "";
-
   return (
     <>
       <style>{`
@@ -524,7 +455,7 @@ const ForgotPassword = () => {
           min-height: 100vh; width: 100%;
           display: flex; align-items: center; justify-content: center;
           padding: 24px; font-family: 'Space Grotesk', sans-serif;
-          background-image: url('${BG_URL}');
+          background-image: url('${BG_IMAGE}');
           background-size: cover; background-position: center;
           position: relative;
         }
@@ -538,25 +469,44 @@ const ForgotPassword = () => {
           background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
           background-size: 28px 28px; pointer-events: none;
         }
+
         .fp-card {
-          position: relative; z-index: 1; width: 100%; max-width: 860px;
-          border-radius: 22px; overflow: hidden;
-          display: flex; flex-direction: row; min-height: 540px;
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          max-width: 900px;
+          background: transparent;
+          border-radius: 22px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: row;
+          min-height: 560px;
+          border: none;
           box-shadow: 0 32px 80px rgba(0,0,0,0.45);
           animation: fadeUp 0.5s cubic-bezier(.2,.8,.2,1) forwards;
           transform: translateZ(0);
         }
+
         .fp-left {
-          width: 42%; flex-shrink: 0; background: #0E0E0E;
-          border-top-left-radius: 22px; border-bottom-left-radius: 22px;
+          width: 42%;
+          flex-shrink: 0;
+          background: #ffffff;
+          position: relative;
+          border-top-left-radius: 22px;
+          border-bottom-left-radius: 22px;
         }
         @media(max-width: 700px) { .fp-left { display: none; } .fp-card { min-height: unset; } }
+
         .fp-right {
-          flex: 1; background: #F5F5F3;
-          display: flex; flex-direction: column;
-          padding: 36px 32px; overflow-y: auto;
+          flex: 1;
+          background: #F5F5F3;
+          display: flex;
+          flex-direction: column;
+          padding: 36px 32px;
+          overflow-y: auto;
         }
         @media(max-width: 480px) { .fp-right { padding: 28px 20px; } }
+
         .fp-back {
           display: inline-flex; align-items: center; gap: 6px;
           font-size: 12px; font-weight: 600; color: rgba(0,0,0,0.4);
@@ -565,27 +515,41 @@ const ForgotPassword = () => {
           margin-bottom: 28px; text-decoration: none;
         }
         .fp-back:hover { color: #b50002; }
+
         .fp-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .fp-eyebrow-line { width: 18px; height: 1.5px; background: #b50002; border-radius: 2px; }
         .fp-eyebrow-txt { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #b50002; }
         .fp-title { font-size: clamp(20px, 2.5vw, 26px); font-weight: 800; color: #0E0E0E; letter-spacing: -0.6px; margin-bottom: 4px; }
         .fp-subtitle { font-size: 12.5px; color: rgba(0,0,0,0.42); line-height: 1.6; margin-bottom: 24px; }
         .fp-form { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
         .fp-footer {
           display: flex; align-items: center; justify-content: space-between;
           margin-top: auto; padding-top: 20px;
         }
+
         .fp-submit {
-          display: flex; align-items: center; gap: 8px;
-          padding: 11px 22px; border-radius: 12px; border: none;
-          font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
-          cursor: pointer; transition: all 0.18s; background: #0E0E0E; color: #fff;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 22px;
+          border-radius: 12px;
+          border: none;
+          font-size: 13px;
+          font-weight: 700;
+          font-family: 'Space Grotesk', sans-serif;
+          cursor: pointer;
+          transition: all 0.18s;
         }
-        .fp-submit:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.2); }
+        .fp-submit:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
+        .fp-submit:active:not(:disabled) { transform: translateY(0); }
         .fp-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+        .fp-submit-dark { background: #0E0E0E; color: #fff; }
+
         .fp-link { font-size: 12px; color: rgba(0,0,0,0.38); font-family: 'Space Grotesk', sans-serif; }
         .fp-link a { color: #b50002; font-weight: 700; text-decoration: none; }
         .fp-link a:hover { text-decoration: underline; }
+
         .fp-notice {
           display: flex; align-items: flex-start; gap: 10px;
           padding: 11px 14px; border-radius: 10px;
@@ -640,7 +604,7 @@ const ForgotPassword = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="fp-submit"
+                      className="fp-submit fp-submit-dark"
                     >
                       {loading ? (
                         <>
@@ -865,7 +829,7 @@ const ForgotPassword = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="fp-submit"
+                      className="fp-submit fp-submit-dark"
                     >
                       {loading ? (
                         <>

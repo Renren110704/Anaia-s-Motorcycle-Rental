@@ -9,6 +9,68 @@ import {
   sendLoginOTP,
   sendPasswordResetOTP,
 } from "../utils/emailService.js";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { v2 as cloudinary } from "cloudinary";
+
+// --- Cloudinary Setup ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
+
+const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_ENABLED = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET
+);
+
+if (CLOUDINARY_ENABLED) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+const normalizeUrl = (value = "") => {
+  const normalized = String(value || "").trim();
+  return normalized.replace(/^http:\/\//i, "https://");
+};
+
+const uploadFileToCloudinary = async (filePath) => {
+  if (!filePath || !CLOUDINARY_ENABLED) return null;
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await cloudinary.uploader.upload(filePath, {
+        folder: CLOUDINARY_FOLDER,
+        resource_type: "image",
+        quality: "auto",
+        fetch_format: "auto",
+      });
+      const url = normalizeUrl(result.secure_url || result.url || "");
+      if (url) return url;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+  return null;
+};
+
+const getUploadedUrl = async (file) => {
+  if (!file) return null;
+  const absolutePath = path.resolve(file.path);
+  if (!fs.existsSync(absolutePath)) return null;
+
+  const cloudUrl = await uploadFileToCloudinary(absolutePath);
+  if (cloudUrl) return cloudUrl;
+
+  // Local fallback
+  const filename = path.basename(absolutePath);
+  return `https://anaias-motorcycle-rental.onrender.com/uploads/${filename}`;
+};
 
 const TOKEN_EXPIRES_IN = "24h";
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_here";
@@ -34,6 +96,7 @@ const safeUser = (user) => ({
   phone: user.phone,
   address: user.address || {},
   isVerified: user.isVerified,
+  profilePicture: user.profilePicture || "",
   createdAt: user.createdAt,
 });
 
@@ -764,6 +827,63 @@ export async function verifyEmailChangeOTP(req, res) {
     });
   } catch (err) {
     console.error("Verify email change OTP error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}
+
+// ── Upload Profile Picture ────────────────────────────────────────────────────
+export async function uploadProfilePicture(req, res) {
+  try {
+    const userId = req.user._id;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image file provided" });
+    }
+
+    const uploadedUrl = await getUploadedUrl(req.file);
+    if (!uploadedUrl) {
+      return res.status(500).json({ success: false, message: "Failed to upload image" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.profilePicture = uploadedUrl;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully",
+      user: safeUser(user),
+    });
+  } catch (err) {
+    console.error("Upload profile picture error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}
+
+export async function removeProfilePicture(req, res) {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Clear the profile picture URL
+    user.profilePicture = "";
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture removed successfully",
+      user: safeUser(user),
+    });
+  } catch (err) {
+    console.error("Remove profile picture error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 }

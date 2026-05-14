@@ -30,6 +30,8 @@ const userSchema = new mongoose.Schema(
 
     isVerified: { type: Boolean, default: false },
 
+    profilePicture: { type: String, default: "" },
+
     // OTP fields
     verificationOTP: { type: String, default: null },
     verificationOTPExpires: { type: Date, default: null },

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -17,6 +17,7 @@ import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
+import anaialogo from "../assets/anaialogo.png";
 
 const BG_IMAGE =
   "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
@@ -64,7 +65,7 @@ const iconBase = {
 
 /* ── OTP Box Input (Professional Clean Style) ────────────────────── */
 const OtpBoxInput = ({ value, onChange, length = 6 }) => {
-  const inputsRef = React.useRef([]);
+  const inputsRef = useRef([]);
 
   const digits = value
     .split("")
@@ -139,27 +140,27 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
             style={{
               width: 48,
               height: 56,
-              borderRadius: 12, // Keeps consistency with your other inputs
+              borderRadius: 12,
               border: filled
-                ? "1.5px solid rgba(0,0,0,0.4)" // Subtle dark gray when filled
-                : "1.5px solid rgba(0,0,0,0.12)", // Faint gray when empty
-              background: "#fff", // Always pure white
-              fontSize: 20, // Slightly reduced for elegance
-              fontWeight: 600, // Slightly less bold
+                ? "1.5px solid rgba(0,0,0,0.4)"
+                : "1.5px solid rgba(0,0,0,0.12)",
+              background: "#fff",
+              fontSize: 20,
+              fontWeight: 600,
               fontFamily: "'Space Grotesk', sans-serif",
               color: "#0E0E0E",
               textAlign: "center",
               outline: "none",
               transition: "all 0.2s ease-in-out",
               cursor: "text",
-              caretColor: "#0E0E0E", // Show the caret so they know it's active
+              caretColor: "#0E0E0E",
             }}
             onFocusCapture={(e) => {
               e.target.style.borderColor = "#0E0E0E";
-              e.target.style.boxShadow = "none"; // <-- Change this to "none" (or just delete this line)
+              e.target.style.boxShadow = "none";
             }}
             onBlurCapture={(e) => {
-              e.target.style.boxShadow = "none"; // Remove focus ring when clicking away
+              e.target.style.boxShadow = "none";
               if (!e.target.value) {
                 e.target.style.borderColor = "rgba(0,0,0,0.12)";
               } else {
@@ -204,48 +205,36 @@ const FEATURES = [
 
 const PANEL_COPY = {
   1: {
-    heading: ["Welcome", "back."],
+    heading: ["", ""],
     sub: "Sign in to access your account and manage your bookings.",
   },
   2: {
-    heading: ["Verify", "your login."],
+    heading: ["", ""],
     sub: "A one-time code was sent to your email to keep your account secure.",
   },
   3: {
-    heading: ["Verify", "your email."],
+    heading: ["", ""],
     sub: "Enter the code we sent to activate your account.",
   },
 };
 
 const LeftPanel = ({ step }) => {
   const { heading, sub } = PANEL_COPY[step] || PANEL_COPY[1];
+  const LOGO_URL = anaialogo;
+
   return (
     <div
       style={{
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+        justifyContent: "center",
         height: "100%",
         padding: "36px 32px",
         overflow: "hidden",
+        background: "#ffffff",
       }}
     >
-      {/* Red radial glow */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: -60,
-          right: -60,
-          width: 220,
-          height: 220,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(181,0,2,0.4) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      {/* Dot grid accent */}
       <div
         style={{
           position: "absolute",
@@ -254,121 +243,106 @@ const LeftPanel = ({ step }) => {
           width: 80,
           height: 80,
           backgroundImage:
-            "radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px)",
+            "radial-gradient(circle, rgba(0,0,0,0.15) 1px, transparent 1px)",
           backgroundSize: "12px 12px",
           pointerEvents: "none",
         }}
       />
-
-      {/* Brand */}
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 36,
-          }}
-        >
-          <FaMotorcycle
-            style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}
-          />
-          <div>
-            <p
-              style={{
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 13,
-                fontFamily: "'Space Grotesk', sans-serif",
-                letterSpacing: "-0.2px",
-                lineHeight: 1,
-              }}
-            >
-              Anaia's Motorcycle Rental
-            </p>
-            <p
-              style={{
-                color: "rgba(255,255,255,0.35)",
-                fontSize: 10,
-                fontFamily: "'Space Grotesk', sans-serif",
-                marginTop: 2,
-              }}
-            >
-              Bacoor, Cavite
-            </p>
-          </div>
-        </div>
-
-        <h2
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "clamp(28px, 3.5vw, 38px)",
-            fontWeight: 800,
-            color: "#fff",
-            letterSpacing: "-1px",
-            lineHeight: 1.05,
-            marginBottom: 14,
-          }}
-        >
-          {heading[0]}
-          <br />
-          {heading[1]}
-        </h2>
-        <p
-          style={{
-            fontSize: 13,
-            color: "rgba(255,255,255,0.45)",
-            fontFamily: "'Space Grotesk', sans-serif",
-            lineHeight: 1.7,
-            maxWidth: 240,
-          }}
-        >
-          {sub}
-        </p>
-      </div>
-
-      {/* Features */}
       <div
         style={{
           position: "relative",
           zIndex: 1,
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          marginBottom: "24px",
         }}
       >
-        {FEATURES.map(({ icon: Icon, text }) => (
-          <div
-            key={text}
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
+        {heading[0] && (
+          <h2
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(28px, 3.5vw, 38px)",
+              fontWeight: 800,
+              color: "#0E0E0E",
+              letterSpacing: "-1px",
+              lineHeight: 1.05,
+              marginBottom: "28px",
+            }}
           >
+            {heading[0]}
+            <br />
+            {heading[1]}
+          </h2>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <img
+            src={LOGO_URL}
+            alt="Anaia's Motorcycle Rental Logo"
+            style={{
+              width: "180px",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "12px",
+            }}
+          />
+        </div>
+      </div>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <p
+          style={{
+            fontSize: 13,
+            color: "rgba(0,0,0,0.55)",
+            fontFamily: "'Space Grotesk', sans-serif",
+            lineHeight: 1.7,
+            maxWidth: 260,
+          }}
+        >
+          {sub}
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {FEATURES.map(({ icon: Icon, text }) => (
             <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 9,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
+              key={text}
+              style={{ display: "flex", alignItems: "center", gap: 12 }}
             >
-              <Icon style={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }} />
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 9,
+                  background: "rgba(0,0,0,0.03)",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon style={{ color: "#b50002", fontSize: 11 }} />
+              </div>
+              <span
+                style={{
+                  color: "rgba(0,0,0,0.7)",
+                  fontSize: 12,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 600,
+                }}
+              >
+                {text}
+              </span>
             </div>
-            <span
-              style={{
-                color: "rgba(255,255,255,0.55)",
-                fontSize: 12,
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              {text}
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -389,6 +363,18 @@ const Login = () => {
   const [resendingLoginOtp, setResendingLoginOtp] = useState(false);
   const [resendingVerificationOtp, setResendingVerificationOtp] =
     useState(false);
+
+  // New Remember Me state
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Load remembered email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("rememberedEmail");
+    if (savedEmail) {
+      setCredentials((prev) => ({ ...prev, email: savedEmail }));
+      setRememberMe(true);
+    }
+  }, []);
 
   const loginOtpCooldown = useResendCooldown({
     storageKey: credentials.email
@@ -502,8 +488,18 @@ const Login = () => {
       );
       if (res.status >= 200 && res.status < 300) {
         const { token, user, message } = res.data || {};
-        if (token) localStorage.setItem("token", token);
-        if (user) localStorage.setItem("user", JSON.stringify(user));
+
+        // Handle Remember Me logic for storage
+        const storage = rememberMe ? localStorage : sessionStorage;
+        if (token) storage.setItem("token", token);
+        if (user) storage.setItem("user", JSON.stringify(user));
+
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", credentials.email);
+        } else {
+          localStorage.removeItem("rememberedEmail");
+        }
+
         toast.success(message || "Login Successful! Welcome back", {
           autoClose: 1000,
           onClose: () => navigate("/", { replace: true }),
@@ -527,8 +523,18 @@ const Login = () => {
       );
       if (res.status >= 200 && res.status < 300) {
         const { token, user } = res.data || {};
-        if (token) localStorage.setItem("token", token);
-        if (user) localStorage.setItem("user", JSON.stringify(user));
+
+        // Handle Remember Me logic for storage
+        const storage = rememberMe ? localStorage : sessionStorage;
+        if (token) storage.setItem("token", token);
+        if (user) storage.setItem("user", JSON.stringify(user));
+
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", unverifiedEmail);
+        } else {
+          localStorage.removeItem("rememberedEmail");
+        }
+
         toast.success("Email verified! Welcome!", {
           autoClose: 1200,
           onClose: () => navigate("/", { replace: true }),
@@ -540,23 +546,6 @@ const Login = () => {
       setLoading(false);
     }
   };
-
-  // const submitBtn = (label, loadingLabel, color = "#0E0E0E") => ({
-  //   display: "flex",
-  //   alignItems: "center",
-  //   gap: 8,
-  //   padding: "11px 24px",
-  //   borderRadius: 12,
-  //   border: "none",
-  //   background: color,
-  //   color: "#fff",
-  //   fontSize: 13,
-  //   fontWeight: 700,
-  //   fontFamily: "'Space Grotesk', sans-serif",
-  //   cursor: loading ? "not-allowed" : "pointer",
-  //   opacity: loading ? 0.6 : 1,
-  //   transition: "all 0.18s",
-  // });
 
   const resendBtnStyle = (canResend) => ({
     fontSize: 12,
@@ -600,7 +589,6 @@ const Login = () => {
             linear-gradient(135deg, rgba(8,8,8,0.75) 0%, rgba(8,8,8,0.40) 60%, rgba(181,0,2,0.15) 100%);
           backdrop-filter: blur(2px);
         }
-        /* dot grid */
         .lg-root::after {
           content: '';
           position: absolute;
@@ -615,7 +603,7 @@ const Login = () => {
           z-index: 1;
           width: 100%;
           max-width: 900px;
-          background: transparent; /* <-- Changed from #fff to transparent */
+          background: transparent;
           border-radius: 22px;
           overflow: hidden;
           display: flex;
@@ -624,17 +612,14 @@ const Login = () => {
           border: none; 
           box-shadow: 0 32px 80px rgba(0,0,0,0.45);
           animation: fadeUp 0.5s cubic-bezier(.2,.8,.2,1) forwards;
-          
-          /* This forces hardware acceleration, which helps Safari/Chrome clip corners cleanly */
           transform: translateZ(0); 
         }
 
         .lg-left {
           width: 42%;
           flex-shrink: 0;
-          background: #0E0E0E;
+          background: #ffffff;
           position: relative;
-          /* Add these two lines to match the parent's radius */
           border-top-left-radius: 22px; 
           border-bottom-left-radius: 22px;
         }
@@ -722,7 +707,7 @@ const Login = () => {
         .lg-link a { color: #b50002; font-weight: 700; text-decoration: none; }
         .lg-link a:hover { text-decoration: underline; }
 
-        .lg-forgot { font-size: 11.5px; font-weight: 700; color: #b50002; text-decoration: none; text-align: right; display: block; }
+        .lg-forgot { font-size: 11.5px; font-weight: 700; color: #b50002; text-decoration: none; display: block; }
         .lg-forgot:hover { text-decoration: underline; }
       `}</style>
 
@@ -822,7 +807,39 @@ const Login = () => {
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right", marginTop: -4 }}>
+                {/* Remember Me and Forgot Password Row */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      color: "rgba(0,0,0,0.6)",
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      style={{
+                        accentColor: "#b50002",
+                        cursor: "pointer",
+                        width: 14,
+                        height: 14,
+                      }}
+                    />
+                    Remember Me
+                  </label>
+
                   <a href="/forgot-password" className="lg-forgot">
                     Forgot Password?
                   </a>

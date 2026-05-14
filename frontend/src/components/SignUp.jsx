@@ -233,7 +233,7 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
             value={filled ? digit : ""}
             onKeyDown={(e) => handleKey(e, idx)}
             onPaste={handlePaste}
-            onChange={() => {}} 
+            onChange={() => {}}
             onFocus={(e) => e.target.select()}
             style={{
               width: 48,
@@ -405,8 +405,6 @@ const LeftPanel = ({ step }) => {
           width: 220,
           height: 220,
           borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(181,0,2,0.4) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -435,10 +433,10 @@ const LeftPanel = ({ step }) => {
             marginBottom: 36,
           }}
         >
-          <FaMotorcycle
+          {/* <FaMotorcycle
             style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}
-          />
-          <div>
+          /> */}
+          {/* <div>
             <p
               style={{
                 color: "#fff",
@@ -461,7 +459,7 @@ const LeftPanel = ({ step }) => {
             >
               Bacoor, Cavite
             </p>
-          </div>
+          </div> */}
         </div>
 
         {/* Step badge */}
@@ -472,7 +470,7 @@ const LeftPanel = ({ step }) => {
               fontWeight: 700,
               letterSpacing: "3px",
               textTransform: "uppercase",
-              color: "rgba(255,255,255,0.45)",
+              color: "rgba(0,0,0,0.42)",
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
@@ -485,7 +483,7 @@ const LeftPanel = ({ step }) => {
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: "clamp(28px, 3.5vw, 38px)",
             fontWeight: 800,
-            color: "#fff",
+            color: "#0E0E0E",
             letterSpacing: "-1px",
             lineHeight: 1.05,
             marginBottom: 14,
@@ -498,7 +496,7 @@ const LeftPanel = ({ step }) => {
         <p
           style={{
             fontSize: 13,
-            color: "rgba(255,255,255,0.45)",
+            color: "rgba(0,0,0,0.42)",
             fontFamily: "'Space Grotesk', sans-serif",
             lineHeight: 1.7,
             maxWidth: 240,
@@ -522,8 +520,8 @@ const LeftPanel = ({ step }) => {
                   s === step
                     ? "#b50002"
                     : s < step
-                      ? "rgba(255,255,255,0.6)"
-                      : "rgba(255,255,255,0.2)",
+                      ? "#b50002"
+                      : "rgba(0,0,0,0.2)",
               }}
             />
           ))}
@@ -550,19 +548,19 @@ const LeftPanel = ({ step }) => {
                 width: 32,
                 height: 32,
                 borderRadius: 9,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(0,0,0,0.03)",
+                border: "1px solid rgba(0,0,0,0.06)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              <Icon style={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }} />
+              <Icon style={{ color: "#b50002", fontSize: 11 }} />
             </div>
             <span
               style={{
-                color: "rgba(255,255,255,0.55)",
+                color: "rgba(0,0,0,0.42)",
                 fontSize: 12,
                 fontFamily: "'Space Grotesk', sans-serif",
                 fontWeight: 500,
@@ -1006,7 +1004,8 @@ const SignUp = () => {
     textAlign: "left",
   });
 
-  const BG_URL = "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
+  const BG_URL =
+    "https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/643321928_923939463472253_7881434427328115220_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=106&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeE2SS8aK8wmUiT7soUy9lcCtjWlJYbT7Fa2NaUlhtPsVjQn_xrGP7hhDGNQFzJLCMxSts5mEW09MZRism8m33rW&_nc_ohc=w_mEyN_G1w0Q7kNvwEuzxo0&_nc_oc=AdrqwFqxvoPuzpoVe4Ni-jWnGTvviWLld69mLVfJdsLvXa0TMiHknBFfsNeARPpSi2k&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=WWEO_z9thjGWUVEpCPRyZQ&_nc_ss=7b2a8&oh=00_Af47u4-rfzTNlbWawMGE_iSMFILqpFKX8OrKEk_YQu7qLw&oe=6A099F00";
   // const BG_URL = typeof bgImage === "string" ? bgImage : "";
 
   return (
@@ -1044,7 +1043,7 @@ const SignUp = () => {
           transform: translateZ(0);
         }
         .su-left {
-          width: 40%; flex-shrink: 0; background: #0E0E0E;
+          width: 40%; flex-shrink: 0; background: #fff;
           border-top-left-radius: 22px; border-bottom-left-radius: 22px;
         }
         @media(max-width: 700px) { .su-left { display: none; } .su-card { min-height: unset; } }
@@ -1141,7 +1140,6 @@ const SignUp = () => {
                 </div>
                 <form onSubmit={handleNextStep} className="su-form">
                   <div>
-                    <p className="su-section-label">Full Name</p>
                     <div className="su-grid-2">
                       <Field icon={FaUser} label="First Name *">
                         <input
@@ -1182,7 +1180,7 @@ const SignUp = () => {
                   </div>
 
                   <div>
-                    <p className="su-section-label">Contact</p>
+                    {/* <p className="su-section-label">Contact</p> */}
                     <div className="su-grid-2">
                       <Field icon={FaEnvelope} label="Email Address *">
                         <input
@@ -1223,7 +1221,7 @@ const SignUp = () => {
                   </div>
 
                   <div>
-                    <p className="su-section-label">Security</p>
+                    {/* <p className="su-section-label">Security</p> */}
                     <div className="su-grid-2">
                       {/* Password */}
                       <div>

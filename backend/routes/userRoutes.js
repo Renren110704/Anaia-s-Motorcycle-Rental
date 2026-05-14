@@ -12,9 +12,29 @@ import {
   updateProfile,
   changePassword,
   requestEmailChangeOTP, 
-  verifyEmailChangeOTP
+  verifyEmailChangeOTP, 
+  removeProfilePicture,
 } from "../controllers/userController.js";
 import authMiddleware from "../middlewares/auth.js";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
+import { uploadProfilePicture } from "../controllers/userController.js";
+
+// Setup multer storage above your route definitions
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = 'uploads/';
+    if (!fs.existsSync(dir)){
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+const upload = multer({ storage: storage });
 
 const userRouter = express.Router();
 
@@ -40,5 +60,9 @@ userRouter.put("/change-password", authMiddleware, changePassword);
 // Email Change with OTP (Protected Routes)
 userRouter.post("/request-email-change-otp", authMiddleware, requestEmailChangeOTP);
 userRouter.post("/verify-email-change-otp", authMiddleware, verifyEmailChangeOTP);
+
+userRouter.post("/upload-profile-picture", authMiddleware, upload.single("image"), uploadProfilePicture);
+
+userRouter.delete("/remove-profile-picture", authMiddleware, removeProfilePicture);
 
 export default userRouter;

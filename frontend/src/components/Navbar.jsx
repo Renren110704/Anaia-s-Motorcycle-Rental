@@ -52,35 +52,38 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const validateToken = useCallback(async (signal) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setIsLoggedIn(false);
-      setUser(null);
-      return;
-    }
-    try {
-      const res = await api.get(ME_ENDPOINT, {
-        signal,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const profile = res?.data?.user ?? res?.data ?? null;
-      setIsLoggedIn(true);
-      setUser(profile);
-      if (profile) {
-        try {
-          localStorage.setItem("user", JSON.stringify(profile));
-        } catch {}
-      }
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+  const validateToken = useCallback(
+    async (signal) => {
+      const token = localStorage.getItem("token");
+      if (!token) {
         setIsLoggedIn(false);
         setUser(null);
+        return;
       }
-    }
-  }, [api]);
+      try {
+        const res = await api.get(ME_ENDPOINT, {
+          signal,
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const profile = res?.data?.user ?? res?.data ?? null;
+        setIsLoggedIn(true);
+        setUser(profile);
+        if (profile) {
+          try {
+            localStorage.setItem("user", JSON.stringify(profile));
+          } catch {}
+        }
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      }
+    },
+    [api],
+  );
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -489,7 +492,20 @@ const Navbar = () => {
                   className="nav-profile-btn"
                   aria-label="User menu"
                 >
-                  <FaUser style={{ fontSize: 12, opacity: 0.6 }} />
+                  {user?.profilePicture ? (
+                    <img
+                      src={user.profilePicture}
+                      alt="Profile"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <FaUser style={{ fontSize: 12, opacity: 0.6 }} />
+                  )}
                   <span>{user?.name?.split(" ")[0] || "Profile"}</span>
                 </button>
 
@@ -497,11 +513,24 @@ const Navbar = () => {
                   <div className="user-dropdown">
                     <Link
                       to="/profile"
-                      onClick={() => setShowUserMenu(false)}
-                      className="dropdown-item"
+                      onClick={() => setIsOpen(false)}
+                      className="mobile-auth"
                     >
-                      <FaUser style={{ fontSize: 12, opacity: 0.5 }} /> My
-                      Profile
+                      {user?.profilePicture ? (
+                        <img
+                          src={user.profilePicture}
+                          alt="Profile"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <FaUser style={{ fontSize: 14 }} />
+                      )}
+                      My Profile
                     </Link>
                     <div className="dropdown-sep" />
                     <button

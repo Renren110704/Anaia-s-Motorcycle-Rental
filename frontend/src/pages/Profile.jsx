@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaUser,
@@ -16,6 +16,7 @@ import {
   FaShieldAlt,
   FaKey,
   FaCalendarAlt,
+  FaTrash,
 } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
@@ -342,6 +343,10 @@ const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     firstName: "",
     middleName: "",
@@ -827,6 +832,75 @@ const Profile = () => {
     password: "Choose a strong new password",
   }[activePanel];
 
+  // Add this function before the return statement
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    setUploadingImage(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `${BASE}/api/auth/upload-profile-picture`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      if (res.data.success) {
+        setUser(res.data.user);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        toast.success("Profile picture updated!");
+
+        // Dispatch storage event to immediately update Navbar
+        window.dispatchEvent(new Event("storage"));
+      }
+    } catch (err) {
+      toast.error("Failed to upload profile picture");
+    } finally {
+      setUploadingImage(false);
+      e.target.value = null; // Clear the input
+    }
+  };
+
+  const handleDeleteProfilePicture = async () => {
+    setDeletingImage(true);
+    setShowDeleteConfirm(false); // Close the modal immediately when confirmed
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.delete(
+        `${BASE}/api/auth/remove-profile-picture`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (res.data.success) {
+        setUser(res.data.user);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        toast.success("Profile picture removed!");
+
+        window.dispatchEvent(new Event("storage"));
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Failed to remove profile picture",
+      );
+    } finally {
+      setDeletingImage(false);
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -846,7 +920,7 @@ const Profile = () => {
         @media(max-width: 860px) { .pf-layout { grid-template-columns: 1fr; } }
         .pf-card { background: #fff; border-radius: 18px; border: 1.5px solid rgba(0,0,0,0.07); overflow: hidden; }
         .pf-avatar-card { background: #fff; border-radius: 18px; border: 1.5px solid rgba(0,0,0,0.07); padding: 28px 24px; margin-bottom: 16px; position: relative; overflow: hidden; }
-        .pf-avatar-card::after { content: ''; position: absolute; bottom: -40px; right: -40px; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(181,0,2,0.35) 0%, transparent 70%); pointer-events: none; }
+        .pf-avatar-card::after { content: ''; position: absolute; bottom: -40px; right: -40px; width: 130px; height: 130px; border-radius: 50%; background: pointer-events: none; }
         .pf-avatar-ring { width: 60px; height: 60px; border-radius: 16px; background: rgba(181,0,2,0.07); border: 1.5px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
         .pf-avatar-initials { font-size: 22px; font-weight: 800; color: #b50002; }
         .pf-avatar-name { font-size: 16px; font-weight: 800; color: #0E0E0E ; letter-spacing: -0.3px; margin-bottom: 4px; }
@@ -881,6 +955,55 @@ const Profile = () => {
         .pf-resend-btn { font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; background: none; border: none; cursor: pointer; padding: 0; margin-top: 8px; }
         .pf-divider { border: none; border-top: 1.5px solid rgba(0,0,0,0.06); margin: 20px 0; }
         input:focus-within + div { border-color: #b50002; }
+        /* Add this inside your <style> block */
+        .modal-overlay {
+          position: fixed; inset: 0;
+          background: rgba(17,17,17,0.45);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          z-index: 200;
+          display: flex; align-items: center; justify-content: center; padding: 24px;
+          animation: fadeIn 0.18s ease;
+        }
+        .modal-card {
+          background: #fff; border-radius: 22px;
+          padding: 32px 28px; max-width: 380px; width: 100%;
+          border: 1px solid rgba(0,0,0,0.06);
+          box-shadow: 0 20px 64px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.06);
+          animation: slideUp 0.2s ease;
+        }
+        .modal-icon {
+          width: 56px; height: 56px; border-radius: 50%;
+          background: rgba(181,0,2,0.07);
+          display: flex; align-items: center; justify-content: center;
+          margin: 0 auto 16px;
+        }
+        .modal-title {
+          font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 800;
+          text-align: center; color: #111; margin-bottom: 8px;
+        }
+        .modal-sub {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13.5px; color: rgba(17,17,17,0.46);
+          text-align: center; line-height: 1.65; margin-bottom: 24px;
+        }
+        .modal-actions { display: flex; gap: 10px; }
+        .modal-cancel {
+          flex: 1; padding: 12px; border-radius: 11px;
+          border: 1px solid rgba(0,0,0,0.1); cursor: pointer;
+          background: #FAFAFA; color: #111;
+          font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+          transition: background 0.18s;
+        }
+        .modal-cancel:hover { background: #f0f0f0; }
+        .modal-confirm {
+          flex: 1; padding: 12px; border-radius: 11px; border: none; cursor: pointer;
+          background: #b50002; color: #fff;
+          font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+          transition: background 0.18s;
+          box-shadow: 0 4px 14px rgba(181,0,2,0.28);
+        }
+        .modal-confirm:hover { background: #a00001; }
       `}</style>
 
       <Navbar />
@@ -898,13 +1021,101 @@ const Profile = () => {
             <div>
               {/* Avatar card */}
               <div className="pf-avatar-card">
-                <div className="pf-avatar-ring">
-                  {initials ? (
+                <div
+                  className="pf-avatar-ring"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    cursor: "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                  title="Click to upload profile picture"
+                >
+                  {uploadingImage && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "rgba(255,255,255,0.7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          border: "2.5px solid #b50002",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 0.8s linear infinite",
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {user?.profilePicture ? (
+                    <img
+                      src={user.profilePicture}
+                      alt="Profile"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : initials ? (
                     <span className="pf-avatar-initials">{initials}</span>
                   ) : (
                     <FaUser style={{ color: "#fff", fontSize: 20 }} />
                   )}
                 </div>
+
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+                {user?.profilePicture && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={deletingImage}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      background: "transparent",
+                      border: "1.5px solid rgba(181,0,2,0.15)",
+                      color: "#b50002",
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: deletingImage ? "not-allowed" : "pointer",
+                      marginBottom: "16px",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      transition: "all 0.2s",
+                      opacity: deletingImage ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deletingImage)
+                        e.currentTarget.style.background = "rgba(181,0,2,0.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!deletingImage)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <FaTrash style={{ fontSize: 10 }} />
+                    {deletingImage ? "Removing..." : "Remove Picture"}
+                  </button>
+                )}
                 <div className="pf-avatar-name">{fullName}</div>
                 <div className="pf-avatar-email">{user?.email}</div>
                 <span
@@ -1449,6 +1660,42 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* ADD THIS RIGHT ABOVE <Footer /> */}
+      {showDeleteConfirm && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">
+              <FaTrash style={{ fontSize: 20, color: "#b50002" }} />
+            </div>
+            <div className="modal-title">Remove Profile Picture</div>
+            <p className="modal-sub">
+              Are you sure you want to remove your profile picture? You can
+              always upload a new one later.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="modal-cancel"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-confirm"
+                onClick={handleDeleteProfilePicture}
+                disabled={deletingImage}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Footer />
 
       <Footer />
       <ToastContainer

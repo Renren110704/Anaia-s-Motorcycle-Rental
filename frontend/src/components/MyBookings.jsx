@@ -1604,7 +1604,7 @@ const BookingRow = ({
     return formatDateInput(originalPickup > today ? originalPickup : today);
   }, [originalPickupDateInput]);
   const maxPickupDate = null;
-  const maxReturnDate = null;
+  // const maxReturnDate = null;
   // Min return date for reschedule = day after pickup
   const rescheduleMinReturnDate = addDaysToDateInput(
     rescheduleForm.pickupDate || minPickupDate,
@@ -1657,8 +1657,7 @@ const BookingRow = ({
       await alertModal("Invalid date input.", { isError: true });
       return false;
     }
-    const today = getTodayStart(),
-      sevenDayLimit = sevenDaysFromToday();
+    const today = getTodayStart();
     const minAllowedPickup =
       originalPickupObj > today ? originalPickupObj : today;
     if (pickupDateObj < minAllowedPickup) {

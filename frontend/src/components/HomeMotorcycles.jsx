@@ -83,7 +83,7 @@ const CATEGORY_TABS = [
   "SUV",
   "Top Rated",
 ];
-const BASE = "https://anaias-motorcycle-rental.onrender.com";
+// const BASE = "https://anaias-motorcycle-rental.onrender.com";
 const LIMIT = 6;
 const FALLBACK_IMG = `${API_BASE_URL}/uploads/default-motorcycle.png`;
 

@@ -200,11 +200,11 @@ const formatDate = (date) => formatLocalDate(date);
 //   d.setMonth(d.getMonth() + 6);
 //   return d;
 // };
-const sevenDaysFromToday = () => {
-  const d = getTodayStart();
-  d.setDate(d.getDate() + 7);
-  return d;
-};
+// const sevenDaysFromToday = () => {
+//   const d = getTodayStart();
+//   d.setDate(d.getDate() + 7);
+//   return d;
+// };
 const addDaysToISODate = (dateISO, days) => {
   const d = new Date(dateISO || todayISO());
   d.setDate(d.getDate() + days);

@@ -436,7 +436,7 @@ const Motorcycles = () => {
 
   const abortControllerRef = useRef(null);
   const topRef = useRef(null);
-  const base = "https://anaias-motorcycle-rental.onrender.com";
+  // const base = "https://anaias-motorcycle-rental.onrender.com";
   const fallbackImage = `${API_BASE_URL}/uploads/default-motorcycle.png`;
 
   const fetchMotorcycles = useCallback(async () => {
@@ -626,7 +626,6 @@ const Motorcycles = () => {
     selectedTransmission,
     priceSliderRange,
     sortBy,
-    isMotorcycleUnavailable,
   ]);
 
   useEffect(() => {

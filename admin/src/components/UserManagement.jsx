@@ -16,7 +16,6 @@ import {
   FaTimes,
   FaUser,
   FaShieldAlt,
-  FaCheckCircle,
 } from "react-icons/fa";
 import { AlertTriangle, CheckCircle2, Trash2, Users } from "lucide-react";
 
@@ -40,8 +39,8 @@ api.interceptors.request.use(
 const ITEMS_PER_PAGE = 10;
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
-const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+// const labelCls =
+//   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const nextSortState = (cur) =>

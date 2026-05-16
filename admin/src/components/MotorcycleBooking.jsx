@@ -643,8 +643,8 @@ const DetailDrawer = ({
   const latestExtension = Array.isArray(booking.extensions)
     ? booking.extensions[booking.extensions.length - 1]
     : null;
-  const originalReturnDate = latestExtension?.previousReturnDate || null;
-  const originalReturnTime = latestExtension?.previousReturnTime || "";
+  // const originalReturnDate = latestExtension?.previousReturnDate || null;
+  // const originalReturnTime = latestExtension?.previousReturnTime || "";
   const isEditLocked = ["completed", "cancelled", "inspection"].includes(
     booking.status,
   );

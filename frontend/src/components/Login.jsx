@@ -490,7 +490,7 @@ const Login = () => {
         const { token, user, message } = res.data || {};
 
         // Handle Remember Me logic for storage
-        const storage = rememberMe ? localStorage : sessionStorage;
+        // const storage = rememberMe ? localStorage : sessionStorage;
         if (token) localStorage.setItem("token", token);
         if (user) localStorage.setItem("user", JSON.stringify(user));
 
@@ -525,7 +525,7 @@ const Login = () => {
         const { token, user } = res.data || {};
 
         // Handle Remember Me logic for storage
-        const storage = rememberMe ? localStorage : sessionStorage;
+        // const storage = rememberMe ? localStorage : sessionStorage;
         if (token) localStorage.setItem("token", token);
         if (user) localStorage.setItem("user", JSON.stringify(user));
 

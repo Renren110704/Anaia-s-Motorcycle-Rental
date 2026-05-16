@@ -52,6 +52,13 @@ const PAYMENT_QR_PATHS = {
   "Bank Transfer": "/images/qr-gcash.jpeg",
 };
 
+const resolveQrPath = (path) => {
+  if (!path) return null;
+  if (path.startsWith("http") || path.startsWith("data:")) return path;
+  if (path.startsWith("/images/")) return path;
+  return `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
 const DISTANCE_TIERS = [
   { maxKm: 8, fee: 0, label: "Within Bacoor (0–8 km)" },
   { maxKm: 15, fee: 80, label: "Very close (8–15 km)" },
@@ -155,12 +162,19 @@ const normalizeCity = (raw = "") =>
     .trim();
 
 const getDistanceFee = (cityName, destinationStr = "") => {
-  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
+  if (!cityName)
+    return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
 
   // Check if the full destination string includes NCR or CALABARZON identifiers
-  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  const isFreeRegion =
+    /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
   if (isFreeRegion) {
-    return { fee: 0, tier: { label: "Free Region (NCR / CALABARZON)" }, km: 0, isEstimate: false };
+    return {
+      fee: 0,
+      tier: { label: "Free Region (NCR / CALABARZON)" },
+      km: 0,
+      isEstimate: false,
+    };
   }
 
   const upper = cityName.toUpperCase().trim();
@@ -1711,7 +1725,9 @@ const PriceSummary = ({
   const discountedDailyRate = discount
     ? Math.round(computeDiscountedPrice(price, discount))
     : price;
-  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+  const discountedBaseRental = Math.round(
+    Math.max(0, baseRental - discountAmount),
+  );
   const discountedTotal = discountedBaseRental + distanceFee + helmetFee;
   const dueAtPickup = Math.max(0, discountedTotal - DOWNPAYMENT);
   return (
@@ -1913,6 +1929,7 @@ const MotorcycleDetail = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
   const [votingReviewId, setVotingReviewId] = useState("");
+  const [dynamicQrs, setDynamicQrs] = useState(PAYMENT_QR_PATHS);
 
   // Calendar data state
   const [calBookings, setCalBookings] = useState([]);
@@ -1970,9 +1987,11 @@ const MotorcycleDetail = () => {
 
   const availablePickupSlots = getAvailablePickupSlots(formData.pickupDate);
   const noSlotsAvailable = availablePickupSlots.length === 0;
-  const selectedQrPath =
-    PAYMENT_QR_PATHS[formData.reservationPaymentMethod] ||
-    PAYMENT_QR_PATHS.GCash;
+  const rawPath =
+    dynamicQrs[formData.reservationPaymentMethod] ||
+    dynamicQrs.GCash ||
+    PAYMENT_QR_PATHS[formData.reservationPaymentMethod];
+  const selectedQrPath = resolveQrPath(rawPath);
   const fetchControllerRef = useRef(null);
   const submitControllerRef = useRef(null);
   const hasSubmittedRef = useRef(false);
@@ -2021,6 +2040,19 @@ const MotorcycleDetail = () => {
     const id = m.motorcycleId || m.motorcycle?._id || m.motorcycle?.id;
     return String(id) === String(currentMotoId);
   });
+
+  useEffect(() => {
+    api
+      .get("/api/settings/qrs")
+      .then((res) => {
+        if (res.data?.data) {
+          setDynamicQrs((prev) => ({ ...prev, ...res.data.data }));
+        }
+      })
+      .catch((err) =>
+        console.log("Failed to load dynamic QRs, using defaults."),
+      );
+  }, []);
 
   // Load calendar data (bookings + motorcycle maintenance)
   useEffect(() => {
@@ -2447,7 +2479,9 @@ const MotorcycleDetail = () => {
       ? (baseRental * applicableDiscount.discountValue) / 100
       : Math.min(applicableDiscount.discountValue, baseRental)
     : 0;
-  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+  const discountedBaseRental = Math.round(
+    Math.max(0, baseRental - discountAmount),
+  );
   const totalAmount = discountedBaseRental + distanceFee + helmetFee;
   const dueAtPickup = Math.max(0, totalAmount - DOWNPAYMENT);
 

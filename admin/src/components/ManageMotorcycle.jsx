@@ -618,7 +618,7 @@ const initialAddForm = {
   imagePreview: null,
 };
 
-const AddMotorcycleModal = ({ onClose, onSuccess }) => {
+const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
   const [data, setData] = useState(initialAddForm);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef(null);
@@ -644,6 +644,16 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const trimmedId = data.traccarDeviceId?.trim();
+    if (trimmedId) {
+      const isDuplicate = motorcycles.some(
+        (m) => m.traccarDeviceId?.trim() === trimmedId,
+      );
+      if (isDuplicate) {
+        toast.error("This GPS Tracker ID is already in use by another unit.");
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -675,9 +685,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
       onClose();
     } catch (err) {
       toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to add unit",
+        err.response?.data?.message || err.message || "Failed to add unit",
       );
     } finally {
       setSubmitting(false);
@@ -690,9 +698,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-50 px-6 py-4 flex items-center justify-between z-10 rounded-t-2xl">
           <div>
-            <h2 className="font-black text-[#171717] text-lg">
-              Add New Unit
-            </h2>
+            <h2 className="font-black text-[#171717] text-lg">Add New Unit</h2>
           </div>
           <button
             onClick={onClose}
@@ -757,7 +763,20 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
                     onChange={handleChange}
                     className={fieldClsIcon}
                   >
-                    {["Honda", "Yamaha", "Suzuki", "Kawasaki", "Toyota", "Nissan", "Geely", "Mitsubishi", "BYD", "Ford", "Isuzu", "Mazda"].map((b) => (
+                    {[
+                      "Honda",
+                      "Yamaha",
+                      "Suzuki",
+                      "Kawasaki",
+                      "Toyota",
+                      "Nissan",
+                      "Geely",
+                      "Mitsubishi",
+                      "BYD",
+                      "Ford",
+                      "Isuzu",
+                      "Mazda",
+                    ].map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>
@@ -772,7 +791,15 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
                     onChange={handleChange}
                     className={fieldClsIcon}
                   >
-                    {["Scooter", "Big Bike", "Underbone", "Pickup", "Sedan", "MPV", "SUV"].map((c) => (
+                    {[
+                      "Scooter",
+                      "Big Bike",
+                      "Underbone",
+                      "Pickup",
+                      "Sedan",
+                      "MPV",
+                      "SUV",
+                    ].map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -1005,7 +1032,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess }) => {
 };
 
 // ── EDIT MOTORCYCLE MODAL ─────────────────────────────────────────────────────
-const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
+const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => {
   const fileRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -1070,6 +1097,20 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
     if (!motorcycle?.unitId) return toast.error("Unit ID is required.");
     if (!motorcycle?.make || !motorcycle?.model)
       return toast.error("Make and Model are required.");
+
+    const trimmedId = motorcycle.traccarDeviceId?.trim();
+    if (trimmedId) {
+      const isDuplicate = motorcycles.some(
+        (m) =>
+          m.traccarDeviceId?.trim() === trimmedId && m._id !== motorcycle._id, // Ignore the unit currently being edited
+      );
+      if (isDuplicate) {
+        return toast.error(
+          "This GPS Tracker ID is already in use by another unit.",
+        );
+      }
+    }
+
     onSubmit(mapToBackend(motorcycle));
   };
 
@@ -1188,7 +1229,15 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange }) => {
             <SF
               label="Category *"
               name="category"
-              options={["Scooter", "Big Bike", "Underbone", "Pickup", "Sedan", "MPV", "SUV"]}
+              options={[
+                "Scooter",
+                "Big Bike",
+                "Underbone",
+                "Pickup",
+                "Sedan",
+                "MPV",
+                "SUV",
+              ]}
             />
             {/* <SF
               label="Status *"
@@ -1309,9 +1358,7 @@ const EmptyState = ({ onReset }) => (
     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
       <FaMotorcycle className="text-slate-200 text-3xl" />
     </div>
-    <h3 className="font-black text-[#171717] text-lg mb-1">
-      No units found
-    </h3>
+    <h3 className="font-black text-[#171717] text-lg mb-1">No units found</h3>
     <p className="text-slate-400 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
@@ -1948,6 +1995,7 @@ const ManageMotorcycle = () => {
         <AddMotorcycleModal
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchMotorcycles}
+          motorcycles={motorcycles}
         />
       )}
 
@@ -1955,6 +2003,7 @@ const ManageMotorcycle = () => {
       {showEditModal && editingMotorcycle && (
         <EditModal
           motorcycle={editingMotorcycle}
+          motorcycles={motorcycles}
           onClose={() => {
             setShowEditModal(false);
             setEditingMotorcycle(null);

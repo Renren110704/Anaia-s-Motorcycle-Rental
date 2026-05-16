@@ -14,6 +14,9 @@ import {
   requestEmailChangeOTP, 
   verifyEmailChangeOTP, 
   removeProfilePicture,
+  getAllUsers,
+  toggleUserStatus,
+  deleteUser
 } from "../controllers/userController.js";
 import authMiddleware from "../middlewares/auth.js";
 import multer from "multer";
@@ -64,5 +67,9 @@ userRouter.post("/verify-email-change-otp", authMiddleware, verifyEmailChangeOTP
 userRouter.post("/upload-profile-picture", authMiddleware, upload.single("image"), uploadProfilePicture);
 
 userRouter.delete("/remove-profile-picture", authMiddleware, removeProfilePicture);
+
+userRouter.get("/users", getAllUsers); 
+userRouter.patch("/users/:id/status", toggleUserStatus);
+userRouter.delete("/users/:id", deleteUser);
 
 export default userRouter;

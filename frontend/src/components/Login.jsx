@@ -491,8 +491,8 @@ const Login = () => {
 
         // Handle Remember Me logic for storage
         const storage = rememberMe ? localStorage : sessionStorage;
-        if (token) storage.setItem("token", token);
-        if (user) storage.setItem("user", JSON.stringify(user));
+        if (token) localStorage.setItem("token", token);
+        if (user) localStorage.setItem("user", JSON.stringify(user));
 
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", credentials.email);
@@ -526,8 +526,8 @@ const Login = () => {
 
         // Handle Remember Me logic for storage
         const storage = rememberMe ? localStorage : sessionStorage;
-        if (token) storage.setItem("token", token);
-        if (user) storage.setItem("user", JSON.stringify(user));
+        if (token) localStorage.setItem("token", token);
+        if (user) localStorage.setItem("user", JSON.stringify(user));
 
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", unverifiedEmail);

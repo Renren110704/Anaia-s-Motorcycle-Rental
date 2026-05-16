@@ -171,12 +171,19 @@ const normalizeCity = (raw = "") =>
     .trim();
 
 const getDistanceFee = (cityName, destinationStr = "") => {
-  if (!cityName) return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
+  if (!cityName)
+    return { fee: 0, tier: DISTANCE_TIERS[0], km: 0, isEstimate: false };
 
   // Check if the full destination string includes NCR or CALABARZON identifiers
-  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  const isFreeRegion =
+    /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
   if (isFreeRegion) {
-    return { fee: 0, tier: { label: "Free Region (NCR / CALABARZON)" }, km: 0, isEstimate: false };
+    return {
+      fee: 0,
+      tier: { label: "Free Region (NCR / CALABARZON)" },
+      km: 0,
+      isEstimate: false,
+    };
   }
 
   const upper = cityName.toUpperCase().trim();
@@ -232,12 +239,6 @@ const calculateDays = (from, to) => {
     1,
     Math.ceil((new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)),
   );
-};
-const sixMonthsFrom = (dateIso) => {
-  const d = new Date(dateIso || todayISO());
-  d.setHours(0, 0, 0, 0);
-  d.setMonth(d.getMonth() + 6);
-  return d;
 };
 const formatMoney = (n) => `₱${Number(n || 0).toLocaleString("en-PH")}`;
 
@@ -351,7 +352,6 @@ const InlineDatePicker = ({
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger button */}
       <button
         type="button"
         disabled={disabled}
@@ -368,10 +368,8 @@ const InlineDatePicker = ({
         />
       </button>
 
-      {/* Dropdown calendar */}
       {open && (
         <div className="absolute top-[calc(100%+6px)] left-0 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 min-w-[300px] w-full max-w-[340px] animate-in fade-in zoom-in-95 duration-100">
-          {/* Month navigation */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
@@ -392,7 +390,6 @@ const InlineDatePicker = ({
             </button>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 gap-1 mb-1">
             {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
               <div
@@ -404,7 +401,6 @@ const InlineDatePicker = ({
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7 gap-1">
             {monthGrid.map((date) => {
               const inMonth = date.getMonth() === viewMonth.getMonth();
@@ -530,7 +526,6 @@ const InlineDatePicker = ({
             })}
           </div>
 
-          {/* Legend */}
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap gap-x-3 gap-y-1.5">
             {[
               { dot: "#7c3aed", label: "Maintenance" },
@@ -559,7 +554,7 @@ const InlineDatePicker = ({
   );
 };
 
-// ── PH Address Hook (unchanged logic) ────────────────────────────────────────
+// ── PH Address Hook ────────────────────────────────────────
 const usePHAddress = () => {
   const [regions, setRegions] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -915,6 +910,7 @@ const WalkInRentals = () => {
   const [loadingMoto, setLoadingMoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [motorcycle, setMotorcycle] = useState(null);
+  const [loadingCustomerInfo, setLoadingCustomerInfo] = useState(false);
 
   const [calBookings, setCalBookings] = useState([]);
   const [maintenanceRanges, setMaintenanceRanges] = useState([]);
@@ -949,6 +945,7 @@ const WalkInRentals = () => {
   }, [fetchRegions]);
 
   const [formData, setFormData] = useState({
+    userId: null,
     customerName: "",
     renterEmail: "",
     phone: "",
@@ -1126,6 +1123,131 @@ const WalkInRentals = () => {
     setFormData((p) => ({ ...p, returnDate: dateISO }));
   };
 
+  const handleLoadCustomerInfo = async () => {
+    const email = formData.renterEmail.trim();
+    if (!email) {
+      toast.error("Please enter an email address first.");
+      return;
+    }
+    setLoadingCustomerInfo(true);
+    try {
+      const res = await api.get("/api/auth/users");
+      const users = Array.isArray(res.data)
+        ? res.data
+        : res.data?.users || res.data?.data || [];
+      const user = users.find(
+        (u) => u.email.toLowerCase() === email.toLowerCase(),
+      );
+
+      if (!user) {
+        toast.error("No customer found with this email.");
+        return;
+      }
+
+      setFormData((p) => ({
+        ...p,
+        userId: user._id || user.id,
+        customerName:
+          [user.firstName, user.middleName, user.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || p.customerName,
+        phone: user.phone || p.phone,
+      }));
+
+      if (user.address && user.address.region) {
+        let rCode = "",
+          pCode = "",
+          cCode = "",
+          bCode = "";
+        let rName = user.address.region,
+          pName = user.address.province || user.address.state || "",
+          cName = user.address.city,
+          bName = user.address.barangay;
+
+        const rMatch = regions.find(
+          (r) => r.name.toLowerCase() === rName.toLowerCase(),
+        );
+        if (rMatch) {
+          rCode = rMatch.code;
+          rName = rMatch.name;
+          fetchProvinces(rCode);
+
+          const pRes = await axios
+            .get(`${PH_API}/regions/${rCode}/provinces/`)
+            .catch(() => null);
+          const provs = pRes?.data || [];
+          if (provs.length > 0 && pName) {
+            const pMatch = provs.find(
+              (p) => p.name.toLowerCase() === pName.toLowerCase(),
+            );
+            if (pMatch) {
+              pCode = pMatch.code;
+              pName = pMatch.name;
+              fetchCities(pCode);
+            }
+          } else if (!provs.length) {
+            fetchCities(rCode);
+          }
+
+          let cRes;
+          if (pCode)
+            cRes = await axios
+              .get(`${PH_API}/provinces/${pCode}/cities-municipalities/`)
+              .catch(() => null);
+          else
+            cRes = await axios
+              .get(`${PH_API}/regions/${rCode}/cities-municipalities/`)
+              .catch(() => null);
+
+          if (cRes?.data && cName) {
+            const cMatch = cRes.data.find(
+              (c) => c.name.toLowerCase() === cName.toLowerCase(),
+            );
+            if (cMatch) {
+              cCode = cMatch.code;
+              cName = cMatch.name;
+              fetchBarangays(cCode);
+            }
+          }
+
+          if (cCode && bName) {
+            const bRes = await axios
+              .get(`${PH_API}/cities-municipalities/${cCode}/barangays/`)
+              .catch(() => null);
+            if (bRes?.data) {
+              const bMatch = bRes.data.find(
+                (b) => b.name.toLowerCase() === bName.toLowerCase(),
+              );
+              if (bMatch) {
+                bCode = bMatch.code;
+                bName = bMatch.name;
+              }
+            }
+          }
+        }
+
+        setAddress({
+          regionCode: rCode,
+          regionName: rName,
+          provinceCode: pCode,
+          provinceName: pName,
+          cityCode: cCode,
+          cityName: cName,
+          barangayCode: bCode,
+          barangayName: bName,
+          zipCode: user.address.zipCode || address.zipCode,
+        });
+      }
+
+      toast.success("Customer information loaded successfully.");
+    } catch (err) {
+      toast.error("Failed to load customer information.");
+    } finally {
+      setLoadingCustomerInfo(false);
+    }
+  };
+
   // Pricing & Discounts logic
   const price = Number(motorcycle?.dailyRate || 0);
   const days = calculateDays(formData.pickupDate, formData.returnDate);
@@ -1147,7 +1269,9 @@ const WalkInRentals = () => {
       ? (baseRental * applicableDiscount.discountValue) / 100
       : Math.min(applicableDiscount.discountValue, baseRental)
     : 0;
-  const discountedBaseRental = Math.max(0, baseRental - discountAmount);
+  const discountedBaseRental = Math.round(
+    Math.max(0, baseRental - discountAmount),
+  );
 
   const totalAmount = discountedBaseRental + distanceFee + helmetFee;
   const DOWNPAYMENT = 200;
@@ -1242,8 +1366,6 @@ const WalkInRentals = () => {
         return;
       }
 
-      // The unit will load, and the calendar booking logic will prevent
-      // overlapping dates based on active rentals and maintenance schedules.
       setMotorcycle(m);
       toast.success(`Loaded ${m.make || ""} ${m.model || ""}`.trim());
     } catch (err) {
@@ -1355,13 +1477,8 @@ const WalkInRentals = () => {
     }
     const pickup = new Date(formData.pickupDate);
     const ret = new Date(formData.returnDate);
-    const maxReturn = sixMonthsFrom(formData.pickupDate);
     if (ret <= pickup) {
       toast.error("Minimum rental duration is 24 hours.");
-      return;
-    }
-    if (ret > maxReturn) {
-      toast.error("Return date must be within 6 months from pickup date.");
       return;
     }
 
@@ -1400,6 +1517,8 @@ const WalkInRentals = () => {
     setSubmitting(true);
     try {
       await api.post("/api/motorcycle-bookings/walk-in", {
+        userId: formData.userId || undefined,
+        user: formData.userId || undefined,
         customer: formData.customerName.trim(),
         email: renterEmail,
         phone,
@@ -1426,6 +1545,10 @@ const WalkInRentals = () => {
         reservationPaymentMethod: formData.paymentMethod,
         fullPaymentMethod: formData.paymentMethod,
         amount: totalAmount,
+
+        status: "pending_reservation",
+        paymentStatus: "pending_verification",
+
         details: {
           pickupLocation:
             "Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite",
@@ -1457,7 +1580,6 @@ const WalkInRentals = () => {
         },
       });
 
-      // Increment discount usage if applicable
       if (applicableDiscount?._id) {
         api
           .patch(`/api/discounts/${applicableDiscount._id}/increment-usage`)
@@ -1467,6 +1589,7 @@ const WalkInRentals = () => {
       toast.success("Walk-in booking created successfully.");
       setFormData((p) => ({
         ...p,
+        userId: null,
         customerName: "",
         renterEmail: "",
         phone: "",
@@ -1714,20 +1837,33 @@ const WalkInRentals = () => {
                       className={fieldClsIcon}
                     />
                   </IconField>
+
                   <IconField icon={FaEnvelope} label="Email Address *">
-                    <input
-                      type="email"
-                      value={formData.renterEmail}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          renterEmail: e.target.value,
-                        }))
-                      }
-                      placeholder="email@example.com"
-                      className={fieldClsIcon}
-                    />
+                    <div className="flex w-full">
+                      <input
+                        type="email"
+                        value={formData.renterEmail}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            renterEmail: e.target.value,
+                            userId: null,
+                          }))
+                        }
+                        placeholder="email@example.com"
+                        className={`${fieldClsIcon} rounded-r-none`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleLoadCustomerInfo}
+                        disabled={loadingCustomerInfo || !formData.renterEmail}
+                        className="px-4 py-2.5 bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl font-bold text-sm text-slate-600 hover:bg-slate-200 disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {loadingCustomerInfo ? "Loading..." : "Load Info"}
+                      </button>
+                    </div>
                   </IconField>
+
                   <IconField icon={FaPhone} label="Phone Number *">
                     <input
                       type="text"
@@ -2182,7 +2318,7 @@ const WalkInRentals = () => {
                         <span className="text-[11px] text-slate-400">
                           {label}
                         </span>
-                        <span className="text-[11px] font-bold text-[#171717] text-right max-w-[55%]">
+                        <span className="text-[11px] font-bold text-[#171717] text-right max-w-[55%]\">
                           {value}
                         </span>
                       </div>

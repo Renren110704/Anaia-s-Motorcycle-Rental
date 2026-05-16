@@ -16,6 +16,8 @@ import DiscountManagement from "./components/DiscountManagement";
 import MaintenancePage from "./components/MaintenancePage";
 import CalendarView from "./components/CalendarView";
 import AdminContact from "./components/AdminContact";
+import UserManagement from "./components/UserManagement";
+import QRChanger from "./components/QRChanger";
 import {
   ADMIN_AUTH_STORAGE_KEY,
   ADMIN_DEFAULT_EMAIL,
@@ -209,6 +211,23 @@ const App = () => {
                 <AdminContact />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/qr-changer"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <QRChanger />
+              </ProtectedRoute>
+            }
+            
           />
           <Route
             path="*"

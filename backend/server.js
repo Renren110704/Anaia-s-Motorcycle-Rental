@@ -15,6 +15,7 @@ import reviewRouter from "./routes/reviewRoutes.js";
 import discountRoutes from "./routes/discountRoutes.js";
 import { startMaintenanceScheduler } from "./utils/maintenanceScheduler.js";
 import contactMessageRouter from "./routes/contactMessageRoutes.js";
+import settingsRouter from "./routes/settingsRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -163,6 +164,7 @@ app.use("/api/tracking", trackingRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/discounts", discountRoutes);
 app.use("/api/contact-messages", contactMessageRouter);
+app.use("/api/settings", settingsRouter);
 
 app.get("/api/ping", (req, res) =>
   res.json({

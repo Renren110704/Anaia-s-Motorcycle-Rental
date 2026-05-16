@@ -8,7 +8,7 @@ const addressSchema = new mongoose.Schema(
     region: { type: String, default: "" },
     zipCode: { type: String, default: "" },
   },
-  { _id: false, default: {} }
+  { _id: false, default: {} },
 );
 
 const userSchema = new mongoose.Schema(
@@ -30,6 +30,9 @@ const userSchema = new mongoose.Schema(
 
     isVerified: { type: Boolean, default: false },
 
+    // Add this inside your userSchema definition (e.g., right under isVerified)
+    isActive: { type: Boolean, default: true },
+
     profilePicture: { type: String, default: "" },
 
     // OTP fields
@@ -43,12 +46,14 @@ const userSchema = new mongoose.Schema(
     emailChangeOTPExpires: { type: Date, default: null },
     pendingEmail: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Virtual: full name (for backwards-compat with existing code that reads user.name)
 userSchema.virtual("name").get(function () {
-  const parts = [this.firstName, this.middleName, this.lastName].filter(Boolean);
+  const parts = [this.firstName, this.middleName, this.lastName].filter(
+    Boolean,
+  );
   return parts.join(" ");
 });
 

@@ -925,6 +925,8 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
 
   try {
     let {
+      user,
+      userId,
       customer,
       phone,
       motorcycle,
@@ -988,10 +990,17 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
     const today = startOfLocalDay(new Date());
     const maxReturn = addMonths(pickupDay, 6);
 
-    if (pickupDay.getTime() !== today.getTime()) {
+    // if (pickupDay.getTime() !== today.getTime()) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Walk-in pickup date must be today",
+    //   });
+    // }
+
+    if (pickupDay.getTime() < today.getTime()) {
       return res.status(400).json({
         success: false,
-        message: "Walk-in pickup date must be today",
+        message: "Walk-in pickup date cannot be in the past",
       });
     }
 
@@ -1002,12 +1011,12 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
       });
     }
 
-    if (returnDay > maxReturn) {
-      return res.status(400).json({
-        success: false,
-        message: "Return date must be within 6 months from pickup date",
-      });
-    }
+    // if (returnDay > maxReturn) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Return date must be within 6 months from pickup date",
+    //   });
+    // }
 
     if (
       !hasMinimumRentalDuration(pickupDate, pickupTime, returnDate, returnTime)
@@ -1073,7 +1082,7 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
     }
 
     const bookingData = {
-      userId: null,
+      userId: user || userId || null,
       customer: String(customer).trim(),
       email: emailStr,
       phone: phoneStr,
@@ -1085,6 +1094,7 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
       returnTime,
       destination: String(destination).trim(),
       amount: Number(amount || 0),
+
       reservationFee: 0,
       reservationFeePaid: true,
       reservationPaymentMethod: selectedPaymentMethod,
@@ -1092,8 +1102,9 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
       fullPaymentMethod: selectedPaymentMethod,
       details: tryParseJSON(details),
       address: tryParseJSON(address),
-      paymentStatus: "fully_paid",
-      status: "active",
+      paymentStatus: req.body.paymentStatus || "pending_verification",
+      status: req.body.status || "pending_reservation",
+
       paymentProofImage: "",
       paymentReferenceId: "",
       paymentSentAt: null,
@@ -1102,7 +1113,7 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
       adminReviewComment: "Walk-in rental",
       adminReviewedAt: new Date(),
       reservationConfirmedAt: new Date(),
-      fullPaymentConfirmedAt: new Date(),
+      fullPaymentConfirmedAt: null,
       receiptVerification: {
         status: "verified",
         score: 1,
@@ -1134,7 +1145,9 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
           {
             $push: { bookings: bookingEntry },
             $unset: { checkoutLock: "" },
-            $set: { status: "rented" },
+            $set: {
+              status: req.body.status === "active" ? "rented" : "pending",
+            },
           },
           { session, new: true },
         );
@@ -1282,6 +1295,7 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
         returnInspection: 1,
         details: 1,
         address: 1,
+        extensions: 1,
         isDeleted: 1,
         deletedAt: 1,
         createdAt: 1,
@@ -1504,10 +1518,25 @@ export const extendMotorcycleBooking = async (req, res, next) => {
     const distanceFee = Number(booking.details?.distanceFee || 0);
     const helmetFee = Number(booking.details?.helmetFee || 0);
     const previousAmount = Number(booking.amount || 0);
-    const newAmount =
+
+    // Calculate base new amount
+    let newAmount =
       dailyRate > 0
         ? dailyRate * days + distanceFee + helmetFee
         : previousAmount;
+
+    // Apply existing discount if present
+    const appliedDiscount = booking.details?.appliedDiscount;
+    if (dailyRate > 0 && appliedDiscount) {
+      const baseRental = dailyRate * days;
+      const discountAmount =
+        appliedDiscount.discountType === "percentage"
+          ? (baseRental * appliedDiscount.discountValue) / 100
+          : Math.min(appliedDiscount.discountValue, baseRental);
+
+      newAmount = Math.max(0, newAmount - discountAmount);
+    }
+
     const additionalAmount = Math.max(0, newAmount - previousAmount);
 
     const previousReturnDate = booking.returnDate;

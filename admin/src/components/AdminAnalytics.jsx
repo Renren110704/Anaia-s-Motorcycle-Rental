@@ -30,7 +30,7 @@ const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
 const PAGE_LIMIT = 1000;
 
-const formatMoney = (n) => `₱${Number(n || 0).toLocaleString()}`;
+const formatMoney = (n) => `₱${Math.round(Number(n || 0)).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 const monthKey = (dateLike) => {
   const d = new Date(dateLike);

@@ -106,6 +106,7 @@ const normalizeDetails = (d = {}, motorcycle = {}) => ({
   helmetRequested: !!d.helmetRequested,
   helmetFee: d.helmetFee != null ? Number(d.helmetFee) : null,
   destinationCity: d.destinationCity ?? "",
+  appliedDiscount: d.appliedDiscount || null,
 });
 
 const extractMotorcycleInfo = (b) => {
@@ -877,15 +878,15 @@ const DetailDrawer = ({
                 Total Amount
               </p>
               <p className="text-3xl font-black text-white">
-                ₱{(booking.amount || 0).toLocaleString()}
+                {/* Wrap in Math.round() below */}₱
+                {Math.round(booking.amount || 0).toLocaleString()}
               </p>
               <p className="text-[11px] text-slate-500 mt-1">
                 Due at pickup:{" "}
                 <span className="text-white font-bold">
-                  ₱
-                  {Math.max(
-                    0,
-                    (booking.amount || 0) - reservationFee,
+                  ₱{/* Wrap in Math.round() below */}
+                  {Math.round(
+                    Math.max(0, (booking.amount || 0) - reservationFee),
                   ).toLocaleString()}
                 </span>
               </p>
@@ -895,17 +896,41 @@ const DetailDrawer = ({
           {/* Fee Breakdown */}
           <Section title="Fee Breakdown">
             <div className="space-y-2.5 text-sm">
+              {/* Base Rental */}
               {dailyRate > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">
-                    Rate/day (₱{dailyRate.toLocaleString()} × {days}{" "}
-                    {days === 1 ? "day" : "days"})
+                    Rate/day (₱{Math.round(dailyRate).toLocaleString("en-US")} ×{" "}
+                    {days}d)
                   </span>
                   <span className="font-bold text-[#171717]">
-                    ₱{baseRental.toLocaleString()}
+                    ₱{Math.round(baseRental).toLocaleString("en-US")}
                   </span>
                 </div>
               )}
+
+              {/* Applied Discount */}
+              {details.appliedDiscount && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">
+                    Promo ({details.appliedDiscount.code || "Discount"})
+                  </span>
+                  <span className="font-bold text-emerald-600">
+                    -₱
+                    {Math.round(
+                      details.appliedDiscount.discountType === "percentage"
+                        ? (baseRental * details.appliedDiscount.discountValue) /
+                            100
+                        : Math.min(
+                            details.appliedDiscount.discountValue,
+                            baseRental,
+                          ),
+                    ).toLocaleString("en-US")}
+                  </span>
+                </div>
+              )}
+
+              {/* Distance Fee */}
               {distanceFee > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 flex items-center gap-1.5">
@@ -918,10 +943,12 @@ const DetailDrawer = ({
                     )}
                   </span>
                   <span className="font-bold text-orange-500">
-                    +₱{distanceFee.toLocaleString()}
+                    +₱{Math.round(distanceFee).toLocaleString("en-US")}
                   </span>
                 </div>
               )}
+
+              {/* Helmet Fee */}
               {(helmetRequested || helmetFee > 0) && (
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 flex items-center gap-1.5">
@@ -929,14 +956,74 @@ const DetailDrawer = ({
                     Helmet
                   </span>
                   <span className="font-bold text-[#b50002]">
-                    +₱{helmetFee.toLocaleString()}
+                    +₱{Math.round(helmetFee).toLocaleString("en-US")}
                   </span>
                 </div>
               )}
+
+              {/* Extension Fee */}
+              {((booking.extensionFee || details.extensionFee) > 0 ||
+                booking.extensions?.length > 0) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Extension Fee</span>
+                  <span className="font-bold text-orange-500">
+                    +₱
+                    {Math.round(
+                      booking.extensionFee ||
+                        details.extensionFee ||
+                        (booking.extensions || []).reduce(
+                          (sum, ext) =>
+                            sum +
+                            (ext.additionalAmount || ext.extensionFee || 0),
+                          0,
+                        ),
+                    ).toLocaleString("en-US")}
+                  </span>
+                </div>
+              )}
+
+              {/* Reschedule Fee */}
+              {((booking.rescheduleFee || details.rescheduleFee) > 0 ||
+                booking.reschedules?.length > 0) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Reschedule Fee</span>
+                  <span className="font-bold text-orange-500">
+                    +₱
+                    {Math.round(
+                      booking.rescheduleFee ||
+                        details.rescheduleFee ||
+                        (booking.reschedules || []).reduce(
+                          (sum, res) =>
+                            sum +
+                            (res.rescheduleFee || res.additionalAmount || 0),
+                          0,
+                        ),
+                    ).toLocaleString("en-US")}
+                  </span>
+                </div>
+              )}
+
+              {/* Penalty */}
+              {booking.returnInspection?.clearanceStatus ===
+                "penalty_required" &&
+                booking.returnInspection?.penaltyAmount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Penalty</span>
+                    <span
+                      className={`font-bold ${booking.returnInspection?.penaltySettled ? "text-emerald-600" : "text-[#b50002]"}`}
+                    >
+                      +₱
+                      {Math.round(
+                        booking.returnInspection.penaltyAmount,
+                      ).toLocaleString("en-US")}
+                    </span>
+                  </div>
+                )}
+
               <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                 <span className="font-bold text-[#171717]">Total</span>
                 <span className="font-black text-[#171717]">
-                  ₱{(booking.amount || 0).toLocaleString()}
+                  ₱{Math.round(booking.amount || 0).toLocaleString("en-US")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -945,24 +1032,23 @@ const DetailDrawer = ({
                   Downpayment (paid)
                 </span>
                 <span className="font-bold text-emerald-600">
-                  −₱{reservationFee.toLocaleString()}
+                  −₱{Math.round(reservationFee).toLocaleString("en-US")}
                 </span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                 <span className="font-bold text-[#171717]">Due at Pickup</span>
                 <span className="font-black text-[#b50002]">
                   ₱
-                  {Math.max(
-                    0,
-                    (booking.amount || 0) - reservationFee,
-                  ).toLocaleString()}
+                  {Math.round(
+                    Math.max(0, (booking.amount || 0) - reservationFee),
+                  ).toLocaleString("en-US")}
                 </span>
               </div>
             </div>
           </Section>
 
           {/* Extension */}
-          {latestExtension && (
+          {/* {latestExtension && (
             <Section title="Extension Details">
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between">
@@ -1002,7 +1088,7 @@ const DetailDrawer = ({
                 </div>
               </div>
             </Section>
-          )}
+          )} */}
 
           {/* Motorcycle */}
           <Section title="Unit Details">
@@ -1311,7 +1397,8 @@ const BookingTable = ({
                 {/* Amount */}
                 <td className="px-5 py-3.5">
                   <span className="font-black text-[13px] text-[#171717]">
-                    ₱{(booking.amount || 0).toLocaleString()}
+                    {/* Wrap in Math.round() below */}₱
+                    {Math.round(booking.amount || 0).toLocaleString()}
                   </span>
                 </td>
 

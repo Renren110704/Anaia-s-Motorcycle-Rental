@@ -1359,6 +1359,7 @@ const BookingRow = ({
   onDownloadAgreement,
   calBookings = [],
   maintenanceRanges = [],
+  discounts = [],
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [reuploadRef, setReuploadRef] = useState(
@@ -1560,31 +1561,82 @@ const BookingRow = ({
       ? ALL_TIME_SLOTS.filter((s) => s.value > rescheduleForm.pickupTime)
       : ALL_TIME_SLOTS;
 
+  // 1. EXTRACT AND VALIDATE THE DISCOUNT
+  const appliedDiscountSnapshot = booking.raw?.details?.appliedDiscount || null;
+  let appliedDiscount = null;
+
+  if (appliedDiscountSnapshot) {
+    // Check against live discounts to ensure it's still active
+    const liveDiscount = discounts.find(
+      (d) => String(d._id || d.id) === String(appliedDiscountSnapshot.id),
+    );
+
+    if (liveDiscount) {
+      const now = new Date();
+      const isActive = liveDiscount.isActive !== false;
+      const isStarted =
+        !liveDiscount.startDate || new Date(liveDiscount.startDate) <= now;
+      const isNotExpired =
+        !liveDiscount.endDate || new Date(liveDiscount.endDate) >= now;
+
+      // Only use the discount if it hasn't been set to inactive or expired
+      if (isActive && isStarted && isNotExpired) {
+        appliedDiscount = appliedDiscountSnapshot;
+      }
+    }
+  }
+
+  // 2. RESCHEDULE LOGIC
   const rescheduledDays = Math.max(
     1,
     daysBetween(rescheduleForm.pickupDate, rescheduleForm.returnDate),
   );
+
+  const rescheduledBaseRental = dailyRate * rescheduledDays;
+  const rescheduledDiscountAmount = appliedDiscount
+    ? appliedDiscount.discountType === "percentage"
+      ? (rescheduledBaseRental * appliedDiscount.discountValue) / 100
+      : Math.min(appliedDiscount.discountValue, rescheduledBaseRental)
+    : 0;
+
+  const discountedRescheduledBase = Math.round(
+    Math.max(0, rescheduledBaseRental - rescheduledDiscountAmount),
+  );
+
   const rescheduledGrossTotal =
     dailyRate > 0
-      ? dailyRate * rescheduledDays + booking.distanceFee + booking.helmetFee
+      ? discountedRescheduledBase + booking.distanceFee + booking.helmetFee
       : grossTotal;
+
   const rescheduledDueAtPickup = Math.max(
     0,
     rescheduledGrossTotal - downpayment,
   );
 
+  // 3. EXTENSION LOGIC
   const extensionDays = daysBetweenWithTime(
     originalPickupDateInput,
     booking.times.pickup || "08:00",
     extensionForm.returnDate,
     extensionForm.returnTime,
   );
+
+  const extensionBaseRental = dailyRate * Math.max(extensionDays, 1);
+  const extensionDiscountAmount = appliedDiscount
+    ? appliedDiscount.discountType === "percentage"
+      ? (extensionBaseRental * appliedDiscount.discountValue) / 100
+      : Math.min(appliedDiscount.discountValue, extensionBaseRental)
+    : 0;
+
+  const discountedExtensionBase = Math.round(
+    Math.max(0, extensionBaseRental - extensionDiscountAmount),
+  );
+
   const extensionGrossTotal =
     dailyRate > 0
-      ? dailyRate * Math.max(extensionDays, 1) +
-        booking.distanceFee +
-        booking.helmetFee
+      ? discountedExtensionBase + booking.distanceFee + booking.helmetFee
       : grossTotal;
+
   const extensionAdditionalAmount = Math.max(
     0,
     extensionGrossTotal - grossTotal,
@@ -2019,7 +2071,10 @@ const BookingRow = ({
                 letterSpacing: "-0.5px",
               }}
             >
-              {formatPrice(dueAtPickup)}
+              {/* Show grossTotal if active, otherwise show dueAtPickup */}
+              {booking.status === "active"
+                ? formatPrice(grossTotal)
+                : formatPrice(dueAtPickup)}
             </div>
             <div
               style={{
@@ -2029,7 +2084,10 @@ const BookingRow = ({
                 marginTop: 1,
               }}
             >
-              due at pickup
+              {/* Change the label if active */}
+              {["active", "inspection", "completed"].includes(booking.status)
+                ? "total price"
+                : "due at pickup"}
             </div>
           </div>
 
@@ -2377,6 +2435,8 @@ const BookingRow = ({
                     Fee Breakdown
                   </span>
                 </div>
+
+                {/* Base Rental */}
                 {dailyRate > 0 && (
                   <div
                     style={{
@@ -2406,6 +2466,49 @@ const BookingRow = ({
                     </span>
                   </div>
                 )}
+
+                {/* Applied Discount */}
+                {appliedDiscountSnapshot && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Promo ({appliedDiscountSnapshot.code || "Discount"})
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#16a34a",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      -
+                      {formatPrice(
+                        appliedDiscountSnapshot.discountType === "percentage"
+                          ? (baseRental *
+                              appliedDiscountSnapshot.discountValue) /
+                              100
+                          : Math.min(
+                              appliedDiscountSnapshot.discountValue,
+                              baseRental,
+                            ),
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Distance Fee */}
                 {booking.distanceFee > 0 && (
                   <div
                     style={{
@@ -2435,6 +2538,8 @@ const BookingRow = ({
                     </span>
                   </div>
                 )}
+
+                {/* Helmet Fee */}
                 {booking.helmetRequested && booking.helmetFee > 0 && (
                   <div
                     style={{
@@ -2464,6 +2569,94 @@ const BookingRow = ({
                     </span>
                   </div>
                 )}
+
+                {/* Extension Fee */}
+                {((booking.raw?.extensionFee ||
+                  booking.raw?.details?.extensionFee) > 0 ||
+                  booking.raw?.extensions?.length > 0) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Extension Fee
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#ea580c",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      +
+                      {formatPrice(
+                        booking.raw?.extensionFee ||
+                          booking.raw?.details?.extensionFee ||
+                          (booking.raw?.extensions || []).reduce(
+                            (sum, ext) =>
+                              sum +
+                              (ext.additionalAmount || ext.extensionFee || 0),
+                            0,
+                          ),
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Reschedule Fee */}
+                {((booking.raw?.rescheduleFee ||
+                  booking.raw?.details?.rescheduleFee) > 0 ||
+                  booking.raw?.reschedules?.length > 0) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(14,14,14,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Reschedule Fee
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#ea580c",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      +
+                      {formatPrice(
+                        booking.raw?.rescheduleFee ||
+                          booking.raw?.details?.rescheduleFee ||
+                          (booking.raw?.reschedules || []).reduce(
+                            (sum, res) =>
+                              sum +
+                              (res.rescheduleFee || res.additionalAmount || 0),
+                            0,
+                          ),
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Penalty */}
                 {booking.raw?.returnInspection?.clearanceStatus ===
                   "penalty_required" &&
                   booking.raw?.returnInspection?.penaltyAmount > 0 && (
@@ -2500,6 +2693,8 @@ const BookingRow = ({
                       </span>
                     </div>
                   )}
+
+                {/* Totals */}
                 <div
                   style={{
                     borderTop: "1.5px solid rgba(0,0,0,0.06)",
@@ -2562,42 +2757,46 @@ const BookingRow = ({
                       −{formatPrice(downpayment)}
                     </span>
                   </div>
-                  <div
-                    style={{
-                      borderTop: "1.5px solid rgba(0,0,0,0.06)",
-                      paddingTop: 10,
-                    }}
-                  >
+                  {!["active", "inspection", "completed"].includes(
+                    booking.status,
+                  ) && (
                     <div
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        borderTop: "1.5px solid rgba(0,0,0,0.06)",
+                        paddingTop: 10,
                       }}
                     >
-                      <span
+                      <div
                         style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "#0E0E0E",
-                          fontFamily: "'Space Grotesk', sans-serif",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
-                        Due at Pickup
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 17,
-                          fontWeight: 800,
-                          color: accentColor,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          letterSpacing: "-0.5px",
-                        }}
-                      >
-                        {formatPrice(dueAtPickup)}
-                      </span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Due at Pickup
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 17,
+                            fontWeight: 800,
+                            color: accentColor,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            letterSpacing: "-0.5px",
+                          }}
+                        >
+                          {formatPrice(dueAtPickup)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -3300,7 +3499,12 @@ const BookingRow = ({
                       {[
                         [
                           `₱${dailyRate.toLocaleString()} × ${rescheduledDays}d`,
-                          formatPrice(dailyRate * rescheduledDays),
+                          formatPrice(rescheduledBaseRental),
+                        ],
+                        // ADD THE DISCOUNT ROW HERE 👇
+                        appliedDiscount && [
+                          `Promo (${appliedDiscount.code || "Discount"})`,
+                          `-${formatPrice(Math.round(rescheduledDiscountAmount))}`,
                         ],
                         booking.distanceFee > 0 && [
                           "Distance Fee",
@@ -3313,6 +3517,7 @@ const BookingRow = ({
                       ]
                         .filter(Boolean)
                         .map(([lbl, val]) => (
+                          // ... rest of the map function stays the same
                           <div
                             key={lbl}
                             style={{
@@ -3587,9 +3792,41 @@ const BookingRow = ({
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
                         >
-                          {formatPrice(dailyRate * Math.max(extensionDays, 1))}
+                          {formatPrice(extensionBaseRental)}
                         </span>
                       </div>
+
+                      {/* ADD THE DISCOUNT ROW HERE 👇 */}
+                      {appliedDiscount && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginBottom: 6,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "rgba(14,14,14,0.45)",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Promo ({appliedDiscount.code || "Discount"})
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#16a34a",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            -{formatPrice(Math.round(extensionDiscountAmount))}
+                          </span>
+                        </div>
+                      )}
+
                       <div
                         style={{
                           borderTop: "1.5px solid rgba(0,0,0,0.06)",
@@ -3930,12 +4167,13 @@ const MyBookings = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [calBookings, setCalBookings] = useState([]);
   const [maintenanceRanges, setMaintenanceRanges] = useState([]);
+  const [discounts, setDiscounts] = useState([]);
 
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
-        const [bookingsRes, motoRes] = await Promise.allSettled([
+        const [bookingsRes, motoRes, discountsRes] = await Promise.allSettled([
           axios.get(`${API_BASE}/api/motorcycle-bookings`, {
             signal: controller.signal,
             params: { limit: 1000 },
@@ -3943,6 +4181,9 @@ const MyBookings = () => {
           axios.get(`${API_BASE}/api/motorcycles`, {
             signal: controller.signal,
             params: { limit: 1000, includeDeleted: "false" },
+          }),
+          axios.get(`${API_BASE}/api/discounts`, {
+            signal: controller.signal,
           }),
         ]);
         if (bookingsRes.status === "fulfilled") {
@@ -3997,6 +4238,16 @@ const MyBookings = () => {
             })
             .filter(Boolean);
           setMaintenanceRanges([...autoMaint, ...stored]);
+        }
+        if (discountsRes.status === "fulfilled") {
+          const payload = discountsRes.value.data;
+          setDiscounts(
+            Array.isArray(payload)
+              ? payload
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : payload?.discounts || [],
+          );
         }
       } catch {}
     })();
@@ -4692,6 +4943,7 @@ const MyBookings = () => {
                     onDownloadAgreement={downloadRentalAgreement}
                     calBookings={calBookings}
                     maintenanceRanges={maintenanceRanges}
+                    discounts={discounts}
                   />
                 </div>
               ))}

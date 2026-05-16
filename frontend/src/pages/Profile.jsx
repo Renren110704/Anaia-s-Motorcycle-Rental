@@ -1696,8 +1696,6 @@ const Profile = () => {
       )}
 
       <Footer />
-
-      <Footer />
       <ToastContainer
         position="top-right"
         autoClose={3000}

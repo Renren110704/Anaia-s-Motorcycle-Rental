@@ -16,6 +16,8 @@ import {
   LogOut,
   TagIcon,
   Wrench,
+  User,
+  QrCode,
 } from "lucide-react";
 import { FaMotorcycle } from "react-icons/fa";
 import axios from "axios";
@@ -50,6 +52,8 @@ const navLinks = [
   { path: "/discounts", icon: TagIcon, label: "Discounts" },
   { path: "/maintenance", icon: Wrench, label: "Maintenance" },
   { path: "/contact", icon: MessageSquare, label: "Contact" },
+  { path: "/users", icon: User, label: "Users" },
+  { path: "/qr-changer", icon: QrCode, label: "QR Changer" },
 ];
 
 const PendingBadge = ({ count, floating }) =>

@@ -887,3 +887,64 @@ export async function removeProfilePicture(req, res) {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 }
+
+// ── Get All Users (For Admin/Management) ──────────────────────────────────────
+export async function getAllUsers(req, res) {
+  try {
+    // .select("-password") ensures we don't send hashed passwords to the frontend
+    const users = await User.find({}).select("-password").sort({ createdAt: -1 });
+    
+    return res.status(200).json({ 
+      success: true, 
+      users: users 
+    });
+  } catch (err) {
+    console.error("Get all users error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}
+
+// ── Toggle User Status ────────────────────────────────────────────────────────
+export async function toggleUserStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.isActive = isActive;
+    await user.save();
+
+    return res.status(200).json({ 
+      success: true, 
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      user: safeUser(user) 
+    });
+  } catch (err) {
+    console.error("Toggle status error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}
+
+// ── Delete User ───────────────────────────────────────────────────────────────
+export async function deleteUser(req, res) {
+  try {
+    const { id } = req.params;
+    
+    const deletedUser = await User.findByIdAndDelete(id);
+    if (!deletedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "User deleted successfully" 
+    });
+  } catch (err) {
+    console.error("Delete user error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}

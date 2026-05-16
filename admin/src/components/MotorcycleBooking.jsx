@@ -640,9 +640,9 @@ const DetailDrawer = ({
   const [isEditing, setIsEditing] = useState(false);
   const [newStatus, setNewStatus] = useState(booking.status);
   const details = booking.details || {};
-  const latestExtension = Array.isArray(booking.extensions)
-    ? booking.extensions[booking.extensions.length - 1]
-    : null;
+  // const latestExtension = Array.isArray(booking.extensions)
+  //   ? booking.extensions[booking.extensions.length - 1]
+  //   : null;
   // const originalReturnDate = latestExtension?.previousReturnDate || null;
   // const originalReturnTime = latestExtension?.previousReturnTime || "";
   const isEditLocked = ["completed", "cancelled", "inspection"].includes(

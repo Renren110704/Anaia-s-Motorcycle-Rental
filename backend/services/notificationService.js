@@ -74,23 +74,23 @@ export async function notifyAllUsers(payload) {
 
 const STATUS_MESSAGES = {
   pending_reservation: {
-    title: "Booking Received 🎉",
+    title: "Booking Received",
     body: "Your reservation request has been submitted. We'll confirm it shortly.",
   },
   pending_full_payment: {
-    title: "Awaiting Full Payment 💳",
+    title: "Awaiting Full Payment",
     body: "Your booking is confirmed! Please complete the full payment to proceed.",
   },
   active: {
-    title: "Rental Started 🏍️",
+    title: "Rental Started",
     body: "Your rental is now active. Enjoy the ride and ride safe!",
   },
   inspection: {
-    title: "Vehicle Under Inspection 🔍",
+    title: "Vehicle Under Inspection",
     body: "Your returned vehicle is being inspected. We'll update you once done.",
   },
   completed: {
-    title: "Rental Completed ✅",
+    title: "Rental Completed",
     body: "Your rental is complete. Thank you for choosing Anaia's! Leave a review anytime.",
   },
   cancelled: {
@@ -114,7 +114,7 @@ export async function notifyBookingStatusChange(userId, status, bookingId) {
 
 export async function notifyBookingCreated(userId) {
   await notifyUser(userId, {
-    title: "Booking Submitted 🎉",
+    title: "Booking Submitted",
     body: "Your reservation request has been received. We'll confirm it shortly.",
     data: { screen: "Bookings" },
   });
@@ -122,9 +122,32 @@ export async function notifyBookingCreated(userId) {
 
 export async function notifyPaymentConfirmed(userId) {
   await notifyUser(userId, {
-    title: "Payment Confirmed ✅",
-    body: "Your full payment has been confirmed. Get ready for your ride!",
+    title: "Payment Confirmed",
+    body: "Your full payment has been confirmed. Your ride is ready for pickup!",
     data: { screen: "Bookings" },
+  });
+}
+
+// ── Inspection notifications ───────────────────────────────────────────────
+
+export async function notifyDamageFound(userId, bookingId, notes) {
+  await notifyUser(userId, {
+    title: "Damage Found on Returned Vehicle",
+    body: notes
+      ? `Damage was found during inspection: ${notes}`
+      : "Damage was found during the return inspection of your vehicle. Please contact us for details.",
+    data: { screen: "Bookings", bookingId: String(bookingId) },
+  });
+}
+
+export async function notifyPenaltyRequired(userId, bookingId, amount, summary) {
+  const amountStr = amount ? `₱${Number(amount).toLocaleString()}` : "";
+  await notifyUser(userId, {
+    title: "Penalty Required",
+    body: summary
+      ? `A penalty of ${amountStr} is required: ${summary}`
+      : `A penalty${amountStr ? ` of ${amountStr}` : ""} has been issued for your rental. Please settle it before completion.`,
+    data: { screen: "Bookings", bookingId: String(bookingId) },
   });
 }
 
@@ -137,7 +160,7 @@ export async function notifyNewPromo(promo) {
       : `₱${promo.discountValue} off`;
 
   await notifyAllUsers({
-    title: `🏷️ New Promo: ${promo.name}`,
+    title: `New Promo: ${promo.name}`,
     body: `${discountLabel} — ${promo.description || "Limited time offer. Book now!"}`,
     data: { screen: "Motorcycles" },
   });

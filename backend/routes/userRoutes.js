@@ -101,4 +101,69 @@ userRouter.delete("/push-token", authMiddleware, async (req, res) => {
   }
 });
 
+// Test notification — sends a real push to the logged-in user and returns the ticket result
+userRouter.post("/push-test", authMiddleware, async (req, res) => {
+  try {
+    const { Expo } = await import("expo-server-sdk");
+    const expo = new Expo();
+
+    const user = req.user;
+    const tokens = user.expoPushTokens || [];
+
+    if (!tokens.length) {
+      return res.json({
+        ok: false,
+        stage: "no_tokens",
+        message: "No push tokens saved for this user. The app never registered a token.",
+        userId: user._id,
+      });
+    }
+
+    const validTokens = tokens.filter((t) => Expo.isExpoPushToken(t));
+    if (!validTokens.length) {
+      return res.json({
+        ok: false,
+        stage: "invalid_tokens",
+        message: "Tokens are saved but none are valid Expo push tokens.",
+        tokens,
+      });
+    }
+
+    const messages = validTokens.map((token) => ({
+      to: token,
+      sound: "default",
+      title: "Test Notification 🔔",
+      body: "If you see this, push notifications are working!",
+      channelId: "default",
+      priority: "high",
+    }));
+
+    const chunks = expo.chunkPushNotifications(messages);
+    const tickets = [];
+    for (const chunk of chunks) {
+      const t = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...t);
+    }
+
+    const errors = tickets.filter((t) => t.status === "error");
+    console.log(`[Push] Test for userId=${user._id} tokens=${validTokens.length} errors=${errors.length}`);
+    tickets.forEach((t, i) => {
+      if (t.status === "error") {
+        console.error(`[Push] Test ticket error token=${validTokens[i]}:`, t.message, t.details);
+      }
+    });
+
+    res.json({
+      ok: errors.length === 0,
+      stage: "sent",
+      userId: user._id,
+      tokens: validTokens,
+      tickets,
+    });
+  } catch (err) {
+    console.error("[Push] Test error:", err.message);
+    res.status(500).json({ ok: false, stage: "exception", message: err.message });
+  }
+});
+
 export default userRouter;

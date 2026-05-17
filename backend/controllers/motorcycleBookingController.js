@@ -11,6 +11,8 @@ import {
   notifyBookingCreated,
   notifyBookingStatusChange,
   notifyPaymentConfirmed,
+  notifyDamageFound,
+  notifyPenaltyRequired,
 } from "../services/notificationService.js";
 import { TRACCAR_BASE_URL, buildTraccarHeaders } from "../config/traccar.js";
 
@@ -45,6 +47,72 @@ async function captureBookingBaseline(bookingId, motorcycleDbId) {
     });
   } catch {
     // best-effort — don't break the status update flow
+  }
+}
+
+// Resolve numeric Traccar device ID from a uniqueId string
+async function resolveTraccarDeviceId(uniqueId) {
+  const res = await fetch(
+    `${TRACCAR_BASE_URL}/api/devices?uniqueId=${encodeURIComponent(uniqueId)}&limit=1`,
+    { headers: buildTraccarHeaders(), cache: "no-store" },
+  );
+  const json = await res.json().catch(() => []);
+  const device = Array.isArray(json) ? json[0] : json?.devices?.[0] || null;
+  return device ?? null;
+}
+
+// Build a trackingSummary object using Traccar's summary report API
+// from = ISO string of baseline capture time, to = ISO string of completion time
+async function fetchTraccarSummary(traccarDeviceId, from, to) {
+  const url =
+    `${TRACCAR_BASE_URL}/api/reports/summary` +
+    `?deviceId=${traccarDeviceId}` +
+    `&from=${encodeURIComponent(from)}` +
+    `&to=${encodeURIComponent(to)}`;
+  const res = await fetch(url, {
+    headers: { ...buildTraccarHeaders(), Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => null);
+  const row = Array.isArray(json) ? json[0] : null;
+  if (!row) return null;
+  return {
+    totalDistanceKm: Number(row.distance ?? 0) / 1000,
+    avgSpeedKmh: Number(row.averageSpeed ?? 0),
+    maxSpeedKmh: Number(row.maxSpeed ?? 0),
+    stopsMade: Number(row.engineHours != null ? 0 : 0), // Traccar summary has no stop count; default 0
+    lastUpdatedAt: new Date(),
+  };
+}
+
+// Fetch final Traccar stats at booking completion and save as trackingSummary
+async function captureTrackingSummaryOnCompletion(bookingId, motorcycleDbId) {
+  try {
+    const booking = await MotorcycleBooking.findById(bookingId).select("trackingBaseline").lean();
+    const baseline = booking?.trackingBaseline;
+
+    const moto = await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
+    const uniqueId = moto?.traccarDeviceId?.trim();
+    if (!uniqueId) return;
+
+    const device = await resolveTraccarDeviceId(uniqueId);
+    if (!device) return;
+
+    const from = baseline?.capturedAt
+      ? new Date(baseline.capturedAt).toISOString()
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // fallback: 7 days ago
+    const to = new Date().toISOString();
+
+    const summary = await fetchTraccarSummary(device.id, from, to);
+    if (!summary) return;
+
+    await MotorcycleBooking.findByIdAndUpdate(bookingId, {
+      $set: { trackingSummary: summary },
+    });
+    console.log(`[Tracking] Saved summary for booking ${bookingId}: ${summary.totalDistanceKm.toFixed(2)} km`);
+  } catch (err) {
+    console.error("[Tracking] captureTrackingSummaryOnCompletion error:", err.message);
   }
 }
 
@@ -1881,6 +1949,10 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
       captureBookingBaseline(updated._id, motorcycleId).catch(() => {});
     }
 
+    if (status === "completed" && motorcycleId) {
+      captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(() => {});
+    }
+
     if (motorcycleId) {
       await Motorcycle.findOneAndUpdate(
         {
@@ -2084,6 +2156,25 @@ export const updateReturnInspection = async (req, res, next) => {
     booking.returnInspection = inspection;
     const updated = await booking.save();
 
+    // Notify customer when clearance status changes to damage_found or penalty_required
+    if (updated.userId) {
+      if (
+        inspection.clearanceStatus === "damage_found" &&
+        previousClearance !== "damage_found"
+      ) {
+        notifyDamageFound(updated.userId, updated._id, inspection.damageNotes).catch((e) =>
+          console.error("[Push] notifyDamageFound:", e.message)
+        );
+      } else if (
+        inspection.clearanceStatus === "penalty_required" &&
+        previousClearance !== "penalty_required"
+      ) {
+        notifyPenaltyRequired(updated.userId, updated._id, inspection.penaltyAmount, inspection.penaltySummary).catch((e) =>
+          console.error("[Push] notifyPenaltyRequired:", e.message)
+        );
+      }
+    }
+
     if (motorcycleId) {
       const nextMotorcycleStatus = inspection.vehicleStatus || null;
 
@@ -2103,6 +2194,7 @@ export const updateReturnInspection = async (req, res, next) => {
             $set: { "bookings.$.status": "completed" },
           },
         );
+        captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(() => {});
       }
 
       await updateMotorcycleStatus(motorcycleId);
@@ -2202,6 +2294,8 @@ export const confirmFullPayment = async (req, res, next) => {
         },
       });
 
+      notifyBookingStatusChange(updated.userId, "pending_full_payment", updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange pending_full_payment:", e.message));
+
       return res.json({
         success: true,
         message:
@@ -2255,6 +2349,7 @@ export const confirmFullPayment = async (req, res, next) => {
     });
 
     notifyPaymentConfirmed(updated.userId).catch((e) => console.error("[Push] notifyPaymentConfirmed:", e.message));
+    notifyBookingStatusChange(updated.userId, "active", updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange active:", e.message));
 
     res.json({
       success: true,
@@ -2469,6 +2564,63 @@ export const updateTrackingSummary = async (req, res, next) => {
     );
     if (!booking) return res.status(404).json({ message: "Booking not found" });
     res.json({ success: true, trackingSummary: booking.trackingSummary });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/motorcycle-bookings/backfill-tracking-summaries
+// Retroactively compute and save trackingSummary for completed bookings that have a baseline but no summary
+export const backfillTrackingSummaries = async (req, res, next) => {
+  try {
+    const bookings = await MotorcycleBooking.find({
+      status: "completed",
+      trackingBaseline: { $exists: true },
+      trackingSummary: { $exists: false },
+    }).select("_id motorcycle trackingBaseline").lean();
+
+    if (!bookings.length) {
+      return res.json({ message: "No bookings need backfill", processed: 0 });
+    }
+
+    const results = [];
+    for (const booking of bookings) {
+      try {
+        const moto = await Motorcycle.findById(booking.motorcycle).select("traccarDeviceId");
+        const uniqueId = moto?.traccarDeviceId?.trim();
+        if (!uniqueId) {
+          results.push({ id: booking._id, status: "skipped", reason: "no traccarDeviceId" });
+          continue;
+        }
+
+        const device = await resolveTraccarDeviceId(uniqueId);
+        if (!device) {
+          results.push({ id: booking._id, status: "skipped", reason: "device not found in Traccar" });
+          continue;
+        }
+
+        const baseline = booking.trackingBaseline;
+        const from = baseline?.capturedAt
+          ? new Date(baseline.capturedAt).toISOString()
+          : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const to = new Date().toISOString();
+
+        const summary = await fetchTraccarSummary(device.id, from, to);
+        if (!summary) {
+          results.push({ id: booking._id, status: "skipped", reason: "no Traccar summary data" });
+          continue;
+        }
+
+        await MotorcycleBooking.findByIdAndUpdate(booking._id, {
+          $set: { trackingSummary: summary },
+        });
+        results.push({ id: booking._id, status: "saved", distanceKm: summary.totalDistanceKm.toFixed(2) });
+      } catch (err) {
+        results.push({ id: booking._id, status: "error", reason: err.message });
+      }
+    }
+
+    res.json({ processed: results.length, results });
   } catch (err) {
     next(err);
   }

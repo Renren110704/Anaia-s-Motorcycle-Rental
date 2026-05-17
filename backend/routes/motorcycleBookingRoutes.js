@@ -20,6 +20,7 @@ import {
   downloadRentalAgreement,
   extendMotorcycleBooking,
   updateTrackingSummary,
+  backfillTrackingSummaries,
 } from '../controllers/motorcycleBookingController.js'
 import { uploads } from '../middlewares/uploads.js';
 
@@ -48,6 +49,7 @@ motorcycleBookingRouter.patch('/:id/request-reupload', requestBookingProofReuplo
 motorcycleBookingRouter.patch('/:id/reupload-proof', authMiddleware, uploads.single('paymentProofImage'), reuploadBookingPaymentProof);
 motorcycleBookingRouter.patch('/:id/extend', authMiddleware, extendMotorcycleBooking);
 motorcycleBookingRouter.patch('/:id/tracking-summary', updateTrackingSummary);
+motorcycleBookingRouter.post('/backfill-tracking-summaries', backfillTrackingSummaries);
 motorcycleBookingRouter.delete('/:id', deleteMotorcycleBooking); 
 motorcycleBookingRouter.delete('/:id/location-log', deleteMotorcycleBookingLocationLog);
 motorcycleBookingRouter.patch('/:id/restore', restoreMotorcycleBooking);

@@ -20,6 +20,8 @@ import {
   FaChevronDown,
   FaChevronUp,
   FaSatelliteDish,
+  FaSyncAlt,
+  FaExclamationCircle,
 } from "react-icons/fa";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
@@ -148,17 +150,17 @@ const formatTime = (timeStr) => {
 
 const formatPrice = (n) => `₱${(Number(n) || 0).toLocaleString("en-PH")}`;
 
-// const buildTrackerLocationText = (tracker) => {
-//   if (tracker?.resolvedLocation) return tracker.resolvedLocation;
-//   if (tracker?.address) return tracker.address;
-//   if (
-//     Number.isFinite(Number(tracker?.lat)) &&
-//     Number.isFinite(Number(tracker?.lng))
-//   ) {
-//     return `${Number(tracker.lat).toFixed(5)}, ${Number(tracker.lng).toFixed(5)}`;
-//   }
-//   return "No live GPS data";
-// };
+const buildTrackerLocationText = (tracker) => {
+  if (tracker?.resolvedLocation) return tracker.resolvedLocation;
+  if (tracker?.address) return tracker.address;
+  if (
+    Number.isFinite(Number(tracker?.lat)) &&
+    Number.isFinite(Number(tracker?.lng))
+  ) {
+    return `${Number(tracker.lat).toFixed(5)}, ${Number(tracker.lng).toFixed(5)}`;
+  }
+  return "No live GPS data";
+};
 
 const persistLocationSnapshots = (units = [], liveTrackersByUnit = {}) => {
   try {

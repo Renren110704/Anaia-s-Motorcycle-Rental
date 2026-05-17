@@ -375,6 +375,21 @@ export const getTrackingLocationLog = async (req, res, next) => {
       };
     });
 
+    // Real motorcycle name/customer/status by unitId from active bookings
+    const realInfoByUnitId = new Map();
+    for (const b of bookings) {
+      const bUnitId = b?.motorcycle?.unitId || "";
+      if (!bUnitId) continue;
+      const name = [b?.motorcycle?.make, b?.motorcycle?.model].filter(Boolean).join(" ").trim();
+      realInfoByUnitId.set(bUnitId, {
+        name: name || "Unknown unit",
+        customer: b.customer || "",
+        status: b.status || "",
+        motorcycleId: String(b?.motorcycle?.id || ""),
+        bookingId: String(b?._id || ""),
+      });
+    }
+
     let snapshotQuery = {};
     if (unitId) snapshotQuery.unitId = unitId;
     if (Object.keys(dateFilter).length > 0)
@@ -386,22 +401,26 @@ export const getTrackingLocationLog = async (req, res, next) => {
       .lean();
 
     const snapshots = snapshotsRaw
-      .map((s) => ({
-        key: s.key,
-        id: s.id,
-        motorcycleId: s.motorcycleId,
-        bookingId: s.bookingId,
-        unitId: s.unitId,
-        motorcycleName: s.motorcycleName,
-        customer: s.customer,
-        status: s.status,
-        lat: toNumberOrNull(s.lat),
-        lng: toNumberOrNull(s.lng),
-        locationText: s.locationText,
-        lastUpdatedAt: s.lastUpdatedAt,
-        source: s.source,
-        resolvedLocation: s.resolvedLocation,
-      }))
+      .map((s) => {
+        const sUnitId = String(s.unitId || "").trim();
+        const realInfo = realInfoByUnitId.get(sUnitId);
+        return {
+          key: s.key,
+          id: s.id,
+          motorcycleId: s.motorcycleId,
+          bookingId: s.bookingId,
+          unitId: s.unitId,
+          motorcycleName: realInfo?.name || s.motorcycleName,
+          customer: realInfo?.customer || s.customer,
+          status: realInfo?.status || s.status,
+          lat: toNumberOrNull(s.lat),
+          lng: toNumberOrNull(s.lng),
+          locationText: s.locationText,
+          lastUpdatedAt: s.lastUpdatedAt,
+          source: s.source,
+          resolvedLocation: s.resolvedLocation,
+        };
+      })
       .filter((s) => {
         if (deletedLocationBookingIds.has(String(s.bookingId || "")))
           return false; // Filter out old hardcoded tracker snapshots
@@ -433,6 +452,13 @@ export const getTrackingLocationLog = async (req, res, next) => {
         liveSnap.unitId = bUnitId;
         liveSnap.motorcycleId = String(motorcycleId);
         liveSnap.bookingId = String(booking._id);
+        // Override Traccar device name with real motorcycle name from booking
+        const realInfo = realInfoByUnitId.get(bUnitId);
+        if (realInfo) {
+          liveSnap.motorcycleName = realInfo.name;
+          liveSnap.customer = realInfo.customer;
+          liveSnap.status = realInfo.status;
+        }
         liveSnapshotsByUnitId.set(bUnitId, liveSnap);
         console.log(`Live tracker fetched for ${bUnitId}:`, {
           lat: liveSnap.lat,
@@ -572,26 +598,7 @@ export const getTrackingLocationLog = async (req, res, next) => {
       return true;
     });
 
-    let allEntries = [...bookingLogsToUse, ...snapshots];
-
-    for (const liveSnap of liveSnapshotsByUnitId.values()) {
-      allEntries.push({
-        key: liveSnap.key || liveSnap.unitId,
-        id: liveSnap.id,
-        motorcycleId: liveSnap.motorcycleId,
-        bookingId: liveSnap.bookingId,
-        unitId: liveSnap.unitId,
-        motorcycleName: liveSnap.motorcycleName,
-        customer: liveSnap.customer,
-        status: liveSnap.status,
-        lat: liveSnap.lat,
-        lng: liveSnap.lng,
-        locationText: liveSnap.locationText,
-        lastUpdatedAt: liveSnap.lastUpdatedAt,
-        source: liveSnap.source,
-        resolvedLocation: liveSnap.resolvedLocation,
-      });
-    }
+    const allEntries = [...bookingLogsToUse, ...snapshots];
 
     const sortByTimeDesc = (entries) =>
       entries.sort((a, b) => {

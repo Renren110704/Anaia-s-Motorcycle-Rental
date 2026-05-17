@@ -1,5 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
+import { notifyNewPromo } from "../services/notificationService.js";
 
 const router = express.Router();
 
@@ -143,6 +144,8 @@ router.post("/", async (req, res) => {
       createdBy: req.user?._id || null,
     });
 
+    if (promo.isActive) notifyNewPromo(promo).catch(() => {});
+
     res.status(201).json(promo);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -206,6 +209,7 @@ router.patch("/:id/toggle", async (req, res) => {
     if (!promo) return res.status(404).json({ message: "Discount not found" });
     promo.isActive = !promo.isActive;
     const updated = await promo.save();
+    if (updated.isActive) notifyNewPromo(updated).catch(() => {});
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: err.message });

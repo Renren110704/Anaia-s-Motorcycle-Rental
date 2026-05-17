@@ -45,6 +45,9 @@ const userSchema = new mongoose.Schema(
     emailChangeOTP: { type: String, default: null },
     emailChangeOTPExpires: { type: Date, default: null },
     pendingEmail: { type: String, default: null },
+
+    // Push notification tokens (one per device)
+    expoPushTokens: { type: [String], default: [] },
   },
   { timestamps: true },
 );

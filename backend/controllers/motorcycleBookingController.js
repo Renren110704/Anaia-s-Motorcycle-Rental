@@ -7,6 +7,46 @@ import { verifyDigitalReceipt } from "../utils/receiptVerifier.js";
 import { createSystemLog } from "../utils/systemLogService.js";
 import { generateRentalAgreementPDF } from "../utils/rentalAgreementPDF.js";
 import { v2 as cloudinary } from "cloudinary";
+import {
+  notifyBookingCreated,
+  notifyBookingStatusChange,
+  notifyPaymentConfirmed,
+} from "../services/notificationService.js";
+import { TRACCAR_BASE_URL, buildTraccarHeaders } from "../config/traccar.js";
+
+// Fetch current Traccar stats for a device and save as booking baseline
+async function captureBookingBaseline(bookingId, motorcycleDbId) {
+  try {
+    const moto = await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
+    const deviceId = moto?.traccarDeviceId?.trim();
+    if (!deviceId) return;
+
+    const devRes = await fetch(
+      `${TRACCAR_BASE_URL}/api/devices?uniqueId=${encodeURIComponent(deviceId)}&limit=1`,
+      { headers: buildTraccarHeaders(), cache: "no-store" },
+    );
+    const devJson = await devRes.json().catch(() => []);
+    const device = Array.isArray(devJson) ? devJson[0] : devJson?.devices?.[0] || null;
+    if (!device) return;
+
+    const posRes = await fetch(
+      `${TRACCAR_BASE_URL}/api/positions?deviceId=${device.id}&limit=1`,
+      { headers: buildTraccarHeaders(), cache: "no-store" },
+    );
+    const positions = await posRes.json().catch(() => []);
+    const pos = Array.isArray(positions) ? positions[0] : null;
+    if (!pos) return;
+
+    const totalDistanceKm = Number(pos.attributes?.totalDistance ? pos.attributes.totalDistance / 1000 : 0);
+    const stopsMade = Number(pos.attributes?.stops || 0);
+
+    await MotorcycleBooking.findByIdAndUpdate(bookingId, {
+      $set: { trackingBaseline: { totalDistanceKm, stopsMade, capturedAt: new Date() } },
+    });
+  } catch {
+    // best-effort — don't break the status update flow
+  }
+}
 
 import path from "path";
 import fs from "fs";
@@ -898,6 +938,8 @@ export const createMotorcycleBooking = async (req, res) => {
         paymentStatus: saved?.paymentStatus,
       },
     });
+
+    notifyBookingCreated(saved.userId).catch((e) => console.error("[Push] notifyBookingCreated:", e.message));
 
     return res.status(201).json({
       success: true,
@@ -1835,6 +1877,10 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
     booking.status = status;
     const updated = await booking.save();
 
+    if (status === "active") {
+      captureBookingBaseline(updated._id, motorcycleId).catch(() => {});
+    }
+
     if (motorcycleId) {
       await Motorcycle.findOneAndUpdate(
         {
@@ -1863,6 +1909,8 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
         newStatus: status,
       },
     });
+
+    notifyBookingStatusChange(updated.userId, status, updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange:", e.message));
 
     res.json(updated);
   } catch (err) {
@@ -2174,6 +2222,8 @@ export const confirmFullPayment = async (req, res, next) => {
 
     const updated = await booking.save();
 
+    captureBookingBaseline(updated._id, motorcycleId).catch(() => {});
+
     if (motorcycleId) {
       await Motorcycle.findOneAndUpdate(
         {
@@ -2203,6 +2253,8 @@ export const confirmFullPayment = async (req, res, next) => {
         fullPaymentMethod: updated.fullPaymentMethod, // Log it too
       },
     });
+
+    notifyPaymentConfirmed(updated.userId).catch((e) => console.error("[Push] notifyPaymentConfirmed:", e.message));
 
     res.json({
       success: true,
@@ -2393,6 +2445,31 @@ export const downloadRentalAgreement = async (req, res, next) => {
     });
   } catch (err) {
     console.error("Error downloading rental agreement:", err);
+    next(err);
+  }
+};
+
+export const updateTrackingSummary = async (req, res, next) => {
+  try {
+    const { totalDistanceKm, avgSpeedKmh, maxSpeedKmh, stopsMade } = req.body;
+    const booking = await MotorcycleBooking.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          trackingSummary: {
+            totalDistanceKm: Number(totalDistanceKm || 0),
+            avgSpeedKmh:     Number(avgSpeedKmh || 0),
+            maxSpeedKmh:     Number(maxSpeedKmh || 0),
+            stopsMade:       Number(stopsMade || 0),
+            lastUpdatedAt:   new Date(),
+          },
+        },
+      },
+      { new: true }
+    );
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    res.json({ success: true, trackingSummary: booking.trackingSummary });
+  } catch (err) {
     next(err);
   }
 };

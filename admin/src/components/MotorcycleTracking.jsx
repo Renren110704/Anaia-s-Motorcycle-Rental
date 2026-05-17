@@ -326,102 +326,6 @@ const TrackerBadge = ({ status, exceeded }) => {
   );
 };
 
-// ── Live Tracker Info Card ────────────────────────────────────────────────────
-const LiveTrackerCard = ({ tracker, loading, error, onRetry }) => {
-  const hasTracker =
-    Number.isFinite(Number(tracker?.lat)) &&
-    Number.isFinite(Number(tracker?.lng));
-  const isOnline = String(tracker?.status || "").toLowerCase() === "online";
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
-            <FaSatelliteDish className="text-violet-500 text-sm" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
-              Traccar Live
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-red-400"}`}
-              />
-              <span className="text-[11px] font-semibold text-slate-500">
-                {isOnline ? "Online" : "Offline"}
-              </span>
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={onRetry}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
-        >
-          <FaSyncAlt className="text-[10px]" /> Refresh
-        </button>
-      </div>
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="h-4 bg-slate-100 rounded-lg animate-pulse"
-            />
-          ))}
-        </div>
-      ) : error && !hasTracker ? (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
-          <FaExclamationCircle className="text-[#b50002] mt-0.5 flex-shrink-0" />
-          <p className="text-xs font-medium text-[#b50002]">{error}</p>
-        </div>
-      ) : hasTracker ? (
-        <>
-          <p className="font-black text-[#171717] text-sm mb-1">
-            {tracker.motorcycleName}
-          </p>
-          <p className="text-xs text-slate-400 mb-3">
-            {buildTrackerLocationText(tracker)}
-          </p>
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>Current Speed</p>
-              <p className="text-xs font-bold text-[#171717]">
-                {tracker.speed ? tracker.speed.toFixed(1) : "0.0"} km/h
-              </p>
-            </div>
-            <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>Total Distance</p>
-              <p className="text-xs font-bold text-[#171717]">
-                {tracker.totalDistance ? tracker.totalDistance.toFixed(1) : "0.0"} km
-              </p>
-            </div>
-            <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>Avg Speed</p>
-              <p className="text-xs font-bold text-[#171717]">
-                {tracker.averageSpeed ? tracker.averageSpeed.toFixed(1) : "0.0"} km/h
-              </p>
-            </div>
-            <div className="bg-slate-50 rounded-xl px-3 py-2">
-              <p className={labelCls} style={{ marginBottom: "2px" }}>Stops Made</p>
-              <p className="text-xs font-bold text-[#171717]">
-                {tracker.stopsMade || 0}
-              </p>
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2">
-            Updated{" "}
-            {new Date(tracker.lastUpdatedAt || Date.now()).toLocaleTimeString()}
-          </p>
-        </>
-      ) : (
-        <p className="text-xs text-slate-400">
-          {error || "Live GPS is currently unavailable"}
-        </p>
-      )}
-    </div>
-  );
-};
-
 // ── Motorcycle List Item ──────────────────────────────────────────────────────
 const MotorcycleListItem = ({ motorcycle, isSelected, onClick }) => {
   const exceeded = motorcycle.exceededGeofence;
@@ -462,6 +366,34 @@ const MotorcycleListItem = ({ motorcycle, isSelected, onClick }) => {
           <p className="text-[10px] font-bold text-[#b50002]">
             Outside destination zone
           </p>
+        </div>
+      )}
+      {motorcycle.trackerStats && (
+        <div className="grid grid-cols-2 gap-1.5 mb-2.5">
+          <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
+            <p className={labelCls} style={{ marginBottom: "1px" }}>Current Speed</p>
+            <p className="text-[11px] font-bold text-[#171717]">
+              {motorcycle.trackerStats.speed ? Number(motorcycle.trackerStats.speed).toFixed(1) : "0.0"} km/h
+            </p>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
+            <p className={labelCls} style={{ marginBottom: "1px" }}>Total Distance</p>
+            <p className="text-[11px] font-bold text-[#171717]">
+              {motorcycle.trackerStats.totalDistance ? Number(motorcycle.trackerStats.totalDistance).toFixed(1) : "0.0"} km
+            </p>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
+            <p className={labelCls} style={{ marginBottom: "1px" }}>Avg Speed</p>
+            <p className="text-[11px] font-bold text-[#171717]">
+              {motorcycle.trackerStats.averageSpeed ? Number(motorcycle.trackerStats.averageSpeed).toFixed(1) : "0.0"} km/h
+            </p>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
+            <p className={labelCls} style={{ marginBottom: "1px" }}>Stops Made</p>
+            <p className="text-[11px] font-bold text-[#171717]">
+              {motorcycle.trackerStats.stopsMade || 0}
+            </p>
+          </div>
         </div>
       )}
       <div className="flex items-center justify-between pt-2.5 border-t border-slate-50">
@@ -770,10 +702,7 @@ const MotorcycleTracking = () => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [liveTracker, setLiveTracker] = useState(null);
   const [liveTrackersByUnit, setLiveTrackersByUnit] = useState({});
-  const [liveTrackerLoading, setLiveTrackerLoading] = useState(true);
-  const [liveTrackerError, setLiveTrackerError] = useState("");
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -845,6 +774,7 @@ const MotorcycleTracking = () => {
               returnDate: booking.returnDate,
               returnTime: booking.returnTime,
               destination: booking.destination || "",
+              trackingBaseline: booking.trackingBaseline || null,
             },
             bookingDetails: details,
             lastUpdate: new Date(),
@@ -867,8 +797,6 @@ const MotorcycleTracking = () => {
 
   const fetchLiveTrackers = useCallback(async ({ force = false } = {}) => {
     try {
-      setLiveTrackerLoading(true);
-      setLiveTrackerError("");
       const bookingsRes = await api.get("/api/motorcycle-bookings", {
         params: { limit: 200, status: "active" },
       });
@@ -906,19 +834,10 @@ const MotorcycleTracking = () => {
         }),
       );
       setLiveTrackersByUnit(trackerMap);
-      const first = Object.values(trackerMap)[0] || null;
-      setLiveTracker(first);
     } catch (err) {
-      setLiveTrackerError(err?.message || "Live GPS is currently unavailable");
-    } finally {
-      setLiveTrackerLoading(false);
+      console.warn("Live GPS fetch error:", err?.message);
     }
   }, []);
-
-  const handleLiveTrackerRefresh = useCallback(
-    () => fetchLiveTrackers({ force: true }),
-    [fetchLiveTrackers],
-  );
 
   const displayedMotorcycles = useMemo(() => {
     return motorcycles.map((motorcycle) => {
@@ -931,12 +850,24 @@ const MotorcycleTracking = () => {
         location.lng,
         motorcycle.booking?.destination || "",
       );
+      const baseline = motorcycle.booking?.trackingBaseline || null;
       return {
         ...motorcycle,
         location,
         exceededGeofence: exceeded,
         lastUpdate: new Date(trackerSnap.lastUpdatedAt || Date.now()),
         trackerStatus: trackerSnap.status || motorcycle.trackerStatus || "",
+        trackerStats: {
+          speed: trackerSnap.speed,
+          totalDistance: baseline
+            ? Math.max(0, (trackerSnap.totalDistance ?? 0) - (baseline.totalDistanceKm ?? 0))
+            : 0,
+          averageSpeed: trackerSnap.averageSpeed,
+          stopsMade: baseline
+            ? Math.max(0, (trackerSnap.stopsMade ?? 0) - (baseline.stopsMade ?? 0))
+            : 0,
+          lastUpdatedAt: trackerSnap.lastUpdatedAt,
+        },
       };
     });
   }, [liveTrackersByUnit, motorcycles]);
@@ -950,6 +881,23 @@ const MotorcycleTracking = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, [fetchLiveTrackers, fetchMotorcycles]);
+
+  // Capture baseline once per booking — use a ref so it never re-triggers renders
+  const baselineCapturedRef = useRef(new Set());
+  useEffect(() => {
+    let needsRefetch = false;
+    const promises = [];
+    motorcycles.forEach((m) => {
+      const bookingId = m.booking?._id;
+      if (!bookingId || m.booking?.trackingBaseline || baselineCapturedRef.current.has(bookingId)) return;
+      baselineCapturedRef.current.add(bookingId);
+      needsRefetch = true;
+      promises.push(api.post(`/api/tracking/baseline/${bookingId}`).catch(() => {}));
+    });
+    if (needsRefetch) {
+      Promise.all(promises).then(() => fetchMotorcycles()).catch(() => {});
+    }
+  }, [motorcycles, fetchMotorcycles]);
 
   useEffect(() => {
     persistLocationSnapshots(displayedMotorcycles, liveTrackersByUnit);
@@ -1222,13 +1170,6 @@ const MotorcycleTracking = () => {
               )}
             </div>
 
-            {/* Traccar live card */}
-            <LiveTrackerCard
-              tracker={liveTracker}
-              loading={liveTrackerLoading}
-              error={liveTrackerError}
-              onRetry={handleLiveTrackerRefresh}
-            />
           </div>
 
           {/* Map — 3/4 */}

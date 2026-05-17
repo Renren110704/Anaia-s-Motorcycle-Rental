@@ -216,6 +216,25 @@ const motorcycleBookingSchema = new Schema(
     address: { type: addressSchema, default: () => ({}) },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
+
+    trackingSummary: {
+      type: {
+        totalDistanceKm: { type: Number, default: 0 },
+        avgSpeedKmh:     { type: Number, default: 0 },
+        maxSpeedKmh:     { type: Number, default: 0 },
+        stopsMade:       { type: Number, default: 0 },
+        lastUpdatedAt:   { type: Date,   default: null },
+      },
+      default: null,
+    },
+    trackingBaseline: {
+      type: {
+        totalDistanceKm: { type: Number, default: 0 },
+        stopsMade:       { type: Number, default: 0 },
+        capturedAt:      { type: Date, default: null },
+      },
+      default: null,
+    },
   },
   { timestamps: true },
 );

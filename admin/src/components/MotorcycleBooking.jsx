@@ -28,6 +28,8 @@ import {
   FaUser,
   FaMoneyBillWave,
   FaBan,
+  FaRoad,
+  FaTachometerAlt,
 } from "react-icons/fa";
 import {
   AlertTriangle,
@@ -1278,6 +1280,56 @@ const DetailDrawer = ({
                 />
               )}
             </div>
+          </Section>
+
+          {/* Tracking Summary */}
+          <Section title="Trip Tracking Summary">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <FaRoad className="text-[#b50002] text-sm flex-shrink-0" />
+                  <span className="text-slate-400 text-xs font-medium">Total Distance</span>
+                </div>
+                <span className="text-[#171717] text-sm font-semibold pl-6">
+                  {booking.trackingSummary ? `${(booking.trackingSummary.totalDistanceKm ?? 0).toFixed(2)} km` : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
+                  <span className="text-slate-400 text-xs font-medium">Avg Speed</span>
+                </div>
+                <span className="text-[#171717] text-sm font-semibold pl-6">
+                  {booking.trackingSummary ? `${(booking.trackingSummary.avgSpeedKmh ?? 0).toFixed(1)} km/h` : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
+                  <span className="text-slate-400 text-xs font-medium">Max Speed</span>
+                </div>
+                <span className="text-[#171717] text-sm font-semibold pl-6">
+                  {booking.trackingSummary ? `${(booking.trackingSummary.maxSpeedKmh ?? 0).toFixed(1)} km/h` : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <FaMapMarkerAlt className="text-[#b50002] text-sm flex-shrink-0" />
+                  <span className="text-slate-400 text-xs font-medium">Stops Made</span>
+                </div>
+                <span className="text-[#171717] text-sm font-semibold pl-6">
+                  {booking.trackingSummary ? (booking.trackingSummary.stopsMade ?? 0) : "—"}
+                </span>
+              </div>
+            </div>
+            {booking.trackingSummary?.lastUpdatedAt && (
+              <p className="text-[10px] text-slate-400 mt-3 text-right">
+                Last updated: {formatDateTime(booking.trackingSummary.lastUpdatedAt)}
+              </p>
+            )}
+            {!booking.trackingSummary && (
+              <p className="text-[11px] text-slate-400 mt-1">No tracking data recorded for this booking.</p>
+            )}
           </Section>
         </div>
       </div>

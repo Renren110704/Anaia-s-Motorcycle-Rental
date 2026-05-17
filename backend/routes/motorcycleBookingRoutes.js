@@ -1,24 +1,25 @@
 import express from 'express'
 import authMiddleware from '../middlewares/auth.js'
-import { 
+import {
   acquireCheckoutLock,
   createWalkInMotorcycleBooking,
-  createMotorcycleBooking, 
-  deleteMotorcycleBooking, 
+  createMotorcycleBooking,
+  deleteMotorcycleBooking,
   deleteMotorcycleBookingLocationLog,
-  getMotorcycleBookings, 
-  getMyMotorcycleBookings, 
+  getMotorcycleBookings,
+  getMyMotorcycleBookings,
   releaseCheckoutLock,
-  updateMotorcycleBooking, 
-  updateMotorcycleBookingStatus, 
+  updateMotorcycleBooking,
+  updateMotorcycleBookingStatus,
   updateReturnInspection,
   restoreMotorcycleBooking,
   permanentDeleteMotorcycleBooking,
-  confirmFullPayment, 
+  confirmFullPayment,
   requestBookingProofReupload,
   reuploadBookingPaymentProof,
   downloadRentalAgreement,
   extendMotorcycleBooking,
+  updateTrackingSummary,
 } from '../controllers/motorcycleBookingController.js'
 import { uploads } from '../middlewares/uploads.js';
 
@@ -46,6 +47,7 @@ motorcycleBookingRouter.patch('/:id/confirm-payment', confirmFullPayment);
 motorcycleBookingRouter.patch('/:id/request-reupload', requestBookingProofReupload);
 motorcycleBookingRouter.patch('/:id/reupload-proof', authMiddleware, uploads.single('paymentProofImage'), reuploadBookingPaymentProof);
 motorcycleBookingRouter.patch('/:id/extend', authMiddleware, extendMotorcycleBooking);
+motorcycleBookingRouter.patch('/:id/tracking-summary', updateTrackingSummary);
 motorcycleBookingRouter.delete('/:id', deleteMotorcycleBooking); 
 motorcycleBookingRouter.delete('/:id/location-log', deleteMotorcycleBookingLocationLog);
 motorcycleBookingRouter.patch('/:id/restore', restoreMotorcycleBooking);

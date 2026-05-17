@@ -68,8 +68,37 @@ userRouter.post("/upload-profile-picture", authMiddleware, upload.single("image"
 
 userRouter.delete("/remove-profile-picture", authMiddleware, removeProfilePicture);
 
-userRouter.get("/users", getAllUsers); 
+userRouter.get("/users", getAllUsers);
 userRouter.patch("/users/:id/status", toggleUserStatus);
 userRouter.delete("/users/:id", deleteUser);
+
+// Push token registration
+userRouter.post("/push-token", authMiddleware, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: "Token required" });
+    await req.user.updateOne({
+      $addToSet: { expoPushTokens: token },
+    });
+    console.log(`[Push] Token saved for userId=${req.user._id}: ${token}`);
+    res.json({ message: "Push token registered" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Push token removal (on logout)
+userRouter.delete("/push-token", authMiddleware, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: "Token required" });
+    await req.user.updateOne({
+      $pull: { expoPushTokens: token },
+    });
+    res.json({ message: "Push token removed" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 export default userRouter;

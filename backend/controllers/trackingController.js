@@ -631,6 +631,32 @@ export const getTrackingLocationLog = async (req, res, next) => {
   }
 };
 
+export const captureTrackingBaseline = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    const booking = await MotorcycleBooking.findById(bookingId)
+      .populate("motorcycle.id", "traccarDeviceId");
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    const deviceUniqueId = booking.motorcycle?.id?.traccarDeviceId || "";
+    if (!deviceUniqueId) {
+      return res.json({ success: false, message: "No tracker configured for this motorcycle" });
+    }
+
+    const snap = await fetchTraccarLiveSnapshot({ force: true, deviceUniqueId });
+    const baseline = {
+      totalDistanceKm: snap.totalDistance ?? 0,
+      stopsMade: snap.stopsMade ?? 0,
+      capturedAt: new Date(),
+    };
+
+    await MotorcycleBooking.findByIdAndUpdate(bookingId, { $set: { trackingBaseline: baseline } });
+    res.json({ success: true, baseline });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const deleteTrackingLocationLog = async (req, res, next) => {
   try {
     const key = String(req.body?.key || "").trim();

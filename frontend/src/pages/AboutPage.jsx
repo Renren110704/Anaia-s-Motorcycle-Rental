@@ -888,10 +888,9 @@ export default function AboutPage() {
             >
               <div className="ab-story-dots-accent" />
               <div className="ab-story-img-wrap">
-                {/* Replace src with your actual shop photo import */}
                 <img
                   className="ab-story-img"
-                  src="https://scontent.fmnl37-1.fna.fbcdn.net/v/t39.30808-6/514264843_736961948836673_2196729220353272776_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=7b2446&_nc_eui2=AeFcZlWdBvvRLf6eMdVtjbxa_vKBrQkO5cf-8oGtCQ7lx2KQgaXXDM4uQtxrnBgYh9rZwgOhAOWY0wyi89P1Ly_W&_nc_ohc=lB2PXwmn9HcQ7kNvwF3aHsj&_nc_oc=AdpG9zOehZZnvpGDTsW3t-VD6MNfxzUCC1TmyWP7GFg9J7GOMXMzuMfU9icclm4Kru4&_nc_zt=23&_nc_ht=scontent.fmnl37-1.fna&_nc_gid=EWJbUDQffdNYaVAJ3_pekA&_nc_ss=7b2a8&oh=00_Af6aqGFtHcqXpIYa_aYE-SGF0K2xQeWZCwZx14fsExqYUw&oe=6A07ADE0"
+                  src="/images/about-story.jpg"
                   alt="Honda Click at Anaia's Motorcycle Rental"
                 />
               </div>

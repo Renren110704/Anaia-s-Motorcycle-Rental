@@ -16,6 +16,7 @@
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.2",
+    "expo-server-sdk": "^6.1.0",
     "express": "^5.1.0",
     "form-data": "^4.0.5",
     "groq-sdk": "^1.2.0",

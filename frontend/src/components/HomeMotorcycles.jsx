@@ -296,7 +296,7 @@ const HomeMotorcycles = () => {
       }
       return { label: "Booked", color: "booked" };
     }
-    return { label: "Available", color: "available" };
+    return { label: "", color: "available" };
   };
 
   const isBookDisabled = (motorcycle) => {

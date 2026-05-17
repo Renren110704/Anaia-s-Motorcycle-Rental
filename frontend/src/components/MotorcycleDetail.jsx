@@ -2983,7 +2983,7 @@ const MotorcycleDetail = () => {
             onClick={() => navigate(-1)}
             style={{ ...S.btnSecondary, color: "rgba(0,0,0,0.45)" }}
           >
-            <FaArrowLeft style={{ fontSize: 11 }} /> Back to motorcycles
+            <FaArrowLeft style={{ fontSize: 11 }} /> Back to vehicles
           </button>
         </div>
 

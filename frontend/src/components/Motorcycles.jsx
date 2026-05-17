@@ -774,7 +774,7 @@ const Motorcycles = () => {
       return;
     if (eff.state === "booked")
       return <span style={badgeStyle("red")}>Booked</span>;
-    return <span style={badgeStyle("green")}>Available</span>;
+    // return <span style={badgeStyle("green")}>Available</span>;
   };
 
   const badgeStyle = (color) => ({

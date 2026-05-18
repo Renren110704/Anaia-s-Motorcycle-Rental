@@ -76,7 +76,7 @@ const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
       >
         Showing <strong style={{ color: "#0E0E0E" }}>{startItem}</strong>–
         <strong style={{ color: "#0E0E0E" }}>{endItem}</strong> of{" "}
-        <strong style={{ color: "#0E0E0E" }}>{totalItems}</strong> motorcycles
+        <strong style={{ color: "#0E0E0E" }}>{totalItems}</strong> vehicles
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <button

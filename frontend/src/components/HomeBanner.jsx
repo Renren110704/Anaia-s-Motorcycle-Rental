@@ -8,13 +8,14 @@ import suzukiLogo from "../assets/logos/suzuki.svg";
 import kawasakiLogo from "../assets/logos/kawasaki.svg";
 import toyotaLogo from "../assets/logos/toyota.svg";
 import nissanLogo from "../assets/logos/nissan.svg";
+// Import your background image here (Adjust the path if necessary)
+import mainBg from "../assets/MainBG.png";
 
 // ─── Map each tab to its own motorcycle image ───────────────────────
-// Replace img1 with the actual imports once you add the image files.
 const TAB_IMAGES = {
   Scooter: img1,
-  Car: img2, // replace with img2
-  Underbone: img3, // replace with img3
+  Car: img2,
+  Underbone: img3,
 };
 
 const BrandLogos = {
@@ -28,7 +29,14 @@ const BrandLogos = {
   Nissan: <img src={nissanLogo} alt="Nissan" className="h-5 object-contain" />,
 };
 
-const BRAND_ITEMS = ["Yamaha", "Honda", "Suzuki", "Kawasaki", "Toyota", "Nissan"];
+const BRAND_ITEMS = [
+  "Yamaha",
+  "Honda",
+  "Suzuki",
+  "Kawasaki",
+  "Toyota",
+  "Nissan",
+];
 
 function BrandMarquee() {
   const items = [...BRAND_ITEMS, ...BRAND_ITEMS];
@@ -104,7 +112,6 @@ export default function HeroBanner() {
     return () => clearTimeout(t);
   }, []);
 
-  // Crossfade helper
   const switchTo = (tab) => {
     setImgVisible(false);
     setTimeout(() => {
@@ -114,7 +121,6 @@ export default function HeroBanner() {
     }, 280);
   };
 
-  // Manual tab change — resets the auto-cycle timer
   const handleTabChange = (tab) => {
     if (tab === activeTab) return;
     switchTo(tab);
@@ -202,13 +208,12 @@ export default function HeroBanner() {
           width: 100%;
           min-height: 100vh;
           overflow: hidden;
-          background: #F8F7F5;
+          background-color: #F8F7F5; /* Serves as fallback */
           display: flex;
           flex-direction: column;
           font-family: 'Inter', sans-serif;
         }
 
-        /* ── Subtle dot grid ── */
         .hb-dots {
           position: absolute; inset: 0; pointer-events: none;
           background-image: radial-gradient(circle, rgba(0,0,0,0.055) 1px, transparent 1px);
@@ -216,7 +221,6 @@ export default function HeroBanner() {
           opacity: 0.6;
         }
 
-        /* ── Radial colour hints ── */
         .hb-pattern {
           position: absolute; inset: 0; pointer-events: none;
           background-image:
@@ -224,7 +228,6 @@ export default function HeroBanner() {
             radial-gradient(ellipse 40% 40% at 10% 85%, rgba(181,0,2,0.035) 0%, transparent 60%);
         }
 
-        /* ── Watermark ── */
         .hb-watermark {
           position: absolute; inset: 0;
           display: flex; align-items: center; justify-content: flex-end;
@@ -243,7 +246,6 @@ export default function HeroBanner() {
           white-space: nowrap;
         }
 
-        /* ── Motorcycle image ── */
         .hb-moto-wrap {
           position: absolute;
           right: -2%; bottom: 88px;
@@ -264,7 +266,6 @@ export default function HeroBanner() {
           .hb-moto-wrap { height: 40%; right: -5%; bottom: 120px; max-width: 80%; }
         }
 
-        /* ── Right-side gradient overlay ── */
         .hb-fade-right {
           position: absolute; right: 0; top: 0; bottom: 0; width: 54%;
           background: linear-gradient(to left,
@@ -275,7 +276,6 @@ export default function HeroBanner() {
           pointer-events: none;
         }
 
-        /* ── Thin red accent line ── */
         .hb-accent-bar {
           position: absolute; bottom: 88px; left: 0;
           width: 36%; height: 1.5px;
@@ -283,7 +283,6 @@ export default function HeroBanner() {
           pointer-events: none;
         }
 
-        /* ── Main content area ── */
         .hb-body {
           position: relative; z-index: 2; flex: 1;
           display: flex; align-items: center;
@@ -294,7 +293,6 @@ export default function HeroBanner() {
 
         .hb-content { display: flex; flex-direction: column; max-width: 520px; width: 100%; }
 
-        /* ── Eyebrow label ── */
         .hb-eyebrow {
           display: inline-flex; align-items: center; gap: 10px;
           font-family: 'Inter', sans-serif;
@@ -307,7 +305,6 @@ export default function HeroBanner() {
         .hb-eyebrow.in { opacity: 1; transform: translateY(0); }
         .hb-eyebrow-line { width: 24px; height: 1.5px; background: #b50002; border-radius: 2px; flex-shrink: 0; }
 
-        /* ── Headline — Playfair for editorial weight ── */
         .hb-h1 {
           font-family: 'Playfair Display', serif;
           font-size: clamp(42px, 5.8vw, 78px);
@@ -322,7 +319,6 @@ export default function HeroBanner() {
         .hb-h1.in { opacity: 1; transform: translateY(0); }
         .hb-h1-red { color: #b50002; font-style: italic; }
 
-        /* ── Body copy — Inter light ── */
         .hb-desc {
           font-family: 'Inter', sans-serif;
           font-size: 14.5px; font-weight: 400; line-height: 1.8;
@@ -333,7 +329,6 @@ export default function HeroBanner() {
         }
         .hb-desc.in { opacity: 1; transform: translateY(0); }
 
-        /* ── Search card ── */
         .hb-card {
           background: #ffffff;
           border-radius: 18px;
@@ -347,7 +342,6 @@ export default function HeroBanner() {
         }
         .hb-card.in { opacity: 1; transform: translateY(0); }
 
-        /* Tabs */
         .hb-tabs {
           display: flex;
           border-bottom: 1px solid rgba(0,0,0,0.06);
@@ -370,33 +364,6 @@ export default function HeroBanner() {
         }
         .hb-tab:hover:not(.active) { color: rgba(0,0,0,0.55); }
 
-        /* Fields */
-        .hb-fields { display: flex; align-items: center; padding: 15px 16px; gap: 0; }
-        .hb-field { flex: 1; min-width: 0; padding: 0 14px; display: flex; flex-direction: column; gap: 4px; }
-        .hb-field label {
-          font-family: 'Inter', sans-serif;
-          font-size: 9px; font-weight: 600; letter-spacing: 2px;
-          text-transform: uppercase; color: rgba(0,0,0,0.28);
-        }
-        .hb-field input {
-          font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
-          color: #0E0E0E; border: none; outline: none;
-          background: transparent; width: 100%;
-        }
-        .hb-field input::placeholder { color: rgba(0,0,0,0.2); font-weight: 400; }
-        .hb-fsep { width: 1px; height: 32px; background: rgba(0,0,0,0.06); flex-shrink: 0; }
-        .hb-submit {
-          flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px;
-          background: #b50002; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          margin-left: 10px; transition: all 0.2s;
-          box-shadow: 0 4px 16px rgba(181,0,2,0.28);
-        }
-        .hb-submit:hover { background: #9e0001; transform: scale(1.05); box-shadow: 0 6px 20px rgba(181,0,2,0.4); }
-        .hb-submit:active { transform: scale(0.97); }
-        .hb-submit svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2.4; }
-
-        /* ── Stats row ── */
         .hb-stats {
           display: flex; gap: 24px; align-items: center;
           opacity: 0; transform: translateY(10px);
@@ -415,7 +382,6 @@ export default function HeroBanner() {
         }
         .hb-stat-sep { width: 1px; height: 28px; background: rgba(0,0,0,0.09); }
 
-        /* ── Tab progress bar ── */
         .hb-tab-progress {
           position: absolute; bottom: -1px; left: 20px; right: 20px;
           height: 1.5px; background: rgba(181,0,2,0.18); border-radius: 2px; overflow: hidden;
@@ -425,7 +391,6 @@ export default function HeroBanner() {
           transition: width 80ms linear;
         }
 
-        /* ── Brand marquee strip ── */
         .hb-marquee-strip {
           position: relative; z-index: 3;
           border-top: 1px solid rgba(0,0,0,0.06);
@@ -440,7 +405,6 @@ export default function HeroBanner() {
           text-align: center; margin-bottom: 18px;
         }
 
-        /* ── Scroll cue ── */
         .hb-scroll {
           position: absolute; bottom: 28px; right: 52px; z-index: 3;
           display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -463,40 +427,27 @@ export default function HeroBanner() {
         }
 
         @media(max-width:768px){
-
-        /* Hide motorcycle */
-        .hb-moto-wrap {
-          display: none;
+          .hb-moto-wrap { display: none; }
+          .hb-fade-right { display: none; }
+          .hb-content { max-width: 100%; align-items: center; text-align: center; }
+          .hb-desc { max-width: 100%; }
+          .hb-stats { justify-content: center; }
+          .hb-card { width: 100%; }
         }
-
-        /* Hide white gradient overlay */
-        .hb-fade-right {
-          display: none;
-        }
-
-        /* Optional: center content better on mobile */
-        .hb-content {
-          max-width: 100%;
-          align-items: center;
-          text-align: center;
-        }
-
-        .hb-desc {
-          max-width: 100%;
-        }
-
-        .hb-stats {
-          justify-content: center;
-        }
-
-        .hb-card {
-          width: 100%;
-        }
-      }
       `}</style>
 
-      <div ref={wrapRef} className="hb-root">
-        {/* Background */}
+      {/* Added Inline Styles here to set the background image */}
+      <div
+        ref={wrapRef}
+        className="hb-root"
+        style={{
+          backgroundImage: `url(${mainBg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        {/* Background Patterns (You can remove these if you want the image completely clean) */}
         <div className="hb-dots" />
         <div className="hb-pattern" />
 
@@ -508,11 +459,11 @@ export default function HeroBanner() {
               transition: "transform 320ms cubic-bezier(.18,.9,.22,1)",
             }}
           >
-            <div className="hb-wm-text">ANAIA'S</div>
+            {/* <div className="hb-wm-text">ANAIA'S</div> */}
           </div>
         </div>
 
-        {/* Motorcycle — swaps on tab change */}
+        {/* Motorcycle */}
         <div
           className="hb-moto-wrap"
           style={{
@@ -521,18 +472,18 @@ export default function HeroBanner() {
         >
           <img
             src={TAB_IMAGES[displayedTab]}
-            alt={`${displayedTab} motorcycle for rent`}
+            alt={`${displayedTab} vehicle for rent`}
             className={`hb-moto ${imgVisible ? "visible" : "hidden"}`}
           />
         </div>
 
         {/* Right fade */}
-        <div className="hb-fade-right" />
+        {/* <div className="hb-fade-right" /> */}
 
         {/* Bottom accent */}
         <div className="hb-accent-bar" />
 
-        {/* ── Content ── */}
+        {/* Content */}
         <div className="hb-body">
           <div className="hb-content">
             <div className={`hb-eyebrow ${mounted ? "in" : ""}`}>
@@ -549,12 +500,11 @@ export default function HeroBanner() {
             </h1>
 
             <p className={`hb-desc ${mounted ? "in" : ""}`}>
-              Choose from scooter, bigbike and underbone motorcycles, as well as pickup,
-              sedan, MPV, and SUV cars built for thrill, comfort, and adventure.
-              Your journey begins here.
+              Choose from scooter, bigbike and underbone motorcycles, as well as
+              pickup, sedan, MPV, and SUV cars built for thrill, comfort, and
+              adventure. Your journey begins here.
             </p>
 
-            {/* Search card */}
             <div className={`hb-card ${mounted ? "in" : ""}`}>
               <div
                 className="hb-tabs"
@@ -579,30 +529,6 @@ export default function HeroBanner() {
                   </button>
                 ))}
               </div>
-              {/* <div className="hb-fields">
-                <div className="hb-field">
-                  <label>Location</label>
-                  <input type="text" placeholder="Bacoor, Cavite" />
-                </div>
-                <div className="hb-fsep" />
-                <div className="hb-field">
-                  <label>Pickup</label>
-                  <input type="text" placeholder="Dec 16, 12:00 PM" />
-                </div>
-                <div className="hb-fsep" />
-                <div className="hb-field">
-                  <label>Return</label>
-                  <input type="text" placeholder="Dec 19, 12:00 PM" />
-                </div>
-                <Link to="/motorcycles">
-                  <button className="hb-submit" aria-label="Search motorcycles">
-                    <svg viewBox="0 0 24 24">
-                      <circle cx="11" cy="11" r="7" />
-                      <path d="m21 21-4.35-4.35" />
-                    </svg>
-                  </button>
-                </Link>
-              </div> */}
             </div>
 
             {/* Stats */}

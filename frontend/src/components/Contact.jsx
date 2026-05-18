@@ -9,6 +9,8 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
+// Import your background image here (Adjust the path if necessary)
+import mainBg from "../assets/MainBG.png";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -136,7 +138,7 @@ export default function Contact() {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap');
 
         .ct-root {
-          background: #F8F7F5;
+          background-color: #F8F7F5; /* Changed to background-color for fallback */
           font-family: 'Space Grotesk', sans-serif;
           color: #0E0E0E;
           overflow-x: hidden;
@@ -393,7 +395,7 @@ export default function Contact() {
 
         /* ══════════ CARDS ══════════ */
         .ct-cards-section {
-          background: #F5F5F3;
+          background-color: rgba(245, 245, 243, 0.75); /* Made slightly transparent so BG image flows nicely */
           padding: 80px 64px;
           border-top: 1.5px solid rgba(0,0,0,0.08);
           text-align: center;
@@ -465,7 +467,16 @@ export default function Contact() {
         .ct-au.in { animation: ct-fadeUp 0.6s cubic-bezier(.2,.8,.2,1) forwards; }
       `}</style>
 
-      <div className="ct-root">
+      {/* Added Inline Styles here to set the background image */}
+      <div
+        className="ct-root"
+        style={{
+          backgroundImage: `url(${mainBg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
         {/* ══════════ HERO ══════════ */}
         <section className="ct-hero">
           <div className="ct-hero-blob" />
@@ -486,8 +497,8 @@ export default function Contact() {
               </h1>
 
               <p className="ct-sub">
-                Whether you have a question about a motorcycle, a car, a booking, or
-                just want to chat — we're here. Let's talk.
+                Whether you have a question about a motorcycle, a car, a
+                booking, or just want to chat — we're here. Let's talk.
               </p>
 
               <div className="ct-socials">

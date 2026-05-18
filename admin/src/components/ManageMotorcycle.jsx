@@ -1031,6 +1031,49 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
   );
 };
 
+// Move the components OUTSIDE of EditModal to prevent focus loss
+const noScroll = (e) => {
+  if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+};
+
+const EditTF = ({ label, name, type = "text", value, onChange, opts = {} }) => (
+  <div>
+    <label className={labelCls}>{label}</label>
+    <input
+      type={type}
+      name={name}
+      value={value || ""}
+      onChange={onChange}
+      onKeyDown={type === "number" ? noScroll : undefined}
+      required={opts.required}
+      min={opts.min}
+      max={opts.max}
+      step={opts.step}
+      maxLength={opts.maxLength}
+      placeholder={opts.placeholder}
+      className={fieldCls}
+    />
+  </div>
+);
+
+const EditSF = ({ label, name, value, onChange, options }) => (
+  <div>
+    <label className={labelCls}>{label}</label>
+    <select
+      name={name}
+      value={value ?? ""}
+      onChange={onChange}
+      className={fieldCls}
+    >
+      {options.map((o) => (
+        <option key={o.value ?? o} value={o.value ?? o}>
+          {o.label ?? o}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
 // ── EDIT MOTORCYCLE MODAL ─────────────────────────────────────────────────────
 const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => {
   const fileRef = useRef(null);
@@ -1102,7 +1145,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
     if (trimmedId) {
       const isDuplicate = motorcycles.some(
         (m) =>
-          m.traccarDeviceId?.trim() === trimmedId && m._id !== motorcycle._id, // Ignore the unit currently being edited
+          m.traccarDeviceId?.trim() === trimmedId && m._id !== motorcycle._id,
       );
       if (isDuplicate) {
         return toast.error(
@@ -1113,54 +1156,6 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
 
     onSubmit(mapToBackend(motorcycle));
   };
-
-  const noScroll = (e) => {
-    if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
-  };
-
-  const TF = ({ label, name, type = "text", opts = {} }) => (
-    <div>
-      <label className={labelCls}>{label}</label>
-      <input
-        type={type}
-        name={name}
-        value={motorcycle[name] || ""}
-        onChange={handleInputChange}
-        onKeyDown={type === "number" ? noScroll : undefined}
-        required={opts.required}
-        min={opts.min}
-        max={opts.max}
-        step={opts.step}
-        maxLength={opts.maxLength}
-        placeholder={opts.placeholder}
-        className={fieldCls}
-      />
-    </div>
-  );
-
-  const SF = ({
-    label,
-    name,
-    options,
-    value: customVal,
-    onChange: customChange,
-  }) => (
-    <div>
-      <label className={labelCls}>{label}</label>
-      <select
-        name={name}
-        value={customVal ?? motorcycle[name] ?? ""}
-        onChange={customChange ?? handleInputChange}
-        className={fieldCls}
-      >
-        {options.map((o) => (
-          <option key={o.value ?? o} value={o.value ?? o}>
-            {o.label ?? o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
@@ -1184,35 +1179,57 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <TF
+              <EditTF
                 label="Unit ID *"
                 name="unitId"
-                opts={{
-                  required: true,
-                  placeholder: "e.g. UNIT-01",
-                  maxLength: 30,
-                }}
+                value={motorcycle.unitId}
+                onChange={handleInputChange}
+                opts={{ required: true, placeholder: "e.g. UNIT-01", maxLength: 30 }}
               />
             </div>
             <div className="sm:col-span-2">
-              <TF
+              <EditTF
                 label="GPS Tracker ID"
                 name="traccarDeviceId"
+                value={motorcycle.traccarDeviceId}
+                onChange={handleInputChange}
                 opts={{ placeholder: "e.g. 9210010703", maxLength: 50 }}
               />
             </div>
-            <TF label="Make *" name="make" opts={{ required: true }} />
-            <TF label="Model *" name="model" opts={{ required: true }} />
-            <TF
+            
+            {/* Make field is now a Select dropdown */}
+            <EditSF 
+              label="Make *" 
+              name="make" 
+              value={motorcycle.make}
+              onChange={handleInputChange}
+              options={[
+                "Honda", "Yamaha", "Suzuki", "Kawasaki", "Toyota", "Nissan", 
+                "Geely", "Mitsubishi", "BYD", "Ford", "Isuzu", "Mazda"
+              ]} 
+            />
+            
+            <EditTF 
+              label="Model *" 
+              name="model" 
+              value={motorcycle.model}
+              onChange={handleInputChange}
+              opts={{ required: true }} 
+            />
+            <EditTF
               label="Year *"
               name="year"
               type="number"
+              value={motorcycle.year}
+              onChange={handleInputChange}
               opts={{ required: true, min: 1900, max: 2099 }}
             />
-            <TF
+            <EditTF
               label="Daily Rate (₱) *"
               name="dailyRate"
               type="number"
+              value={motorcycle.dailyRate}
+              onChange={handleInputChange}
               opts={{ required: true, min: 1, step: 0.01 }}
             />
             <div className="sm:col-span-2">
@@ -1226,9 +1243,11 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none"
               />
             </div>
-            <SF
+            <EditSF
               label="Category *"
               name="category"
+              value={motorcycle.category}
+              onChange={handleInputChange}
               options={[
                 "Scooter",
                 "Big Bike",
@@ -1239,52 +1258,46 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                 "SUV",
               ]}
             />
-            {/* <SF
-              label="Status *"
-              name="status"
-              options={[
-                { value: "available", label: "Available" },
-                { value: "maintenance", label: "Maintenance" },
-              ]}
-            /> */}
-            <TF
+            <EditTF
               label="Engine Size (cc) *"
               name="engineSize"
               type="number"
+              value={motorcycle.engineSize}
+              onChange={handleInputChange}
               opts={{ required: true, min: 50 }}
             />
-            <SF
+            <EditSF
               label="Transmission *"
               name="transmission"
+              value={motorcycle.transmission}
+              onChange={handleInputChange}
               options={["Manual", "Automatic", "Semi-Automatic"]}
             />
-            <SF
+            <EditSF
               label="Fuel Type *"
               name="fuelType"
+              value={motorcycle.fuelType}
+              onChange={handleInputChange}
               options={["Unleaded", "Premium", "Diesel", "Electric"]}
             />
-            <SF
+            <EditSF
               label="ABS"
               name="hasABS"
               value={motorcycle.hasABS ? "yes" : "no"}
-              options={[
-                { value: "no", label: "No ABS" },
-                { value: "yes", label: "Has ABS" },
-              ]}
               onChange={(e) =>
                 handleInputChange({
                   target: { name: "hasABS", value: e.target.value === "yes" },
                 })
               }
+              options={[
+                { value: "no", label: "No ABS" },
+                { value: "yes", label: "Has ABS" },
+              ]}
             />
-            <SF
+            <EditSF
               label="Helmet"
               name="hasHelmet"
               value={motorcycle.hasHelmet ? "yes" : "no"}
-              options={[
-                { value: "no", label: "No Helmet" },
-                { value: "yes", label: "Includes Helmet" },
-              ]}
               onChange={(e) =>
                 handleInputChange({
                   target: {
@@ -1293,6 +1306,10 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                   },
                 })
               }
+              options={[
+                { value: "no", label: "No Helmet" },
+                { value: "yes", label: "Includes Helmet" },
+              ]}
             />
           </div>
           <div>

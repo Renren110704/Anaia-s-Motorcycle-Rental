@@ -43,8 +43,11 @@ const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 const fieldClsIcon =
   "w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 appearance-none";
+const fieldClsIconError =
+  "w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#b50002] bg-[#FDF0F0] text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002] appearance-none";
+const fieldErrorTextCls = "text-[11px] font-semibold text-[#b50002] mt-1.5";
 
-const IconField = ({ icon: Icon, label, children }) => (
+const IconField = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label className={labelCls}>{label}</label>}
     <div className="relative flex items-center">
@@ -53,6 +56,7 @@ const IconField = ({ icon: Icon, label, children }) => (
       )}
       {children}
     </div>
+    {error && <p className={fieldErrorTextCls}>{error}</p>}
   </div>
 );
 
@@ -911,6 +915,7 @@ const WalkInRentals = () => {
   const [submitting, setSubmitting] = useState(false);
   const [motorcycle, setMotorcycle] = useState(null);
   const [loadingCustomerInfo, setLoadingCustomerInfo] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const [calBookings, setCalBookings] = useState([]);
   const [maintenanceRanges, setMaintenanceRanges] = useState([]);
@@ -1123,6 +1128,47 @@ const WalkInRentals = () => {
     setFormData((p) => ({ ...p, returnDate: dateISO }));
   };
 
+  // Statuses that mean the customer already has a booking in progress and
+  // therefore cannot start a new walk-in rental until it's resolved.
+  const BLOCKING_BOOKING_STATUSES = [
+    "pending",
+    "pending_reservation",
+    "pending_full_payment",
+    "active",
+    "inspection",
+  ];
+
+  const describeBlockingStatus = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "active") return "Active";
+    if (s === "inspection") return "Inspection";
+    return "Pending";
+  };
+
+  // Looks through the bookings already loaded for the calendar to see if
+  // the given user has any booking (on any unit, any dates) that is
+  // Pending, Active, or Inspection. Returns that booking, or null.
+  const findBlockingBookingForUser = useCallback(
+    (userIdValue) => {
+      if (!userIdValue) return null;
+      return (
+        calBookings.find((b) => {
+          if (b.isDeleted) return false;
+          const rawUserId = b.userId || b.user;
+          const normalizedUserId =
+            rawUserId && typeof rawUserId === "object"
+              ? rawUserId._id || rawUserId.id
+              : rawUserId;
+          if (!normalizedUserId) return false;
+          if (String(normalizedUserId) !== String(userIdValue)) return false;
+          const status = String(b.status || "").toLowerCase();
+          return BLOCKING_BOOKING_STATUSES.includes(status);
+        }) || null
+      );
+    },
+    [calBookings],
+  );
+
   const handleLoadCustomerInfo = async () => {
     const email = formData.renterEmail.trim();
     if (!email) {
@@ -1141,6 +1187,17 @@ const WalkInRentals = () => {
 
       if (!user) {
         toast.error("No customer found with this email.");
+        return;
+      }
+
+      const userIdValue = user._id || user.id;
+      const blockingBooking = findBlockingBookingForUser(userIdValue);
+      if (blockingBooking) {
+        toast.error(
+          `This customer already has a booking with ${describeBlockingStatus(
+            blockingBooking.status,
+          )} status. A walk-in rental cannot be created until that booking is resolved.`,
+        );
         return;
       }
 
@@ -1366,7 +1423,33 @@ const WalkInRentals = () => {
         return;
       }
 
+      const loadedStatus = String(m.status || "").toLowerCase();
+      if (loadedStatus && loadedStatus !== "available") {
+        const STATUS_MESSAGES = {
+          rented:
+            "This unit currently has an active rental and is not available for walk-in booking.",
+          pending:
+            "This unit has a pending booking/reservation and is not available for walk-in booking.",
+          maintenance:
+            "This unit is under maintenance and is not available for walk-in booking.",
+          inspection:
+            "This unit is under inspection and is not available for walk-in booking.",
+        };
+        toast.error(
+          STATUS_MESSAGES[loadedStatus] ||
+            "This unit is not currently available for walk-in booking.",
+        );
+        setMotorcycle(null);
+        return;
+      }
+
       setMotorcycle(m);
+      setErrors((p) => {
+        if (!("unitId" in p)) return p;
+        const n = { ...p };
+        delete n.unitId;
+        return n;
+      });
       toast.success(`Loaded ${m.make || ""} ${m.model || ""}`.trim());
     } catch (err) {
       setMotorcycle(null);
@@ -1428,42 +1511,48 @@ const WalkInRentals = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const nextErrors = {};
+
     if (!motorcycle?._id) {
-      toast.error("Load a unit by Unit ID first.");
-      return;
+      nextErrors.unitId = "Load a unit by Unit ID first.";
     }
     if (!formData.customerName.trim()) {
-      toast.error("Customer full name is required.");
-      return;
+      nextErrors.customerName = "Customer full name is required.";
     }
     const renterEmail = String(formData.renterEmail || "").trim();
     if (!renterEmail) {
-      toast.error("Renter email address is required.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(renterEmail)) {
-      toast.error("Please enter a valid renter email address.");
-      return;
+      nextErrors.renterEmail = "Renter email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(renterEmail)) {
+      nextErrors.renterEmail = "Please enter a valid renter email address.";
     }
     const phone = formData.phone.replace(/\D/g, "");
     if (!/^09\d{9}$/.test(phone)) {
-      toast.error(
-        "Phone number must be numeric, 11 digits, and start with 09.",
-      );
-      return;
+      nextErrors.phone =
+        "Phone number must be numeric, 11 digits, and start with 09.";
     }
-    if (!address.regionCode || !address.cityCode || !address.barangayCode) {
-      toast.error("Please complete customer address up to barangay.");
-      return;
+    if (!address.regionCode) {
+      nextErrors.region = "Region is required.";
+    }
+    if (!address.cityCode) {
+      nextErrors.city = "City is required.";
+    }
+    if (!address.barangayCode) {
+      nextErrors.barangay = "Barangay is required.";
     }
     if (!formData.returnDate) {
-      toast.error("Return date is required.");
-      return;
+      nextErrors.returnDate = "Return date is required.";
     }
     if (!formData.destination || !formData.destinationCity) {
-      toast.error("Please select destination.");
+      nextErrors.destination = "Please select destination.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      toast.error("Please fix the highlighted fields.");
       return;
     }
+    setErrors({});
+
     if (
       formData.returnTime < RETURN_TIME_MIN ||
       formData.returnTime > RETURN_TIME_MAX
@@ -1512,6 +1601,18 @@ const WalkInRentals = () => {
         "Selected dates overlap with an existing booking or maintenance.",
       );
       return;
+    }
+
+    if (formData.userId) {
+      const blockingBooking = findBlockingBookingForUser(formData.userId);
+      if (blockingBooking) {
+        toast.error(
+          `This customer already has a booking with ${describeBlockingStatus(
+            blockingBooking.status,
+          )} status. Please resolve it before creating a new walk-in rental.`,
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -1626,7 +1727,7 @@ const WalkInRentals = () => {
     }
   };
 
-  const SelectRow = ({ icon: Icon, label, children }) => (
+  const SelectRow = ({ icon: Icon, label, error, children }) => (
     <div>
       {label && <label className={labelCls}>{label}</label>}
       <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
@@ -1634,6 +1735,7 @@ const WalkInRentals = () => {
         {children}
         <FaChevronDown className="absolute right-3 text-slate-300 text-[10px] pointer-events-none" />
       </div>
+      {error && <p className={fieldErrorTextCls}>{error}</p>}
     </div>
   );
 
@@ -1650,14 +1752,18 @@ const WalkInRentals = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {/* Left column — forms */}
             <div className="xl:col-span-2 space-y-4">
               {/* Motorcycle Unit */}
               <FormSection title="Unit Being Rented">
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-                  <IconField icon={FaSearch} label="Unit ID">
+                  <IconField
+                    icon={FaSearch}
+                    label="Unit ID"
+                    error={errors.unitId}
+                  >
                     <div className="relative w-full">
                       <input
                         type="text"
@@ -1665,13 +1771,21 @@ const WalkInRentals = () => {
                         onChange={(e) => {
                           setUnitIdInput(e.target.value.toUpperCase());
                           setShowUnitSuggestions(true);
+                          setErrors((p) => {
+                            if (!("unitId" in p)) return p;
+                            const n = { ...p };
+                            delete n.unitId;
+                            return n;
+                          });
                         }}
                         onFocus={() => setShowUnitSuggestions(true)}
                         onBlur={() =>
                           setTimeout(() => setShowUnitSuggestions(false), 120)
                         }
                         placeholder="e.g. UNIT-01"
-                        className={fieldClsIcon}
+                        className={
+                          errors.unitId ? fieldClsIconError : fieldClsIcon
+                        }
                       />
                       {showUnitSuggestions && unitIdInput.trim() && (
                         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
@@ -1680,38 +1794,57 @@ const WalkInRentals = () => {
                               Searching unit IDs...
                             </div>
                           ) : unitSuggestions.length ? (
-                            unitSuggestions.map((m) => (
-                              <button
-                                key={m._id}
-                                type="button"
-                                onMouseDown={() =>
-                                  chooseUnitSuggestion(m.unitId)
-                                }
-                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b last:border-b-0 border-slate-50 flex items-center gap-3 transition-colors"
-                              >
-                                <div className="w-11 h-8 rounded-lg overflow-hidden bg-slate-50 border border-slate-100 flex-shrink-0">
-                                  {m.image ? (
-                                    <img
-                                      src={getImageSrc(m.image)}
-                                      alt=""
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <FaMotorcycle className="text-slate-200 text-sm" />
-                                    </div>
+                            unitSuggestions.map((m) => {
+                              const mStatus = String(
+                                m?.status || "",
+                              ).toLowerCase();
+                              const isUnavailable =
+                                m?.isDeleted ||
+                                (mStatus && mStatus !== "available");
+                              const badgeLabel = m?.isDeleted
+                                ? "Deleted"
+                                : mStatus
+                                  ? mStatus.charAt(0).toUpperCase() +
+                                    mStatus.slice(1)
+                                  : "";
+                              return (
+                                <button
+                                  key={m._id}
+                                  type="button"
+                                  onMouseDown={() =>
+                                    chooseUnitSuggestion(m.unitId)
+                                  }
+                                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b last:border-b-0 border-slate-50 flex items-center gap-3 transition-colors"
+                                >
+                                  <div className="w-11 h-8 rounded-lg overflow-hidden bg-slate-50 border border-slate-100 flex-shrink-0">
+                                    {m.image ? (
+                                      <img
+                                        src={getImageSrc(m.image)}
+                                        alt=""
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <FaMotorcycle className="text-slate-200 text-sm" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-[#b50002] uppercase tracking-wider">
+                                      {m.unitId || "N/A"}
+                                    </p>
+                                    <p className="text-[11px] text-slate-400">
+                                      {(m.make || "") + " " + (m.model || "")}
+                                    </p>
+                                  </div>
+                                  {isUnavailable && badgeLabel && (
+                                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex-shrink-0">
+                                      {badgeLabel}
+                                    </span>
                                   )}
-                                </div>
-                                <div>
-                                  <p className="text-xs font-black text-[#b50002] uppercase tracking-wider">
-                                    {m.unitId || "N/A"}
-                                  </p>
-                                  <p className="text-[11px] text-slate-400">
-                                    {(m.make || "") + " " + (m.model || "")}
-                                  </p>
-                                </div>
-                              </button>
-                            ))
+                                </button>
+                              );
+                            })
                           ) : (
                             <div className="px-4 py-3 text-xs text-slate-400">
                               No matching Unit IDs found.
@@ -1823,35 +1956,57 @@ const WalkInRentals = () => {
               {/* Customer Information */}
               <FormSection title="Customer Information">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <IconField icon={FaUser} label="Full Name *">
+                  <IconField
+                    icon={FaUser}
+                    label="Full Name *"
+                    error={errors.customerName}
+                  >
                     <input
                       type="text"
                       value={formData.customerName}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData((p) => ({
                           ...p,
                           customerName: e.target.value,
-                        }))
-                      }
+                        }));
+                        setErrors((p) => {
+                          if (!("customerName" in p)) return p;
+                          const n = { ...p };
+                          delete n.customerName;
+                          return n;
+                        });
+                      }}
                       placeholder="Customer full name"
-                      className={fieldClsIcon}
+                      className={
+                        errors.customerName ? fieldClsIconError : fieldClsIcon
+                      }
                     />
                   </IconField>
 
-                  <IconField icon={FaEnvelope} label="Email Address *">
+                  <IconField
+                    icon={FaEnvelope}
+                    label="Email Address *"
+                    error={errors.renterEmail}
+                  >
                     <div className="flex w-full">
                       <input
                         type="email"
                         value={formData.renterEmail}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData((p) => ({
                             ...p,
                             renterEmail: e.target.value,
                             userId: null,
-                          }))
-                        }
+                          }));
+                          setErrors((p) => {
+                            if (!("renterEmail" in p)) return p;
+                            const n = { ...p };
+                            delete n.renterEmail;
+                            return n;
+                          });
+                        }}
                         placeholder="email@example.com"
-                        className={`${fieldClsIcon} rounded-r-none`}
+                        className={`${errors.renterEmail ? fieldClsIconError : fieldClsIcon} rounded-r-none`}
                       />
                       <button
                         type="button"
@@ -1864,18 +2019,30 @@ const WalkInRentals = () => {
                     </div>
                   </IconField>
 
-                  <IconField icon={FaPhone} label="Phone Number *">
+                  <IconField
+                    icon={FaPhone}
+                    label="Phone Number *"
+                    error={errors.phone}
+                  >
                     <input
                       type="text"
                       value={formData.phone}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData((p) => ({
                           ...p,
                           phone: e.target.value.replace(/\D/g, "").slice(0, 11),
-                        }))
-                      }
+                        }));
+                        setErrors((p) => {
+                          if (!("phone" in p)) return p;
+                          const n = { ...p };
+                          delete n.phone;
+                          return n;
+                        });
+                      }}
                       placeholder="09XXXXXXXXX"
-                      className={fieldClsIcon}
+                      className={
+                        errors.phone ? fieldClsIconError : fieldClsIcon
+                      }
                     />
                   </IconField>
                 </div>
@@ -1884,11 +2051,25 @@ const WalkInRentals = () => {
                 <div>
                   <label className={labelCls}>Customer Address *</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <SelectRow icon={FaMapMarkerAlt} label="">
+                    <SelectRow
+                      icon={FaMapMarkerAlt}
+                      label=""
+                      error={errors.region}
+                    >
                       <select
                         value={address.regionCode}
-                        onChange={onAddressRegion}
-                        className={fieldClsIcon}
+                        onChange={(e) => {
+                          onAddressRegion(e);
+                          setErrors((p) => {
+                            if (!("region" in p)) return p;
+                            const n = { ...p };
+                            delete n.region;
+                            return n;
+                          });
+                        }}
+                        className={
+                          errors.region ? fieldClsIconError : fieldClsIcon
+                        }
                       >
                         <option value="">
                           {loading.regions
@@ -1924,12 +2105,26 @@ const WalkInRentals = () => {
                         </select>
                       </SelectRow>
                     ) : (
-                      <SelectRow icon={FaMapMarkerAlt} label="">
+                      <SelectRow
+                        icon={FaMapMarkerAlt}
+                        label=""
+                        error={errors.city}
+                      >
                         <select
                           value={address.cityCode}
-                          onChange={onAddressCity}
+                          onChange={(e) => {
+                            onAddressCity(e);
+                            setErrors((p) => {
+                              if (!("city" in p)) return p;
+                              const n = { ...p };
+                              delete n.city;
+                              return n;
+                            });
+                          }}
                           disabled={!address.regionCode || loading.cities}
-                          className={fieldClsIcon}
+                          className={
+                            errors.city ? fieldClsIconError : fieldClsIcon
+                          }
                         >
                           <option value="">
                             {loading.cities
@@ -1946,12 +2141,26 @@ const WalkInRentals = () => {
                     )}
 
                     {hasProvinces && (
-                      <SelectRow icon={FaMapMarkerAlt} label="">
+                      <SelectRow
+                        icon={FaMapMarkerAlt}
+                        label=""
+                        error={errors.city}
+                      >
                         <select
                           value={address.cityCode}
-                          onChange={onAddressCity}
+                          onChange={(e) => {
+                            onAddressCity(e);
+                            setErrors((p) => {
+                              if (!("city" in p)) return p;
+                              const n = { ...p };
+                              delete n.city;
+                              return n;
+                            });
+                          }}
                           disabled={loading.cities || !address.provinceCode}
-                          className={fieldClsIcon}
+                          className={
+                            errors.city ? fieldClsIconError : fieldClsIcon
+                          }
                         >
                           <option value="">
                             {loading.cities
@@ -1967,12 +2176,26 @@ const WalkInRentals = () => {
                       </SelectRow>
                     )}
 
-                    <SelectRow icon={FaMapMarkerAlt} label="">
+                    <SelectRow
+                      icon={FaMapMarkerAlt}
+                      label=""
+                      error={errors.barangay}
+                    >
                       <select
                         value={address.barangayCode}
-                        onChange={onAddressBarangay}
+                        onChange={(e) => {
+                          onAddressBarangay(e);
+                          setErrors((p) => {
+                            if (!("barangay" in p)) return p;
+                            const n = { ...p };
+                            delete n.barangay;
+                            return n;
+                          });
+                        }}
                         disabled={!address.cityCode || loading.barangays}
-                        className={fieldClsIcon}
+                        className={
+                          errors.barangay ? fieldClsIconError : fieldClsIcon
+                        }
                       >
                         <option value="">
                           {loading.barangays
@@ -2050,17 +2273,33 @@ const WalkInRentals = () => {
                 <div>
                   <label className={labelCls}>Return</label>
                   <div className="grid grid-cols-2 gap-3">
-                    <InlineDatePicker
-                      value={formData.returnDate}
-                      onChange={handleReturnDateChange}
-                      minDate={addDaysToISODate(formData.pickupDate, 1)}
-                      maxDate={getNextUnavailableDate(formData.pickupDate)}
-                      label="Return Date"
-                      mode="return"
-                      pickupDateISO={formData.pickupDate}
-                      maintenanceRanges={currentMaintenanceRanges}
-                      bookingRanges={bookingRanges}
-                    />
+                    <div
+                      className={
+                        errors.returnDate
+                          ? "rounded-xl ring-1 ring-[#b50002] bg-[#FDF0F0]"
+                          : undefined
+                      }
+                    >
+                      <InlineDatePicker
+                        value={formData.returnDate}
+                        onChange={(dateISO) => {
+                          handleReturnDateChange(dateISO);
+                          setErrors((p) => {
+                            if (!("returnDate" in p)) return p;
+                            const n = { ...p };
+                            delete n.returnDate;
+                            return n;
+                          });
+                        }}
+                        minDate={addDaysToISODate(formData.pickupDate, 1)}
+                        maxDate={getNextUnavailableDate(formData.pickupDate)}
+                        label="Return Date"
+                        mode="return"
+                        pickupDateISO={formData.pickupDate}
+                        maintenanceRanges={currentMaintenanceRanges}
+                        bookingRanges={bookingRanges}
+                      />
+                    </div>
                     <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
                       <FaClock className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
                       <select
@@ -2088,21 +2327,41 @@ const WalkInRentals = () => {
                       <FaChevronDown className="absolute right-3 text-slate-300 text-[10px] pointer-events-none" />
                     </div>
                   </div>
+                  {errors.returnDate && (
+                    <p className={fieldErrorTextCls}>{errors.returnDate}</p>
+                  )}
                 </div>
 
                 {/* Destination */}
                 <div>
                   <label className={labelCls}>Primary Destination *</label>
-                  <DestinationSelect
-                    value={formData.destination}
-                    onChange={(destString, cityName) =>
-                      setFormData((p) => ({
-                        ...p,
-                        destination: destString,
-                        destinationCity: cityName || "",
-                      }))
+                  <div
+                    className={
+                      errors.destination
+                        ? "rounded-xl ring-1 ring-[#b50002] bg-[#FDF0F0]"
+                        : undefined
                     }
-                  />
+                  >
+                    <DestinationSelect
+                      value={formData.destination}
+                      onChange={(destString, cityName) => {
+                        setFormData((p) => ({
+                          ...p,
+                          destination: destString,
+                          destinationCity: cityName || "",
+                        }));
+                        setErrors((p) => {
+                          if (!("destination" in p)) return p;
+                          const n = { ...p };
+                          delete n.destination;
+                          return n;
+                        });
+                      }}
+                    />
+                  </div>
+                  {errors.destination && (
+                    <p className={fieldErrorTextCls}>{errors.destination}</p>
+                  )}
                   {formData.destinationCity && (
                     <div
                       className={`mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold border ${distanceFee === 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}
@@ -2330,14 +2589,14 @@ const WalkInRentals = () => {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={submitting || !motorcycle}
+                disabled={submitting}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <PlusCircle className="w-4 h-4" />
                 {submitting ? "Creating Booking..." : "Create Walk-In Booking"}
               </button>
 
-              {!motorcycle && (
+              {!motorcycle && !errors.unitId && (
                 <p className="text-center text-[11px] text-slate-400">
                   Load a unit by Unit ID to enable booking
                 </p>

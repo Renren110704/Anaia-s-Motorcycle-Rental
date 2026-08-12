@@ -487,7 +487,7 @@ export const getMotorcycles = async (req, res, next) => {
       ) {
         plain.image = getRelativeImagePath(plain.image);
       }
-      if (m.status !== "maintenance") {
+      if (m.status !== "maintenance" && m.status !== "inspection") {
         plain.status = deriveStatusFromBookings(m);
       }
 
@@ -530,7 +530,10 @@ export const getMotorcycleById = async (req, res, next) => {
     const plain = motorcycle.toObject();
     plain.availability = motorcycle.getAvailabilitySummary();
     plain.image = getRelativeImagePath(plain.image);
-    if (motorcycle.status !== "maintenance") {
+    if (
+      motorcycle.status !== "maintenance" &&
+      motorcycle.status !== "inspection"
+    ) {
       plain.status = deriveStatusFromBookings(motorcycle);
     }
 
@@ -593,7 +596,10 @@ export const getMotorcycleByUnitId = async (req, res, next) => {
     const plain = motorcycle.toObject();
     plain.availability = motorcycle.getAvailabilitySummary();
     plain.image = getRelativeImagePath(plain.image);
-    if (motorcycle.status !== "maintenance") {
+    if (
+      motorcycle.status !== "maintenance" &&
+      motorcycle.status !== "inspection"
+    ) {
       plain.status = deriveStatusFromBookings(motorcycle);
     }
 

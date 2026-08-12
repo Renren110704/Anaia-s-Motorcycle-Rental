@@ -6,6 +6,7 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaFileExport,
+  FaFileInvoiceDollar,
   FaFilter,
   FaMoneyBillWave,
   FaMotorcycle,
@@ -21,6 +22,7 @@ import {
   CheckCircle2,
   CreditCard,
   BarChart3,
+  Wallet,
 } from "lucide-react";
 import ExportCSVModal from "./ExportCSVModal";
 import PrintReportModal from "./PrintReportModal";
@@ -30,7 +32,92 @@ const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
 const PAGE_LIMIT = 1000;
 
-const formatMoney = (n) => `₱${Math.round(Number(n || 0)).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+// ── Semantic color system ───────────────────────────────────────────────────
+// A small, deliberate palette anchored on the brand red. Just four accent
+// colors total (brand, success, warning, info) plus true gray for "neutral" —
+// every stat card, badge, and bar maps to one of these, so the same meaning
+// always reads the same color throughout the dashboard, and the dashboard as
+// a whole reads as one coordinated palette instead of a rainbow of hues.
+const TONES = {
+  brand: {
+    dot: "bg-[#b50002]",
+    icon: "text-[#b50002]",
+    iconBg: "bg-[#b50002]/10",
+    text: "text-[#b50002]",
+    badgeBg: "bg-red-50 border-red-100",
+  },
+  success: {
+    dot: "bg-emerald-600",
+    icon: "text-emerald-600",
+    iconBg: "bg-emerald-50",
+    text: "text-emerald-600",
+    badgeBg: "bg-emerald-50 border-emerald-100",
+  },
+  warning: {
+    dot: "bg-amber-600",
+    icon: "text-amber-600",
+    iconBg: "bg-amber-50",
+    text: "text-amber-600",
+    badgeBg: "bg-amber-50 border-amber-100",
+  },
+  info: {
+    dot: "bg-blue-600",
+    icon: "text-blue-600",
+    iconBg: "bg-blue-50",
+    text: "text-blue-600",
+    badgeBg: "bg-blue-50 border-blue-100",
+  },
+  // True gray, not a fifth hue — for counts that carry no status meaning.
+  neutral: {
+    dot: "bg-slate-500",
+    icon: "text-slate-500",
+    iconBg: "bg-slate-100",
+    text: "text-slate-500",
+    badgeBg: "bg-slate-50 border-slate-200",
+  },
+};
+
+// ── Return-inspection violation keys that represent actual repair costs ────
+// (as opposed to soft/behavioral penalties like Dirty, Late Return, or
+// Geofence Exceeded). Mirrors the `repair: true` flags on
+// INSPECTION_MATRIX_DEFAULTS in motorcycleBookingController.js — kept in
+// sync manually since analytics reads plain booking JSON, not the matrix
+// definitions themselves.
+const REPAIR_VIOLATION_KEYS = [
+  "minor_scratches",
+  "major_damage",
+  "tire_damage",
+  "mirror_damage",
+  "helmet_damage",
+];
+
+// Splits a booking's returnInspection violations into repair-cost amount and
+// non-repair penalty amount. Falls back to treating the entire legacy
+// `penaltyAmount` as a non-repair penalty when no itemized `violations`
+// array is present (older records created before the matrix existed).
+const splitRepairAndPenaltyAmounts = (returnInspection) => {
+  const violations = Array.isArray(returnInspection?.violations)
+    ? returnInspection.violations
+    : null;
+
+  if (violations && violations.length) {
+    let repair = 0;
+    let penalty = 0;
+    violations.forEach((v) => {
+      const amount = Number(v?.amount || 0);
+      if (REPAIR_VIOLATION_KEYS.includes(v?.key)) repair += amount;
+      else penalty += amount;
+    });
+    return { repair, penalty };
+  }
+
+  // No itemized breakdown available — keep old behavior (whole amount
+  // counted as a general penalty) so historical totals don't shift.
+  return { repair: 0, penalty: Number(returnInspection?.penaltyAmount || 0) };
+};
+
+const formatMoney = (n) =>
+  `₱${Math.round(Number(n || 0)).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 const monthKey = (dateLike) => {
   const d = new Date(dateLike);
@@ -43,41 +130,43 @@ const StatCard = ({
   label,
   value,
   sub,
-  subColor,
+  tone = "neutral",
   icon: Icon,
-  accent,
   onClick,
   isActive,
   loading,
-}) => (
-  <button
-    onClick={onClick}
-    className={`relative text-left bg-white rounded-2xl border shadow-sm p-5 overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full
-      ${isActive ? "border-[#b50002]/30 ring-2 ring-[#b50002]/20" : "border-slate-100"}`}
-  >
-    <div
-      className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
-    />
-    <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
-        {label}
-      </p>
+}) => {
+  const t = TONES[tone] || TONES.neutral;
+  return (
+    <button
+      onClick={onClick}
+      className={`relative text-left bg-white rounded-2xl border shadow-sm p-5 overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full
+        ${isActive ? "border-[#b50002]/30 ring-2 ring-[#b50002]/20" : "border-slate-100"}`}
+    >
       <div
-        className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10`}
-      >
-        <Icon className={`w-4 h-4 ${accent.replace("bg-", "text-")}`} />
+        className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-[0.07] blur-xl ${t.dot}`}
+      />
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+          {label}
+        </p>
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center ${t.iconBg}`}
+        >
+          <Icon className={`w-4 h-4 ${t.icon}`} />
+        </div>
       </div>
-    </div>
-    <p className="text-[2rem] font-black text-[#171717] leading-none mb-2">
-      {loading ? (
-        <span className="inline-block w-16 h-7 bg-slate-100 rounded-lg animate-pulse" />
-      ) : (
-        value
-      )}
-    </p>
-    {sub && <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>}
-  </button>
-);
+      <p className="text-[2rem] font-black text-[#171717] leading-none mb-2">
+        {loading ? (
+          <span className="inline-block w-16 h-7 bg-slate-100 rounded-lg animate-pulse" />
+        ) : (
+          value
+        )}
+      </p>
+      {sub && <p className={`text-[11px] font-semibold ${t.text}`}>{sub}</p>}
+    </button>
+  );
+};
 
 // ── Section card wrapper ──────────────────────────────────────────────────────
 const SectionCard = ({ title, icon: Icon, children, action }) => (
@@ -95,46 +184,52 @@ const SectionCard = ({ title, icon: Icon, children, action }) => (
   </div>
 );
 
-// ── Bar distribution row ──────────────────────────────────────────────────────
-const DistributionRow = ({
-  label,
-  count,
-  max,
-  color = "bg-[#b50002]",
-  suffix = "",
-}) => {
-  const pct = max ? Math.max(4, Math.round((count / max) * 100)) : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[12px] font-semibold text-slate-600 truncate max-w-[60%]">
+// ── Top unit rank row (leaderboard-style, used only for Top Requested Units) ──
+const UNIT_RANK_COLOR = "#2d63a9"; // matches the evenly-weighted info blue in CHART_COLORS
+
+const UnitRankRow = ({ rank, label, count, share }) => (
+  <div className="flex items-center gap-3">
+    <div
+      className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white"
+      style={{ backgroundColor: UNIT_RANK_COLOR }}
+    >
+      {rank}
+    </div>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <span className="text-[13px] font-bold text-[#171717] truncate">
           {label}
         </span>
-        <span className="text-[12px] font-black text-[#171717]">
-          {suffix}
-          {count.toLocaleString()}
+        <span className="text-[12px] font-black text-slate-600 whitespace-nowrap">
+          {count.toLocaleString()}{" "}
+          <span className="text-slate-400 font-semibold">({share}%)</span>
         </span>
       </div>
-      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full ${color} transition-all duration-700`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${Math.max(4, share)}%`,
+            backgroundColor: UNIT_RANK_COLOR,
+          }}
         />
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-// ── Donut Chart ───────────────────────────────────────────────────────────────
+// Same saturation and lightness across every color (only hue changes), so
+// no donut segment reads visually heavier, darker, or duller than another —
+// the color differences come purely from hue, not from mismatched weight.
 const CHART_COLORS = [
-  "#b50002",
-  "#171717",
-  "#2563eb",
-  "#16a34a",
-  "#f59e0b",
-  "#7c3aed",
-  "#0891b2",
-  "#be123c",
+  "#a92d31", // brand red
+  "#2d63a9", // info blue
+  "#2da96f", // success green
+  "#a9732d", // warning amber
+  "#5e6978", // neutral gray
+  "#7ea7dd", // light blue (overflow)
+  "#7eddb1", // light green (overflow)
+  "#a4acb7", // light gray (overflow)
 ];
 
 const DonutChart = ({ items }) => {
@@ -160,15 +255,15 @@ const DonutChart = ({ items }) => {
     <div className="flex flex-col items-center gap-5">
       <div className="flex items-center justify-center">
         <div
-          className="relative h-28 w-28 rounded-full"
+          className="relative h-40 w-40 rounded-full"
           style={{ background: `conic-gradient(${stops})` }}
         >
-          <div className="absolute inset-4 rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
+          <div className="absolute inset-[14px] rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
             <div>
               <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
                 Total
               </p>
-              <p className="text-xl font-black text-[#171717] leading-none">
+              <p className="text-2xl font-black text-[#171717] leading-none">
                 {total}
               </p>
             </div>
@@ -427,6 +522,52 @@ const AdminAnalytics = () => {
       );
     }, 0);
 
+    // Security deposits: how much is currently collected, how much has been
+    // returned to renters, and how much is still being held (outstanding).
+    // A deposit can be returned either in full (cleared, no violations) or
+    // partially (penalty settled — deposit.deductions were applied).
+    const depositsCollected = filteredBookings.filter(
+      (b) => b.securityDeposit?.collected,
+    );
+    const securityDepositsCollectedCount = depositsCollected.length;
+    const securityDepositsHeldCount = depositsCollected.filter(
+      (b) => !b.securityDeposit?.returned,
+    ).length;
+    const securityDepositsReturnedCount = depositsCollected.filter(
+      (b) => b.securityDeposit?.returned,
+    ).length;
+    const securityDepositsFullyRefundedCount = depositsCollected.filter(
+      (b) =>
+        b.securityDeposit?.returned && !Number(b.securityDeposit?.deductions),
+    ).length;
+    const securityDepositsPartiallyRefundedCount = depositsCollected.filter(
+      (b) =>
+        b.securityDeposit?.returned &&
+        Number(b.securityDeposit?.deductions) > 0,
+    ).length;
+    const securityDepositsOutstanding = depositsCollected.reduce(
+      (sum, b) =>
+        b.securityDeposit?.returned
+          ? sum
+          : sum + Number(b.securityDeposit?.amount || 1000),
+      0,
+    );
+    const securityDepositsReturnedAmount = depositsCollected.reduce(
+      (sum, b) =>
+        b.securityDeposit?.returned
+          ? sum + Number(b.securityDeposit?.returnedAmount || 0)
+          : sum,
+      0,
+    );
+    const securityDepositsDeductedAmount = depositsCollected.reduce(
+      (sum, b) => sum + Number(b.securityDeposit?.deductions || 0),
+      0,
+    );
+    const securityDepositsBalanceDueAmount = depositsCollected.reduce(
+      (sum, b) => sum + Number(b.securityDeposit?.balanceDue || 0),
+      0,
+    );
+
     return {
       totalBookings,
       activeRentals,
@@ -437,6 +578,15 @@ const AdminAnalytics = () => {
       reuploadRequested,
       totalRevenue,
       totalDueAtPickup,
+      securityDepositsCollectedCount,
+      securityDepositsHeldCount,
+      securityDepositsReturnedCount,
+      securityDepositsFullyRefundedCount,
+      securityDepositsPartiallyRefundedCount,
+      securityDepositsOutstanding,
+      securityDepositsReturnedAmount,
+      securityDepositsDeductedAmount,
+      securityDepositsBalanceDueAmount,
     };
   }, [filteredBookings]);
 
@@ -462,11 +612,21 @@ const AdminAnalytics = () => {
         : 0;
       const helmetFee = Number(b.details?.helmetFee || 0);
       const distanceFee = Number(b.details?.distanceFee || 0);
-      const penaltyAmount = Number(b.returnInspection?.penaltyAmount || 0);
+
+      // Repair-related violations (Minor Scratches, Major Damage, Tire /
+      // Mirror / Helmet damage) are true repair expenses; everything else
+      // charged during return inspection (Dirty, Late Return, Geofence
+      // Exceeded) is a behavioral penalty, not a repair cost. The legacy
+      // mechanic-entered repairEstimateAmount is also a repair cost.
+      const { repair: repairViolationAmount, penalty: nonRepairPenaltyAmount } =
+        splitRepairAndPenaltyAmounts(b.returnInspection);
       const repairEstimate = Number(
         b.returnInspection?.repairEstimateAmount || 0,
       );
-      const penaltyAndDamageAmount = penaltyAmount + repairEstimate;
+      const repairAmount = repairViolationAmount + repairEstimate;
+      const penaltyAmount = nonRepairPenaltyAmount;
+      const penaltyAndDamageAmount = penaltyAmount + repairAmount;
+
       const amountTotal = Number(b.amount || 0);
       const baseRental = Math.max(
         0,
@@ -485,13 +645,15 @@ const AdminAnalytics = () => {
         if (extensionAdditional && b.status !== "completed")
           t.pendingExtensions += extensionAdditional;
       }
-      if (b.status === "completed") {
-        if (extensionAdditional) t.extensions += extensionAdditional;
-        if (penaltyAndDamageAmount) t.penalties += penaltyAndDamageAmount;
+      const settled =
+        b.status === "completed" ||
+        (b.returnInspection?.penaltySettled && b.status !== "completed");
+      if (b.status === "completed" && extensionAdditional)
+        t.extensions += extensionAdditional;
+      if (settled) {
+        if (penaltyAmount) t.penalties += penaltyAmount;
+        if (repairAmount) t.expenses += repairAmount;
       }
-      if (b.returnInspection?.penaltySettled && b.status !== "completed")
-        t.penalties += penaltyAndDamageAmount;
-      if (repairEstimate) t.expenses += repairEstimate;
       const attributed =
         baseRental +
         extensionAdditional +
@@ -624,96 +786,105 @@ const AdminAnalytics = () => {
       label: "Total Bookings",
       value: metrics.totalBookings,
       sub: selectedPeriodLabel,
-      subColor: "text-slate-400",
+      tone: "neutral",
       icon: FaCalendarAlt,
-      accent: "bg-violet-500",
     },
     {
       label: "Revenue",
       value: formatMoney(metrics.totalRevenue),
       sub: "Confirmed payments",
-      subColor: "text-emerald-500",
+      tone: "success",
       icon: FaMoneyBillWave,
-      accent: "bg-emerald-500",
     },
     {
       label: "Due At Pickup",
       value: formatMoney(metrics.totalDueAtPickup),
       sub: "Outstanding balance",
-      subColor: "text-amber-500",
+      tone: "warning",
       icon: CreditCard,
-      accent: "bg-amber-500",
     },
     {
       label: "Active Rentals",
       value: metrics.activeRentals,
       sub: `${fleetStats.rented} units out`,
-      subColor: "text-blue-500",
+      tone: "info",
       icon: Bike,
-      accent: "bg-blue-500",
     },
     {
       label: "Pending Reservation",
       value: metrics.pendingReservations,
       sub: "Awaiting confirmation",
-      subColor: "text-violet-500",
+      tone: "neutral",
       icon: Clock,
-      accent: "bg-violet-500",
     },
     {
       label: "Pending Full Payment",
       value: metrics.pendingFullPayment,
       sub: "Balance due",
-      subColor: "text-amber-500",
+      tone: "warning",
       icon: CheckCircle2,
-      accent: "bg-amber-500",
     },
-    {
-      label: "Suspected Fake",
-      value: metrics.suspectedFake,
-      sub: `${metrics.reuploadRequested} re-upload requests`,
-      subColor: "text-red-500",
-      icon: FaShieldAlt,
-      accent: "bg-[#b50002]",
-    },
+    // {
+    //   label: "Suspected Fake",
+    //   value: metrics.suspectedFake,
+    //   sub: `${metrics.reuploadRequested} re-upload requests`,
+    //   tone: "brand",
+    //   icon: FaShieldAlt,
+    // },
     {
       label: "Completed",
       value: metrics.completed,
       sub: "Finished rentals",
-      subColor: "text-emerald-500",
+      tone: "success",
       icon: FaCheckCircle,
-      accent: "bg-emerald-500",
     },
+    {
+      label: "Security Deposits Held",
+      value: formatMoney(metrics.securityDepositsOutstanding),
+      sub: `${metrics.securityDepositsHeldCount} held · ${metrics.securityDepositsReturnedCount} returned`,
+      tone: "info",
+      icon: Wallet,
+    },
+    // {
+    //   label: "Deposit Deductions",
+    //   value: formatMoney(metrics.securityDepositsDeductedAmount),
+    //   sub:
+    //     metrics.securityDepositsBalanceDueAmount > 0
+    //       ? `${metrics.securityDepositsPartiallyRefundedCount} partial · ${formatMoney(metrics.securityDepositsBalanceDueAmount)} owed`
+    //       : `${metrics.securityDepositsFullyRefundedCount} full · ${metrics.securityDepositsPartiallyRefundedCount} partial refund${metrics.securityDepositsPartiallyRefundedCount === 1 ? "" : "s"}`,
+    //   tone: metrics.securityDepositsBalanceDueAmount > 0 ? "brand" : "warning",
+    //   icon: FaFileInvoiceDollar,
+    // },
   ];
 
   const fleetStatCards = [
     {
       label: "Available",
       value: fleetStats.available,
-      color: "bg-emerald-500",
-      text: "text-emerald-600",
-      bg: "bg-emerald-50 border-emerald-200",
+      color: TONES.success.dot,
+      text: TONES.success.text,
+      bg: TONES.success.badgeBg,
     },
     {
       label: "Rented",
       value: fleetStats.rented,
-      color: "bg-blue-500",
-      text: "text-blue-600",
-      bg: "bg-blue-50 border-blue-200",
+      color: TONES.info.dot,
+      text: TONES.info.text,
+      bg: TONES.info.badgeBg,
     },
     {
       label: "Pending",
       value: fleetStats.pending,
-      color: "bg-violet-500",
-      text: "text-violet-600",
-      bg: "bg-violet-50 border-violet-200",
+      color: TONES.neutral.dot,
+      text: TONES.neutral.text,
+      bg: TONES.neutral.badgeBg,
     },
     {
       label: "Maintenance",
       value: fleetStats.maintenance,
-      color: "bg-amber-500",
-      text: "text-amber-600",
-      bg: "bg-amber-50 border-amber-200",
+      color: TONES.warning.dot,
+      text: TONES.warning.text,
+      bg: TONES.warning.badgeBg,
     },
   ];
 
@@ -864,10 +1035,7 @@ const AdminAnalytics = () => {
               <SectionCard title="Booking Status" icon={BarChart3}>
                 <DonutChart items={bookingStatusData} />
               </SectionCard>
-              <SectionCard
-                title="Payment Method (Res)"
-                icon={CreditCard}
-              >
+              <SectionCard title="Payment Method (Res)" icon={CreditCard}>
                 <DonutChart items={reservationPaymentMethodData} />
               </SectionCard>
               <SectionCard title="Payment Method (Full)" icon={CreditCard}>
@@ -882,16 +1050,24 @@ const AdminAnalytics = () => {
                   No bookings yet
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {topMotorcycles.map((m) => (
-                    <DistributionRow
-                      key={m.label}
-                      label={m.label}
-                      count={m.count}
-                      max={topMotorcycles[0].count}
-                      color="bg-blue-500"
-                    />
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                  {(() => {
+                    const topTotal = topMotorcycles.reduce(
+                      (s, x) => s + x.count,
+                      0,
+                    );
+                    return topMotorcycles.map((m, idx) => (
+                      <UnitRankRow
+                        key={m.label}
+                        rank={idx + 1}
+                        label={m.label}
+                        count={m.count}
+                        share={
+                          topTotal ? Math.round((m.count / topTotal) * 100) : 0
+                        }
+                      />
+                    ));
+                  })()}
                 </div>
               )}
             </SectionCard>
@@ -959,7 +1135,7 @@ const AdminAnalytics = () => {
                   {
                     label: "Extensions",
                     value: earningsAndExpenses.extensions,
-                    color: "text-violet-600",
+                    color: "text-slate-600",
                   },
                   {
                     label: "Penalties",
@@ -1014,8 +1190,69 @@ const AdminAnalytics = () => {
               </div>
             </div>
 
-            {/* Receipt integrity */}
+            {/* Security Deposits breakdown */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                Security Deposits
+              </h3>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Collected
+                  </span>
+                  <span className="text-[12px] font-black text-[#171717]">
+                    {metrics.securityDepositsCollectedCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Currently Held
+                  </span>
+                  <span className="text-[12px] font-black text-blue-600">
+                    {metrics.securityDepositsHeldCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Fully Refunded
+                  </span>
+                  <span className="text-[12px] font-black text-emerald-600">
+                    {metrics.securityDepositsFullyRefundedCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Partially Refunded
+                  </span>
+                  <span className="text-[12px] font-black text-amber-600">
+                    {metrics.securityDepositsPartiallyRefundedCount}
+                  </span>
+                </div>
+                {metrics.securityDepositsDeductedAmount > 0 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                    <span className="text-[11px] font-semibold text-amber-600">
+                      Total Deducted
+                    </span>
+                    <span className="text-[12px] font-black text-amber-600">
+                      {formatMoney(metrics.securityDepositsDeductedAmount)}
+                    </span>
+                  </div>
+                )}
+                {metrics.securityDepositsBalanceDueAmount > 0 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] font-semibold text-[#b50002]">
+                      Balance Still Owed
+                    </span>
+                    <span className="text-[12px] font-black text-[#b50002]">
+                      {formatMoney(metrics.securityDepositsBalanceDueAmount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Receipt integrity */}
+            {/* <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <h3 className="font-black text-[#171717] text-[14px] mb-4">
                 Receipt Integrity
               </h3>
@@ -1043,7 +1280,7 @@ const AdminAnalytics = () => {
                   <FaExclamationTriangle className="text-amber-500 text-xl opacity-40" />
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

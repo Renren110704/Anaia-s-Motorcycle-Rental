@@ -175,23 +175,37 @@ const OtpBoxInput = ({ value, onChange, length = 6 }) => {
 };
 
 /* ── Field wrapper ───────────────────────────────────────────────── */
-const Field = ({ icon: Icon, label, children }) => (
+const errorTextStyle = {
+  color: "#b50002",
+  fontSize: 11,
+  fontWeight: 600,
+  marginTop: 6,
+  fontFamily: "'Space Grotesk', sans-serif",
+};
+
+const Field = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
     <div
-      style={inputWrapBase}
+      style={{
+        ...inputWrapBase,
+        ...(error ? { borderColor: "#b50002", background: "#FDF0F0" } : null),
+      }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = "#b50002";
-        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#fff";
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-        e.currentTarget.style.background = "#F5F5F3";
+        e.currentTarget.style.borderColor = error
+          ? "#b50002"
+          : "rgba(0,0,0,0.09)";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#F5F5F3";
       }}
     >
       {Icon && <Icon style={iconBase} />}
       {children}
     </div>
+    {error && <p style={errorTextStyle}>{error}</p>}
   </div>
 );
 
@@ -366,6 +380,34 @@ const Login = () => {
 
   // New Remember Me state
   const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  // Login lockout countdown (populated when the backend returns a 423 with
+  // a lockedUntil timestamp, e.g. after too many failed password attempts).
+  const [lockedUntil, setLockedUntil] = useState(null); // epoch ms
+  const [lockRemaining, setLockRemaining] = useState(0); // seconds
+
+  useEffect(() => {
+    if (!lockedUntil) {
+      setLockRemaining(0);
+      return;
+    }
+    const tick = () => {
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((lockedUntil - Date.now()) / 1000),
+      );
+      setLockRemaining(secondsLeft);
+      if (secondsLeft <= 0) {
+        setLockedUntil(null);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  const isLocked = Boolean(lockedUntil) && lockRemaining > 0;
 
   // Load remembered email on mount
   useEffect(() => {
@@ -389,8 +431,34 @@ const Login = () => {
     cooldownSeconds: 60,
   });
 
-  const handleChange = (e) =>
-    setCredentials((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+    // Editing the email clears any lockout countdown shown for a previous
+    // account so it doesn't linger while trying a different login.
+    if (name === "email") {
+      setLockedUntil(null);
+    }
+    setCredentials((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateLogin = () => {
+    const next = {};
+    if (!credentials.email.trim()) {
+      next.email = "Email is required";
+    } else if (!EMAIL_RE.test(credentials.email.trim())) {
+      next.email = "Enter a valid email address";
+    }
+    if (!credentials.password) next.password = "Password is required";
+    return next;
+  };
 
   const handleResendVerification = async () => {
     if (
@@ -439,12 +507,20 @@ const Login = () => {
         setStep(2);
       } else toast.error("Unable to resend OTP");
     } catch (err) {
-      if (err.response?.data?.needsVerification) {
+      const data = err.response?.data;
+      if (data?.needsVerification) {
         setNeedsVerification(true);
         setUnverifiedEmail(credentials.email);
         toast.error("Please verify your email first.", { autoClose: 5000 });
         setStep(1);
-      } else toast.error(err.response?.data?.message || "Failed to resend OTP");
+      } else if (err.response?.status === 423 && data?.lockedUntil) {
+        setLockedUntil(new Date(data.lockedUntil).getTime());
+        toast.error(
+          data.message ||
+            "Too many failed login attempts. Please try again after 10 minutes.",
+        );
+        setStep(1);
+      } else toast.error(data?.message || "Failed to resend OTP");
     } finally {
       setResendingLoginOtp(false);
     }
@@ -452,6 +528,13 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLocked) return;
+    const stepErrors = validateLogin();
+    setErrors(stepErrors);
+    if (Object.keys(stepErrors).length > 0) {
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
     setLoading(true);
     setNeedsVerification(false);
     try {
@@ -467,11 +550,18 @@ const Login = () => {
         }
       }
     } catch (err) {
-      if (err.response?.data?.needsVerification) {
+      const data = err.response?.data;
+      if (data?.needsVerification) {
         setNeedsVerification(true);
         setUnverifiedEmail(credentials.email);
         toast.error("Please verify your email first.", { autoClose: 5000 });
-      } else toast.error(err.response?.data?.message || "Login failed");
+      } else if (err.response?.status === 423 && data?.lockedUntil) {
+        setLockedUntil(new Date(data.lockedUntil).getTime());
+        toast.error(
+          data.message ||
+            "Too many failed login attempts. Please try again after 10 minutes.",
+        );
+      } else toast.error(data?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -749,8 +839,12 @@ const Login = () => {
 
             {/* ── STEP 1 — Credentials ── */}
             {step === 1 && (
-              <form onSubmit={handleSubmit} className="lg-form">
-                <Field icon={FaEnvelope} label="Email Address">
+              <form onSubmit={handleSubmit} className="lg-form" noValidate>
+                <Field
+                  icon={FaEnvelope}
+                  label="Email Address"
+                  error={errors.email}
+                >
                   <input
                     type="email"
                     name="email"
@@ -766,14 +860,25 @@ const Login = () => {
                 <div>
                   <label style={labelStyle}>Password</label>
                   <div
-                    style={inputWrapBase}
+                    style={{
+                      ...inputWrapBase,
+                      ...(errors.password
+                        ? { borderColor: "#b50002", background: "#FDF0F0" }
+                        : null),
+                    }}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = "#b50002";
-                      e.currentTarget.style.background = "#fff";
+                      e.currentTarget.style.background = errors.password
+                        ? "#FDF0F0"
+                        : "#fff";
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-                      e.currentTarget.style.background = "#F5F5F3";
+                      e.currentTarget.style.borderColor = errors.password
+                        ? "#b50002"
+                        : "rgba(0,0,0,0.09)";
+                      e.currentTarget.style.background = errors.password
+                        ? "#FDF0F0"
+                        : "#F5F5F3";
                     }}
                   >
                     <FaLock style={iconBase} />
@@ -805,6 +910,9 @@ const Login = () => {
                       {showPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
+                  {errors.password && (
+                    <p style={errorTextStyle}>{errors.password}</p>
+                  )}
                 </div>
 
                 {/* Remember Me and Forgot Password Row */}
@@ -888,13 +996,45 @@ const Login = () => {
                   </div>
                 )}
 
+                {isLocked && (
+                  <div className="lg-notice lg-notice-red">
+                    <FaShieldAlt
+                      style={{
+                        color: "#b50002",
+                        fontSize: 11,
+                        marginTop: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div>
+                      <p
+                        style={{
+                          fontWeight: 700,
+                          color: "#7a0002",
+                          fontSize: 11,
+                          marginBottom: 4,
+                        }}
+                      >
+                        Account temporarily locked
+                      </p>
+                      <p style={{ fontSize: 11, color: "rgba(0,0,0,0.6)" }}>
+                        Too many failed login attempts. Try again in{" "}
+                        <strong style={{ color: "#0E0E0E" }}>
+                          {formatCooldown(lockRemaining)}
+                        </strong>
+                        .
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="lg-footer">
                   <p className="lg-link">
                     No account? <a href="/signup">Create one</a>
                   </p>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || isLocked}
                     className="lg-submit lg-submit-dark"
                   >
                     {loading ? (
@@ -911,6 +1051,8 @@ const Login = () => {
                         />{" "}
                         Signing in…
                       </>
+                    ) : isLocked ? (
+                      <>Locked — {formatCooldown(lockRemaining)}</>
                     ) : (
                       <>
                         Sign In <FaChevronRight style={{ fontSize: 9 }} />

@@ -1,5 +1,6 @@
 import express from "express";
 import ContactMessage from "../models/ContactMessage.js";
+import adminAuth from "../middlewares/adminAuth.js";
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/contact-messages (admin)
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     const messages = await ContactMessage.find().sort({ createdAt: -1 });
     res.json(messages);
@@ -50,7 +51,7 @@ router.get("/", async (req, res) => {
 });
 
 // PATCH /api/contact-messages/:id/reply (admin)
-router.patch("/:id/reply", async (req, res) => {
+router.patch("/:id/reply", adminAuth, async (req, res) => {
   try {
     const { replyMessage } = req.body;
     if (!replyMessage?.trim())

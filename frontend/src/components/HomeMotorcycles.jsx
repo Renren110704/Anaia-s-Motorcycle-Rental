@@ -17,25 +17,40 @@ const startOfDay = (d) => {
   return x;
 };
 
-const renderStars = (rating) => {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) {
-      stars.push(<FaStar key={i} style={{ color: "#f59e0b", fontSize: 11 }} />);
-    } else if (rating >= i - 0.5) {
-      stars.push(
-        <FaStarHalfAlt key={i} style={{ color: "#f59e0b", fontSize: 11 }} />,
-      );
-    } else {
-      stars.push(
-        <FaRegStar
-          key={i}
-          style={{ color: "rgba(0,0,0,0.15)", fontSize: 11 }}
-        />,
-      );
-    }
-  }
-  return stars;
+const renderStars = (rating, size = 11) => {
+  const numericRating = Math.max(0, Math.min(5, Number(rating) || 0));
+  return [1, 2, 3, 4, 5].map((i) => {
+    const starFill = Math.max(0, Math.min(1, numericRating - (i - 1)));
+    return (
+      <span
+        key={i}
+        style={{
+          position: "relative",
+          display: "inline-block",
+          width: size,
+          height: size,
+          lineHeight: 0,
+        }}
+      >
+        <FaStar
+          size={size}
+          style={{ display: "block", color: "rgba(0,0,0,0.15)" }}
+        />
+        <span
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            overflow: "hidden",
+            width: `${starFill * 100}%`,
+            height: "100%",
+          }}
+        >
+          <FaStar size={size} style={{ display: "block", color: "#f59e0b" }} />
+        </span>
+      </span>
+    );
+  });
 };
 
 const computeEffectiveAvailability = (motorcycle) => {
@@ -294,7 +309,7 @@ const HomeMotorcycles = () => {
         avail.setDate(avail.getDate() + 1);
         return { label: `Available ${formatDate(avail)}`, color: "booked" };
       }
-      return { label: "Booked", color: "booked" };
+      return { label: "", color: "booked" };
     }
     return { label: "", color: "available" };
   };
@@ -306,9 +321,12 @@ const HomeMotorcycles = () => {
   };
 
   const handleBook = (motorcycle) => {
-    // if (isBookDisabled(motorcycle)) return;
+    const disabled = isBookDisabled(motorcycle);
     navigate(`/motorcycles/${motorcycle._id || motorcycle.id}`, {
-      state: { motorcycle },
+      state: {
+        motorcycle,
+        showCalendar: disabled,
+      },
     });
   };
 
@@ -910,7 +928,7 @@ const HomeMotorcycles = () => {
                     >
                       {disabled ? (
                         <>
-                          Check Availability <ArrowRight size={13} />
+                          View Availability <ArrowRight size={13} />
                         </>
                       ) : (
                         <>

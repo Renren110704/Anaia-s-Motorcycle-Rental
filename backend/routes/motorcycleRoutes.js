@@ -11,6 +11,7 @@ import {
   getDeletedMotorcycles,
 } from "../controllers/motorcycleController.js";
 import { uploads } from "../middlewares/uploads.js";
+import adminAuth from "../middlewares/adminAuth.js";
 
 const motorcycleRouter = express.Router();
 
@@ -18,15 +19,13 @@ const motorcycleRouter = express.Router();
 motorcycleRouter.get("/", getMotorcycles);
 motorcycleRouter.get("/unit/:unitId", getMotorcycleByUnitId);
 motorcycleRouter.get("/:id", getMotorcycleById);
-motorcycleRouter.post("/", uploads.single("image"), createMotorcycle);
-motorcycleRouter.put("/:id", uploads.single("image"), updateMotorcycle);
-
-// Soft delete (default delete operation)
-motorcycleRouter.delete("/:id", deleteMotorcycle);
+motorcycleRouter.post("/", adminAuth, uploads.single("image"), createMotorcycle);
+motorcycleRouter.put("/:id", adminAuth, uploads.single("image"), updateMotorcycle);
+motorcycleRouter.delete("/:id", adminAuth, deleteMotorcycle);
 
 // Additional soft delete management routes
-motorcycleRouter.get("/deleted/all", getDeletedMotorcycles); // Get all deleted motorcycles
-motorcycleRouter.patch("/:id/restore", restoreMotorcycle); // Restore a soft-deleted motorcycle
-motorcycleRouter.delete("/:id/permanent", hardDeleteMotorcycle); // Permanently delete (admin only)
+motorcycleRouter.get("/deleted/all", adminAuth, getDeletedMotorcycles);
+motorcycleRouter.patch("/:id/restore", adminAuth, restoreMotorcycle);
+motorcycleRouter.delete("/:id/permanent", adminAuth, hardDeleteMotorcycle);
 
 export default motorcycleRouter;

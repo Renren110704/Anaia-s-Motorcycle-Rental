@@ -13,17 +13,19 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { v2 as cloudinary } from "cloudinary";
+import MotorcycleBooking from "../models/motorcycleBookingModel.js";
 
 // --- Cloudinary Setup ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
 
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_FOLDER =
+  process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
   process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
+  process.env.CLOUDINARY_API_SECRET,
 );
 
 if (CLOUDINARY_ENABLED) {
@@ -53,7 +55,8 @@ const uploadFileToCloudinary = async (filePath) => {
       const url = normalizeUrl(result.secure_url || result.url || "");
       if (url) return url;
     } catch (err) {
-      if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000 * attempt));
+      if (attempt < MAX_RETRIES)
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
     }
   }
   return null;
@@ -98,6 +101,10 @@ const safeUser = (user) => ({
   isVerified: user.isVerified,
   profilePicture: user.profilePicture || "",
   createdAt: user.createdAt,
+  // Loyalty rewards program summary. Full code list/progress is available
+  // via GET /api/discounts/loyalty/status/:userId for a fresher read.
+  completedRentalsCount: user.completedRentalsCount || 0,
+  loyaltyTier: user.loyaltyTier || "None",
 });
 
 // In-memory storage for pending registrations (use Redis in production)
@@ -114,6 +121,45 @@ setInterval(
   },
   5 * 60 * 1000,
 );
+
+// ── Check Availability (email / phone) ──────────────────────────────────────
+// Lightweight duplicate check used by the sign-up form before the user moves
+// past step 1, so they don't fill in address details only to be rejected at
+// final submission. Mirrors the same "verified user" logic used in register().
+export async function checkAvailability(req, res) {
+  try {
+    const email = req.body.email ? normalizeEmail(req.body.email) : "";
+    const phone = req.body.phone ? String(req.body.phone).trim() : "";
+
+    if (!email && !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Email or phone is required",
+      });
+    }
+
+    const result = { success: true, emailTaken: false, phoneTaken: false };
+
+    if (email) {
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail && existingEmail.isVerified) {
+        result.emailTaken = true;
+      }
+    }
+
+    if (phone) {
+      const existingPhone = await User.findOne({ phone });
+      if (existingPhone && existingPhone.isVerified) {
+        result.phoneTaken = true;
+      }
+    }
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Check availability error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+}
 
 // ── Register ─────────────────────────────────────────────────────────────────
 export async function register(req, res) {
@@ -191,6 +237,7 @@ export async function register(req, res) {
       otp,
       otpExpires,
       createdAt: new Date(),
+      otpResendCount: 0,
     });
 
     const fullName = [firstName, middleName, lastName]
@@ -241,12 +288,10 @@ export async function verifyEmail(req, res) {
 
     if (new Date() > pendingReg.otpExpires) {
       global.pendingRegistrations.delete(email);
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "OTP has expired. Please register again.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please register again.",
+      });
     }
 
     const existingEmail = await User.findOne({ email });
@@ -303,6 +348,8 @@ export async function verifyEmail(req, res) {
 }
 
 // ── Resend Verification OTP ───────────────────────────────────────────────────
+const MAX_OTP_RESENDS = 3;
+
 export async function resendVerificationOTP(req, res) {
   try {
     const email = normalizeEmail(req.body.email);
@@ -320,10 +367,19 @@ export async function resendVerificationOTP(req, res) {
       });
     }
 
+    const resendCount = pendingReg.otpResendCount || 0;
+    if (resendCount >= MAX_OTP_RESENDS) {
+      return res.status(429).json({
+        success: false,
+        message: "OTP resend limit reached. Please try registering again.",
+      });
+    }
+
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000);
     pendingReg.otp = otp;
     pendingReg.otpExpires = otpExpires;
+    pendingReg.otpResendCount = resendCount + 1;
     global.pendingRegistrations.set(email, pendingReg);
 
     const fullName = [
@@ -349,6 +405,13 @@ export async function resendVerificationOTP(req, res) {
   }
 }
 
+// ── Login lockout config ───────────────────────────────────────────────────
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCK_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+// Cap on how many times the login OTP can be resent within one 5-minute
+// OTP cycle (initial send + this many resends).
+const MAX_LOGIN_OTP_RESENDS = 3;
+
 // ── Login step 1 ──────────────────────────────────────────────────────────────
 export async function login(req, res) {
   try {
@@ -368,6 +431,18 @@ export async function login(req, res) {
         .json({ success: false, message: "Invalid email or password" });
     }
 
+    // If the account is currently locked out, reject immediately without
+    // touching bcrypt/attempt counters, and let the user know when they can
+    // try again.
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      return res.status(423).json({
+        success: false,
+        message:
+          "Too many failed login attempts. Please try again after 10 minutes.",
+        lockedUntil: user.lockUntil,
+      });
+    }
+
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
@@ -378,9 +453,54 @@ export async function login(req, res) {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (user.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+        user.lockUntil = new Date(Date.now() + LOGIN_LOCK_DURATION_MS);
+        user.failedLoginAttempts = 0;
+        await user.save();
+        return res.status(423).json({
+          success: false,
+          message:
+            "Too many failed login attempts. Please try again after 10 minutes.",
+          lockedUntil: user.lockUntil,
+        });
+      }
+
+      await user.save();
       return res
         .status(401)
         .json({ success: false, message: "Invalid email or password" });
+    }
+
+    // Successful password check — clear any prior failed-attempt tracking.
+    if (user.failedLoginAttempts || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+    }
+
+    // A login OTP is "pending" if one was already issued and hasn't expired
+    // yet — in that case this call is a resend (either the user pressed
+    // "Resend OTP" or re-submitted the login form), so it counts against the
+    // resend cap. Once the pending OTP expires (or there isn't one), this is
+    // a fresh cycle and the counter resets.
+    const hasPendingLoginOTP =
+      user.loginOTP &&
+      user.loginOTPExpires &&
+      user.loginOTPExpires > new Date();
+
+    if (hasPendingLoginOTP) {
+      if ((user.loginOTPResendCount || 0) >= MAX_LOGIN_OTP_RESENDS) {
+        await user.save();
+        return res.status(429).json({
+          success: false,
+          message:
+            "OTP resend limit reached. Please wait for the current code to expire and try logging in again.",
+        });
+      }
+      user.loginOTPResendCount = (user.loginOTPResendCount || 0) + 1;
+    } else {
+      user.loginOTPResendCount = 0;
     }
 
     const otp = generateOTP();
@@ -439,6 +559,7 @@ export async function verifyLoginOTP(req, res) {
 
     user.loginOTP = null;
     user.loginOTPExpires = null;
+    user.loginOTPResendCount = 0;
     await user.save();
 
     const token = createToken(user._id.toString());
@@ -468,6 +589,10 @@ export async function logout(req, res) {
   }
 }
 
+// Cap on how many times the password-reset OTP can be resent within one
+// 15-minute OTP cycle (initial send + this many resends).
+const MAX_PASSWORD_RESET_OTP_RESENDS = 3;
+
 // ── Request password reset ────────────────────────────────────────────────────
 export async function requestPasswordReset(req, res) {
   try {
@@ -485,6 +610,31 @@ export async function requestPasswordReset(req, res) {
         .json({ success: false, message: "User not found" });
     }
 
+    // A reset OTP is "pending" if one was already issued and hasn't expired
+    // yet — in that case this call is a resend and counts against the cap.
+    // Once the pending OTP expires (or there isn't one), it's a fresh cycle.
+    const hasPendingResetOTP =
+      user.resetPasswordOTP &&
+      user.resetPasswordOTPExpires &&
+      user.resetPasswordOTPExpires > new Date();
+
+    if (hasPendingResetOTP) {
+      if (
+        (user.resetPasswordOTPResendCount || 0) >=
+        MAX_PASSWORD_RESET_OTP_RESENDS
+      ) {
+        return res.status(429).json({
+          success: false,
+          message:
+            "OTP resend limit reached. Please wait for the current code to expire and try again.",
+        });
+      }
+      user.resetPasswordOTPResendCount =
+        (user.resetPasswordOTPResendCount || 0) + 1;
+    } else {
+      user.resetPasswordOTPResendCount = 0;
+    }
+
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000);
     user.resetPasswordOTP = otp;
@@ -493,20 +643,16 @@ export async function requestPasswordReset(req, res) {
 
     const emailResult = await sendPasswordResetOTP(email, otp, user.name);
     if (!emailResult.success) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Failed to send password reset email",
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send password reset email",
+      });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Password reset OTP sent to your email",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Password reset OTP sent to your email",
+    });
   } catch (err) {
     console.error("Request password reset error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });
@@ -526,12 +672,10 @@ export async function resetPassword(req, res) {
     }
 
     if (newPassword.length < 8) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Password must be at least 8 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters",
+      });
     }
 
     const user = await User.findOne({ email });
@@ -554,6 +698,7 @@ export async function resetPassword(req, res) {
     user.password = await bcrypt.hash(newPassword, 10);
     user.resetPasswordOTP = null;
     user.resetPasswordOTPExpires = null;
+    user.resetPasswordOTPResendCount = 0;
     await user.save();
 
     return res
@@ -660,12 +805,10 @@ export async function changePassword(req, res) {
     }
 
     if (newPassword.length < 8) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "New password must be at least 8 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 8 characters",
+      });
     }
 
     const user = await User.findById(userId);
@@ -684,12 +827,10 @@ export async function changePassword(req, res) {
 
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "New password must be different from current password",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "New password must be different from current password",
+      });
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
@@ -703,6 +844,10 @@ export async function changePassword(req, res) {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 }
+
+// Cap on how many times the email-change OTP can be resent within one
+// 15-minute OTP cycle (initial send + this many resends).
+const MAX_EMAIL_CHANGE_OTP_RESENDS = 3;
 
 // ── Request email change OTP ──────────────────────────────────────────────────
 export async function requestEmailChangeOTP(req, res) {
@@ -730,12 +875,10 @@ export async function requestEmailChangeOTP(req, res) {
     }
 
     if (currentUser.email === newEmail) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "New email is the same as current email",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "New email is the same as current email",
+      });
     }
 
     const existingUser = await User.findOne({
@@ -743,12 +886,37 @@ export async function requestEmailChangeOTP(req, res) {
       _id: { $ne: userId },
     });
     if (existingUser) {
-      return res
-        .status(409)
-        .json({
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use by another account",
+      });
+    }
+
+    // An email-change OTP is "pending" if one was already issued for this
+    // exact target email and hasn't expired yet — in that case this call is
+    // a resend and counts against the cap. Targeting a different new email,
+    // or having no pending/expired OTP, starts a fresh cycle.
+    const hasPendingEmailChangeOTP =
+      currentUser.emailChangeOTP &&
+      currentUser.emailChangeOTPExpires &&
+      currentUser.emailChangeOTPExpires > new Date() &&
+      currentUser.pendingEmail === newEmail;
+
+    if (hasPendingEmailChangeOTP) {
+      if (
+        (currentUser.emailChangeOTPResendCount || 0) >=
+        MAX_EMAIL_CHANGE_OTP_RESENDS
+      ) {
+        return res.status(429).json({
           success: false,
-          message: "Email is already in use by another account",
+          message:
+            "OTP resend limit reached. Please wait for the current code to expire and try again.",
         });
+      }
+      currentUser.emailChangeOTPResendCount =
+        (currentUser.emailChangeOTPResendCount || 0) + 1;
+    } else {
+      currentUser.emailChangeOTPResendCount = 0;
     }
 
     const otp = generateOTP();
@@ -764,20 +932,16 @@ export async function requestEmailChangeOTP(req, res) {
       currentUser.name,
     );
     if (!emailResult.success) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Failed to send verification email to new address",
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email to new address",
+      });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Verification OTP sent to your new email address",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Verification OTP sent to your new email address",
+    });
   } catch (err) {
     console.error("Request email change OTP error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });
@@ -817,6 +981,7 @@ export async function verifyEmailChangeOTP(req, res) {
     user.email = normalizeEmail(newEmail);
     user.emailChangeOTP = null;
     user.emailChangeOTPExpires = null;
+    user.emailChangeOTPResendCount = 0;
     user.pendingEmail = null;
     await user.save();
 
@@ -837,17 +1002,23 @@ export async function uploadProfilePicture(req, res) {
     const userId = req.user._id;
 
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "No image file provided" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No image file provided" });
     }
 
     const uploadedUrl = await getUploadedUrl(req.file);
     if (!uploadedUrl) {
-      return res.status(500).json({ success: false, message: "Failed to upload image" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to upload image" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     user.profilePicture = uploadedUrl;
@@ -870,7 +1041,9 @@ export async function removeProfilePicture(req, res) {
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Clear the profile picture URL
@@ -892,11 +1065,13 @@ export async function removeProfilePicture(req, res) {
 export async function getAllUsers(req, res) {
   try {
     // .select("-password") ensures we don't send hashed passwords to the frontend
-    const users = await User.find({}).select("-password").sort({ createdAt: -1 });
-    
-    return res.status(200).json({ 
-      success: true, 
-      users: users 
+    const users = await User.find({})
+      .select("-password")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      users: users,
     });
   } catch (err) {
     console.error("Get all users error:", err);
@@ -912,16 +1087,18 @@ export async function toggleUserStatus(req, res) {
 
     const user = await User.findById(id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     user.isActive = isActive;
     await user.save();
 
-    return res.status(200).json({ 
-      success: true, 
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-      user: safeUser(user) 
+    return res.status(200).json({
+      success: true,
+      message: `User ${isActive ? "activated" : "deactivated"} successfully`,
+      user: safeUser(user),
     });
   } catch (err) {
     console.error("Toggle status error:", err);
@@ -933,15 +1110,45 @@ export async function toggleUserStatus(req, res) {
 export async function deleteUser(req, res) {
   try {
     const { id } = req.params;
-    
-    const deletedUser = await User.findByIdAndDelete(id);
-    if (!deletedUser) {
-      return res.status(404).json({ success: false, message: "User not found" });
+
+    // 1. Check if the user has any blocking bookings
+    const blockingStatuses = [
+      "pending",
+      "pending_reservation",
+      "pending_full_payment",
+      "active",
+      "inspection",
+    ];
+
+    const blockingBooking = await MotorcycleBooking.findOne({
+      userId: id,
+      status: { $in: blockingStatuses },
+      isDeleted: { $ne: true },
+    })
+      .select("status")
+      .lean();
+
+    // 2. Prevent deletion and return a descriptive error message
+    if (blockingBooking) {
+      // Format the status string for better readability in the UI
+      const formattedStatus = blockingBooking.status.replace(/_/g, " ");
+      return res.status(409).json({
+        success: false,
+        message: `Cannot delete this user. They currently have a booking in "${formattedStatus}" status.`,
+      });
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "User deleted successfully" 
+    // 3. Proceed with deletion if no blocking bookings are found
+    const deletedUser = await User.findByIdAndDelete(id);
+    if (!deletedUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
     });
   } catch (err) {
     console.error("Delete user error:", err);

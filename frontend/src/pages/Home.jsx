@@ -6,6 +6,8 @@ import Testimonial from "../components/Testimonial";
 import Footer from "../components/Footer";
 import FAQPage from "./FAQPage";
 import AboutPage from "./AboutPage";
+import Chatbot from "../components/Chatbot";
+import UserLiveChat from "../components/UserLiveChat";
 
 const Home = () => {
   return (
@@ -17,6 +19,8 @@ const Home = () => {
       <AboutPage />
       <Testimonial />
       <Footer />
+      <UserLiveChat />
+      <Chatbot />
     </div>
   );
 };

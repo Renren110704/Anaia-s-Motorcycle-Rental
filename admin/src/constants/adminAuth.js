@@ -1,6 +1,6 @@
-export const ADMIN_AUTH_STORAGE_KEY = "admin_authenticated";
-export const ADMIN_DEFAULT_EMAIL = "admin@anaiasmotorcyclerental.com";
-export const ADMIN_DEFAULT_PASSWORD = "Anaias@123";
+// Key used to store the admin JWT in localStorage. Note: this now holds a
+// real, expiring, server-issued token — not a plain "true"/"false" flag.
+export const ADMIN_TOKEN_STORAGE_KEY = "admin_token";
 
 export const PASSWORD_RULES = [
   "At least 8 characters",
@@ -10,6 +10,9 @@ export const PASSWORD_RULES = [
   "Contains special character",
 ];
 
+// Client-side check kept only as a UX hint (live checklist while typing).
+// It is NOT the source of truth — the server independently verifies the
+// actual admin password against ADMIN_PASSWORD_HASH.
 export const validateStrongPassword = (password) => {
   const errors = [];
 

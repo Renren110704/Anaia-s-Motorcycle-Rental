@@ -1,25 +1,31 @@
 import mongoose from "mongoose";
 import MotorcycleBooking from "../models/motorcycleBookingModel.js";
 import Motorcycle from "../models/motorcycleModel.js";
+import InspectionMatrixSetting from "../models/inspectionMatrixSettingModel.js";
 import LocationSnapshot from "../models/locationSnapshotModel.js";
 import { sendBookingReceiptEmail } from "../utils/emailService.js";
 import { verifyDigitalReceipt } from "../utils/receiptVerifier.js";
 import { createSystemLog } from "../utils/systemLogService.js";
+import { evaluateLoyaltyAfterCompletion } from "../services/loyaltyService.js";
+import User from "../models/userModel.js";
 import { generateRentalAgreementPDF } from "../utils/rentalAgreementPDF.js";
 import { v2 as cloudinary } from "cloudinary";
 import {
   notifyBookingCreated,
   notifyBookingStatusChange,
   notifyPaymentConfirmed,
-  notifyDamageFound,
   notifyPenaltyRequired,
+  notifyPenaltySettled,
+  notifyVehicleCleared,
+  notifyProofReuploadRequested,
 } from "../services/notificationService.js";
 import { TRACCAR_BASE_URL, buildTraccarHeaders } from "../config/traccar.js";
 
 // Fetch current Traccar stats for a device and save as booking baseline
 async function captureBookingBaseline(bookingId, motorcycleDbId) {
   try {
-    const moto = await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
+    const moto =
+      await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
     const deviceId = moto?.traccarDeviceId?.trim();
     if (!deviceId) return;
 
@@ -28,7 +34,9 @@ async function captureBookingBaseline(bookingId, motorcycleDbId) {
       { headers: buildTraccarHeaders(), cache: "no-store" },
     );
     const devJson = await devRes.json().catch(() => []);
-    const device = Array.isArray(devJson) ? devJson[0] : devJson?.devices?.[0] || null;
+    const device = Array.isArray(devJson)
+      ? devJson[0]
+      : devJson?.devices?.[0] || null;
     if (!device) return;
 
     const posRes = await fetch(
@@ -39,11 +47,19 @@ async function captureBookingBaseline(bookingId, motorcycleDbId) {
     const pos = Array.isArray(positions) ? positions[0] : null;
     if (!pos) return;
 
-    const totalDistanceKm = Number(pos.attributes?.totalDistance ? pos.attributes.totalDistance / 1000 : 0);
+    const totalDistanceKm = Number(
+      pos.attributes?.totalDistance ? pos.attributes.totalDistance / 1000 : 0,
+    );
     const stopsMade = Number(pos.attributes?.stops || 0);
 
     await MotorcycleBooking.findByIdAndUpdate(bookingId, {
-      $set: { trackingBaseline: { totalDistanceKm, stopsMade, capturedAt: new Date() } },
+      $set: {
+        trackingBaseline: {
+          totalDistanceKm,
+          stopsMade,
+          capturedAt: new Date(),
+        },
+      },
     });
   } catch {
     // best-effort — don't break the status update flow
@@ -89,10 +105,13 @@ async function fetchTraccarSummary(traccarDeviceId, from, to) {
 // Fetch final Traccar stats at booking completion and save as trackingSummary
 async function captureTrackingSummaryOnCompletion(bookingId, motorcycleDbId) {
   try {
-    const booking = await MotorcycleBooking.findById(bookingId).select("trackingBaseline").lean();
+    const booking = await MotorcycleBooking.findById(bookingId)
+      .select("trackingBaseline")
+      .lean();
     const baseline = booking?.trackingBaseline;
 
-    const moto = await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
+    const moto =
+      await Motorcycle.findById(motorcycleDbId).select("traccarDeviceId");
     const uniqueId = moto?.traccarDeviceId?.trim();
     if (!uniqueId) return;
 
@@ -110,9 +129,14 @@ async function captureTrackingSummaryOnCompletion(bookingId, motorcycleDbId) {
     await MotorcycleBooking.findByIdAndUpdate(bookingId, {
       $set: { trackingSummary: summary },
     });
-    console.log(`[Tracking] Saved summary for booking ${bookingId}: ${summary.totalDistanceKm.toFixed(2)} km`);
+    console.log(
+      `[Tracking] Saved summary for booking ${bookingId}: ${summary.totalDistanceKm.toFixed(2)} km`,
+    );
   } catch (err) {
-    console.error("[Tracking] captureTrackingSummaryOnCompletion error:", err.message);
+    console.error(
+      "[Tracking] captureTrackingSummaryOnCompletion error:",
+      err.message,
+    );
   }
 }
 
@@ -140,9 +164,202 @@ const RECEIPT_VERIFY_TIMEOUT_MS = Number(
 const CLEARANCE_STATUSES = [
   "pending_inspection",
   "cleared",
-  "damage_found",
   "penalty_required",
 ];
+
+// ── Standardized return-inspection penalty / repair matrix ────────────────
+// Default per-item rates. Admins can override any non-"custom" rate via the
+// InspectionMatrixSetting collection (see getInspectionMatrix /
+// updateInspectionMatrixRates below); these defaults are the fallback used
+// whenever no override — or no DB connection yet — is available. The client
+// sends which items were selected (and quantities/custom amounts where
+// applicable); the server always recomputes each line and the total against
+// the current effective rates so a tampered client payload can't change the
+// charged amount.
+//
+// `repair: true` marks the items that represent actual vehicle repair costs
+// (as opposed to soft/behavioral penalties like Dirty, Late Return, or
+// Geofence Exceeded) — used by analytics to split "Expenses (Repairs)" out
+// from general "Penalties".
+const INSPECTION_MATRIX_DEFAULTS = {
+  dirty: { label: "Dirty", rate: 200, kind: "flat", repair: false },
+  minor_scratches: {
+    label: "Minor Scratches",
+    rate: 500,
+    kind: "flat",
+    repair: true,
+  },
+  major_damage: {
+    label: "Major Damage",
+    kind: "custom",
+    repair: true,
+  }, // actual repair cost, entered per-incident
+  tire_damage: {
+    label: "Tire worn or damaged",
+    rate: 500,
+    kind: "per_unit",
+    repair: true,
+  },
+  mirror_damage: {
+    label: "Mirror missing or broken",
+    rate: 300,
+    kind: "per_unit",
+    repair: true,
+  },
+  helmet_damage: {
+    label: "Helmet missing or damaged",
+    rate: 1000,
+    kind: "flat",
+    repair: true,
+  },
+  late_return: {
+    label: "Late Return",
+    rate: 100,
+    kind: "per_hour",
+    repair: false,
+  },
+  geofence_exceeded: {
+    label: "Geofence Exceeded",
+    kind: "custom",
+    repair: false,
+  },
+};
+
+// Keys whose rate is meaningfully customizable (i.e. not "custom" kind,
+// which is priced per-incident by the admin at inspection time).
+const CUSTOMIZABLE_MATRIX_KEYS = Object.keys(INSPECTION_MATRIX_DEFAULTS).filter(
+  (key) => INSPECTION_MATRIX_DEFAULTS[key].kind !== "custom",
+);
+
+// There is always a single settings document. Fetches it and returns the
+// effective matrix — defaults merged with any admin overrides. Falls back
+// to pure defaults if the settings doc doesn't exist yet or the DB read
+// fails, so booking creation/inspection flows never break on this.
+const getEffectiveInspectionMatrix = async () => {
+  let doc;
+  try {
+    doc = await InspectionMatrixSetting.findOne();
+  } catch {
+    doc = null;
+  }
+  const overrides = doc?.rates instanceof Map ? doc.rates : new Map();
+
+  const matrix = {};
+  for (const [key, def] of Object.entries(INSPECTION_MATRIX_DEFAULTS)) {
+    if (def.kind === "custom") {
+      matrix[key] = { ...def };
+      continue;
+    }
+    const override = overrides.get(key);
+    const rate =
+      typeof override === "number" && Number.isFinite(override) && override >= 0
+        ? override
+        : def.rate;
+    matrix[key] = { ...def, rate };
+  }
+  return matrix;
+};
+
+// Recomputes a trusted violations array + total from raw client input.
+// `rawViolations` is expected to be an array of
+// { key, quantity?, customAmount? } objects (already JSON-parsed).
+// `matrix` should be the effective (defaults + admin overrides) matrix,
+// fetched fresh via getEffectiveInspectionMatrix() before calling this, so
+// the charged amount always reflects the currently configured rates.
+const computeViolations = (
+  rawViolations,
+  matrix = INSPECTION_MATRIX_DEFAULTS,
+) => {
+  if (!Array.isArray(rawViolations)) return { violations: [], total: 0 };
+
+  const violations = [];
+  let total = 0;
+
+  for (const raw of rawViolations) {
+    const key = raw?.key;
+    const def = key && matrix[key];
+    if (!def) continue;
+
+    let unitAmount = 0;
+    let quantity = 1;
+    let amount = 0;
+
+    if (def.kind === "flat") {
+      unitAmount = def.rate;
+      amount = def.rate;
+    } else if (def.kind === "per_unit" || def.kind === "per_hour") {
+      quantity = Math.max(1, Math.floor(Number(raw?.quantity)) || 1);
+      unitAmount = def.rate;
+      amount = def.rate * quantity;
+    } else if (def.kind === "custom") {
+      const custom = Number(raw?.customAmount);
+      amount = Number.isFinite(custom) && custom > 0 ? custom : 0;
+      unitAmount = amount;
+    }
+
+    if (amount <= 0 && def.kind === "custom") continue; // skip unpriced custom items
+
+    violations.push({ key, label: def.label, unitAmount, quantity, amount });
+    total += amount;
+  }
+
+  return { violations, total };
+};
+
+// ── GET /api/motorcycle-bookings/inspection-matrix ─────────────────────────
+// Returns the effective (defaults + admin overrides) matrix so the admin UI
+// can render current rates and let staff edit them.
+export const getInspectionMatrix = async (req, res, next) => {
+  try {
+    const matrix = await getEffectiveInspectionMatrix();
+    res.json({ matrix });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── PUT /api/motorcycle-bookings/inspection-matrix ──────────────────────────
+// Admin-only. Body: { rates: { [key]: number, ... } }. Only accepts keys that
+// exist in INSPECTION_MATRIX_DEFAULTS and are not "custom" kind; silently
+// ignores anything else so a bad payload can't inject new violation types.
+export const updateInspectionMatrixRates = async (req, res, next) => {
+  try {
+    const rawRates = req.body?.rates;
+    if (!rawRates || typeof rawRates !== "object" || Array.isArray(rawRates)) {
+      return res.status(400).json({ message: "rates object is required." });
+    }
+
+    const sanitized = {};
+    for (const key of CUSTOMIZABLE_MATRIX_KEYS) {
+      if (!(key in rawRates)) continue;
+      const value = Number(rawRates[key]);
+      if (!Number.isFinite(value) || value < 0) {
+        return res.status(400).json({
+          message: `Invalid rate for "${key}" — must be a non-negative number.`,
+        });
+      }
+      sanitized[key] = value;
+    }
+
+    if (!Object.keys(sanitized).length) {
+      return res.status(400).json({ message: "No valid rates provided." });
+    }
+
+    const doc =
+      (await InspectionMatrixSetting.findOne()) ||
+      new InspectionMatrixSetting();
+    for (const [key, value] of Object.entries(sanitized)) {
+      doc.rates.set(key, value);
+    }
+    doc.updatedBy = req.user?._id || req.user?.id || null;
+    await doc.save();
+
+    const matrix = await getEffectiveInspectionMatrix();
+    res.json({ message: "Inspection matrix rates updated.", matrix });
+  } catch (err) {
+    next(err);
+  }
+};
 const INSPECTION_VEHICLE_STATUSES = [
   "inspection",
   "under_review",
@@ -636,8 +853,7 @@ export const acquireCheckoutLock = async (req, res) => {
         return res.status(409).json({
           success: false,
           code: "MOTORCYCLE_LOCKED",
-          message:
-            "Another user is currently checking out this motorcycle. Please wait a few minutes.",
+          message: "Another user is currently checking out this motorcycle.",
           lockExpiresAt: current.checkoutLock.expiresAt,
         });
       }
@@ -1007,7 +1223,9 @@ export const createMotorcycleBooking = async (req, res) => {
       },
     });
 
-    notifyBookingCreated(saved.userId).catch((e) => console.error("[Push] notifyBookingCreated:", e.message));
+    notifyBookingCreated(saved.userId).catch((e) =>
+      console.error("[Push] notifyBookingCreated:", e.message),
+    );
 
     return res.status(201).json({
       success: true,
@@ -1189,6 +1407,27 @@ export const createWalkInMotorcycleBooking = async (req, res) => {
         success: false,
         message: "Motorcycle already booked for selected dates",
       });
+    }
+
+    // A walk-in rental cannot proceed if the loaded customer already has
+    // a booking that is Pending (any variant), Active, or Inspection —
+    // regardless of which motorcycle or dates that other booking involves.
+    const effectiveUserId = user || userId || null;
+    if (effectiveUserId) {
+      const existingUserBooking = await MotorcycleBooking.findOne({
+        userId: effectiveUserId,
+        status: { $in: BLOCKING_STATUSES },
+        isDeleted: { $ne: true },
+      })
+        .select({ status: 1 })
+        .lean();
+
+      if (existingUserBooking) {
+        return res.status(409).json({
+          success: false,
+          message: `This customer already has a booking with "${existingUserBooking.status}" status. A walk-in rental cannot be created until that booking is resolved.`,
+        });
+      }
     }
 
     const bookingData = {
@@ -1377,6 +1616,7 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
     const userId = req.user._id || req.user.id;
     const bookings = await MotorcycleBooking.find({ userId })
       .select({
+        userId: 1,
         customer: 1,
         email: 1,
         phone: 1,
@@ -1403,9 +1643,11 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
         adminReviewedAt: 1,
         receiptVerification: 1,
         returnInspection: 1,
+        securityDeposit: 1,
         details: 1,
         address: 1,
         extensions: 1,
+        reschedules: 1,
         isDeleted: 1,
         deletedAt: 1,
         createdAt: 1,
@@ -1612,6 +1854,8 @@ export const extendMotorcycleBooking = async (req, res, next) => {
       });
     }
 
+    // Total scheduled rental length AFTER this extension (original pickup
+    // through the newly requested return).
     const days = computeRentalDays(
       booking.pickupDate,
       booking.pickupTime,
@@ -1624,30 +1868,130 @@ export const extendMotorcycleBooking = async (req, res, next) => {
         .json({ success: false, message: "Invalid extension duration." });
     }
 
-    const dailyRate = Number(booking.motorcycle?.dailyRate || 0);
-    const distanceFee = Number(booking.details?.distanceFee || 0);
-    const helmetFee = Number(booking.details?.helmetFee || 0);
-    const previousAmount = Number(booking.amount || 0);
-
-    // Calculate base new amount
-    let newAmount =
-      dailyRate > 0
-        ? dailyRate * days + distanceFee + helmetFee
-        : previousAmount;
-
-    // Apply existing discount if present
-    const appliedDiscount = booking.details?.appliedDiscount;
-    if (dailyRate > 0 && appliedDiscount) {
-      const baseRental = dailyRate * days;
-      const discountAmount =
-        appliedDiscount.discountType === "percentage"
-          ? (baseRental * appliedDiscount.discountValue) / 100
-          : Math.min(appliedDiscount.discountValue, baseRental);
-
-      newAmount = Math.max(0, newAmount - discountAmount);
+    // Total scheduled rental length BEFORE this extension, so we can isolate
+    // just the incremental days being added. Diffing two independently
+    // re-priced full-duration totals (as this used to do) would silently
+    // re-introduce or cancel out whatever discount applied to the *original*
+    // booking — the extension fee must be based solely on the motorcycle's
+    // daily rate for the incremental days, not on the original pricing.
+    const previousDays = computeRentalDays(
+      booking.pickupDate,
+      booking.pickupTime,
+      booking.returnDate,
+      booking.returnTime,
+    );
+    const extensionDays = Math.max(0, days - previousDays);
+    if (extensionDays <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid extension duration." });
     }
 
-    const additionalAmount = Math.max(0, newAmount - previousAmount);
+    const dailyRate = Number(booking.motorcycle?.dailyRate || 0);
+    const previousAmount = Number(booking.amount || 0);
+
+    // Base extension cost: just the incremental days at the daily rate.
+    // One-time fees (distance/helmet) were already charged on the original
+    // booking and are not repeated here.
+    let extensionAmount = dailyRate > 0 ? dailyRate * extensionDays : 0;
+
+    // ── Promo/loyalty code for THIS extension only ──────────────────────────
+    // Promo codes are only meant to be redeemed at checkout on the Motorcycle
+    // Detail page, so the discount originally applied to the booking
+    // (booking.details.appliedDiscount) must NOT be carried over here
+    // automatically. A user may still manually supply another valid code
+    // when requesting an extension, via req.body.promoCode.
+    let extensionDiscount = null;
+    const promoCodeInput = String(req.body?.promoCode || "")
+      .trim()
+      .toUpperCase();
+
+    if (dailyRate > 0 && promoCodeInput) {
+      const Discount = mongoose.model("Discount");
+      const promo = await Discount.findOne({ code: promoCodeInput }).lean();
+
+      if (promo) {
+        const now = new Date();
+        const isActive = promo.isActive !== false;
+        const isStarted = !promo.startDate || new Date(promo.startDate) <= now;
+        const isNotExpired = !promo.endDate || new Date(promo.endDate) >= now;
+        const underMaxUses =
+          promo.maxUses == null || promo.usedCount < promo.maxUses;
+
+        if (!isActive || !isStarted || !isNotExpired || !underMaxUses) {
+          return res.status(400).json({
+            success: false,
+            message: "This promo code has expired or is no longer active.",
+          });
+        }
+        if (promo.minRentalDays && extensionDays < promo.minRentalDays) {
+          return res.status(400).json({
+            success: false,
+            message: `This code requires a minimum rental of ${promo.minRentalDays} day(s).`,
+          });
+        }
+
+        extensionDiscount = {
+          source: "promo",
+          refId: promo._id,
+          code: promo.code,
+          discountType: promo.discountType,
+          discountValue: promo.discountValue,
+        };
+      } else {
+        const codeOwner = await User.findById(userId);
+        const loyaltyEntry = (codeOwner?.loyaltyCodes || []).find(
+          (c) => c.code === promoCodeInput,
+        );
+
+        if (!loyaltyEntry) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Promo code not found." });
+        }
+        if (loyaltyEntry.usedAt) {
+          return res.status(400).json({
+            success: false,
+            message: "This code has already been used.",
+          });
+        }
+        if (
+          loyaltyEntry.expiresAt &&
+          new Date(loyaltyEntry.expiresAt) < new Date()
+        ) {
+          return res
+            .status(400)
+            .json({ success: false, message: "This code has expired." });
+        }
+        if (
+          loyaltyEntry.minRentalDays &&
+          extensionDays < loyaltyEntry.minRentalDays
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `This code requires a minimum rental of ${loyaltyEntry.minRentalDays} day(s).`,
+          });
+        }
+
+        extensionDiscount = {
+          source: "loyalty",
+          refId: loyaltyEntry._id,
+          code: loyaltyEntry.code,
+          discountType: loyaltyEntry.discountType,
+          discountValue: loyaltyEntry.discountValue,
+        };
+      }
+
+      const discountAmount =
+        extensionDiscount.discountType === "percentage"
+          ? (extensionAmount * extensionDiscount.discountValue) / 100
+          : Math.min(extensionDiscount.discountValue, extensionAmount);
+
+      extensionAmount = Math.max(0, extensionAmount - discountAmount);
+    }
+
+    const additionalAmount = extensionAmount;
+    const newAmount = previousAmount + additionalAmount;
 
     const previousReturnDate = booking.returnDate;
     const previousReturnTime = booking.returnTime;
@@ -1666,9 +2010,34 @@ export const extendMotorcycleBooking = async (req, res, next) => {
       previousAmount,
       newAmount,
       additionalAmount,
+      // Scoped to THIS extension only — intentionally not copied from
+      // booking.details.appliedDiscount.
+      appliedDiscount: extensionDiscount || null,
     });
 
     const updated = await booking.save();
+
+    // Mark the extension's promo/loyalty code as used now that the
+    // extension has been saved successfully.
+    if (extensionDiscount) {
+      if (extensionDiscount.source === "promo") {
+        await mongoose
+          .model("Discount")
+          .findByIdAndUpdate(extensionDiscount.refId, {
+            $inc: { usedCount: 1 },
+          });
+      } else if (extensionDiscount.source === "loyalty") {
+        await User.updateOne(
+          { _id: userId, "loyaltyCodes._id": extensionDiscount.refId },
+          {
+            $set: {
+              "loyaltyCodes.$.usedAt": new Date(),
+              "loyaltyCodes.$.usedOnBookingId": updated._id,
+            },
+          },
+        );
+      }
+    }
 
     await Motorcycle.findOneAndUpdate(
       {
@@ -1699,6 +2068,7 @@ export const extendMotorcycleBooking = async (req, res, next) => {
         previousAmount,
         newAmount,
         additionalAmount,
+        appliedDiscount: extensionDiscount || null,
       },
     });
 
@@ -1707,6 +2077,420 @@ export const extendMotorcycleBooking = async (req, res, next) => {
       booking: updated,
       additionalAmount,
       newAmount,
+      appliedDiscount: extensionDiscount || null,
+      days,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const rescheduleMotorcycleBooking = async (req, res, next) => {
+  try {
+    if (!req.user || (!req.user.id && !req.user._id)) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const booking = await MotorcycleBooking.findById(req.params.id);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const userId = String(req.user._id || req.user.id);
+    if (!booking.userId || String(booking.userId) !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot reschedule this booking.",
+      });
+    }
+
+    if (booking.isDeleted) {
+      return res
+        .status(400)
+        .json({ success: false, message: "This booking is not active." });
+    }
+
+    // Reschedule replaces the ORIGINAL, not-yet-started booking's dates —
+    // unlike an extension (which adds days to an already-active rental),
+    // this must only be allowed before pickup happens.
+    if (
+      !["pending", "pending_reservation", "pending_full_payment"].includes(
+        booking.status,
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Only upcoming bookings can be rescheduled.",
+      });
+    }
+
+    const pickupDate = req.body?.pickupDate;
+    const pickupTime = String(req.body?.pickupTime || "").trim();
+    const returnDate = req.body?.returnDate;
+    const returnTime = String(req.body?.returnTime || "").trim();
+    if (!pickupDate || !pickupTime || !returnDate || !returnTime) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "pickupDate, pickupTime, returnDate, and returnTime are required.",
+      });
+    }
+
+    const newPickupAt = combineDateAndTime(pickupDate, pickupTime);
+    const newReturnAt = combineDateAndTime(returnDate, returnTime);
+    if (!newPickupAt || !newReturnAt) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid pickup/return date-time." });
+    }
+    if (newReturnAt.getTime() <= newPickupAt.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: "Return must be after pickup.",
+      });
+    }
+
+    const currentPickupAt = combineDateAndTime(
+      booking.pickupDate,
+      booking.pickupTime,
+    );
+    const currentReturnAt = combineDateAndTime(
+      booking.returnDate,
+      booking.returnTime,
+    );
+    if (
+      currentPickupAt &&
+      currentReturnAt &&
+      newPickupAt.getTime() === currentPickupAt.getTime() &&
+      newReturnAt.getTime() === currentReturnAt.getTime()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select new dates to reschedule your booking.",
+      });
+    }
+
+    const motorcycleId = booking.motorcycle?.id;
+    if (!motorcycleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking has no motorcycle assigned.",
+      });
+    }
+
+    const overlappingCount = await MotorcycleBooking.countDocuments({
+      _id: { $ne: booking._id },
+      "motorcycle.id": motorcycleId,
+      status: { $in: BLOCKING_STATUSES },
+      isDeleted: { $ne: true },
+      pickupDate: { $lte: newReturnAt },
+      returnDate: { $gte: newPickupAt },
+    });
+    if (overlappingCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Reschedule conflicts with another booking for this motorcycle.",
+      });
+    }
+
+    const days = computeRentalDays(
+      pickupDate,
+      pickupTime,
+      returnDate,
+      returnTime,
+    );
+    if (!days) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid rental duration." });
+    }
+
+    // True original pickup/return BEFORE any reschedule was ever made for
+    // this booking. Used to cap how many days of the ORIGINAL checkout
+    // discount can continue to apply — see promo/loyalty block below.
+    const firstRescheduleRecord =
+      Array.isArray(booking.reschedules) && booking.reschedules.length > 0
+        ? booking.reschedules[0]
+        : null;
+    const originalPickupDate =
+      firstRescheduleRecord?.previousPickupDate || booking.pickupDate;
+    const originalPickupTime =
+      firstRescheduleRecord?.previousPickupTime || booking.pickupTime;
+    const originalReturnDate =
+      firstRescheduleRecord?.previousReturnDate || booking.returnDate;
+    const originalReturnTime =
+      firstRescheduleRecord?.previousReturnTime || booking.returnTime;
+    const originalDays =
+      computeRentalDays(
+        originalPickupDate,
+        originalPickupTime,
+        originalReturnDate,
+        originalReturnTime,
+      ) || days;
+
+    const dailyRate = Number(booking.motorcycle?.dailyRate || 0);
+    const distanceFee = Number(booking.details?.distanceFee || 0);
+    const helmetFee = Number(booking.details?.helmetFee || 0);
+    const previousAmount = Number(booking.amount || 0);
+
+    // ── Promo/loyalty code for THIS reschedule ──────────────────────────────
+    // Two ways a discount can apply:
+    //  1. Manual override (req.body.promoCode): a freshly-entered code,
+    //     applied in full to the entire new duration — same as extend.
+    //  2. Carryover (default, no promoCode given): the ORIGINAL checkout
+    //     discount keeps applying automatically (since reschedule edits the
+    //     same not-yet-started booking, not a new transaction) — but only
+    //     up to the number of days it was originally applied to. Any extra
+    //     days beyond that are charged at the regular rate. If it's no
+    //     longer valid (deactivated/expired promo), no discount applies.
+    let rescheduleDiscount = null;
+    let newAmount =
+      dailyRate > 0
+        ? dailyRate * days + distanceFee + helmetFee
+        : previousAmount;
+    const promoCodeInput = String(req.body?.promoCode || "")
+      .trim()
+      .toUpperCase();
+
+    if (dailyRate > 0 && promoCodeInput) {
+      const Discount = mongoose.model("Discount");
+      const promo = await Discount.findOne({ code: promoCodeInput }).lean();
+
+      if (promo) {
+        const now = new Date();
+        const isActive = promo.isActive !== false;
+        const isStarted = !promo.startDate || new Date(promo.startDate) <= now;
+        const isNotExpired = !promo.endDate || new Date(promo.endDate) >= now;
+        const underMaxUses =
+          promo.maxUses == null || promo.usedCount < promo.maxUses;
+
+        if (!isActive || !isStarted || !isNotExpired || !underMaxUses) {
+          return res.status(400).json({
+            success: false,
+            message: "This promo code has expired or is no longer active.",
+          });
+        }
+        if (promo.minRentalDays && days < promo.minRentalDays) {
+          return res.status(400).json({
+            success: false,
+            message: `This code requires a minimum rental of ${promo.minRentalDays} day(s).`,
+          });
+        }
+
+        rescheduleDiscount = {
+          source: "promo",
+          refId: promo._id,
+          code: promo.code,
+          discountType: promo.discountType,
+          discountValue: promo.discountValue,
+        };
+      } else {
+        const codeOwner = await User.findById(userId);
+        const loyaltyEntry = (codeOwner?.loyaltyCodes || []).find(
+          (c) => c.code === promoCodeInput,
+        );
+
+        if (!loyaltyEntry) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Promo code not found." });
+        }
+        if (loyaltyEntry.usedAt) {
+          return res.status(400).json({
+            success: false,
+            message: "This code has already been used.",
+          });
+        }
+        if (
+          loyaltyEntry.expiresAt &&
+          new Date(loyaltyEntry.expiresAt) < new Date()
+        ) {
+          return res
+            .status(400)
+            .json({ success: false, message: "This code has expired." });
+        }
+        if (loyaltyEntry.minRentalDays && days < loyaltyEntry.minRentalDays) {
+          return res.status(400).json({
+            success: false,
+            message: `This code requires a minimum rental of ${loyaltyEntry.minRentalDays} day(s).`,
+          });
+        }
+
+        rescheduleDiscount = {
+          source: "loyalty",
+          refId: loyaltyEntry._id,
+          code: loyaltyEntry.code,
+          discountType: loyaltyEntry.discountType,
+          discountValue: loyaltyEntry.discountValue,
+        };
+      }
+
+      const baseRental = dailyRate * days;
+      const discountAmount =
+        rescheduleDiscount.discountType === "percentage"
+          ? (baseRental * rescheduleDiscount.discountValue) / 100
+          : Math.min(rescheduleDiscount.discountValue, baseRental);
+
+      newAmount = Math.max(0, newAmount - discountAmount);
+    } else if (dailyRate > 0 && booking.details?.appliedDiscount) {
+      const original = booking.details.appliedDiscount;
+      let stillValid = true;
+
+      if (!original.isLoyaltyCode) {
+        // Global promo codes can be deactivated/expired after the original
+        // booking was made — re-check current validity before continuing to
+        // honor it. (Loyalty codes were redeemed specifically for this
+        // booking already, so they stay honored on it regardless of the
+        // code's live state elsewhere.)
+        const Discount = mongoose.model("Discount");
+        const promoDoc = original.id
+          ? await Discount.findById(original.id).lean()
+          : original.code
+            ? await Discount.findOne({ code: original.code }).lean()
+            : null;
+        if (promoDoc) {
+          const now = new Date();
+          const isActive = promoDoc.isActive !== false;
+          const isStarted =
+            !promoDoc.startDate || new Date(promoDoc.startDate) <= now;
+          const isNotExpired =
+            !promoDoc.endDate || new Date(promoDoc.endDate) >= now;
+          stillValid = isActive && isStarted && isNotExpired;
+        } else {
+          stillValid = false;
+        }
+      }
+
+      if (
+        stillValid &&
+        original.discountType &&
+        original.discountValue != null
+      ) {
+        const cappedDays = Math.min(days, originalDays);
+        const extraDays = Math.max(0, days - cappedDays);
+        const cappedBaseRental = dailyRate * cappedDays;
+        const discountAmount =
+          original.discountType === "percentage"
+            ? (cappedBaseRental * original.discountValue) / 100
+            : Math.min(original.discountValue, cappedBaseRental);
+        const discountedCappedRental = Math.max(
+          0,
+          cappedBaseRental - discountAmount,
+        );
+        const extraAmount = dailyRate * extraDays;
+
+        newAmount =
+          discountedCappedRental + extraAmount + distanceFee + helmetFee;
+        rescheduleDiscount = {
+          source: "carryover",
+          refId: original.id || null,
+          code: original.code || "",
+          discountType: original.discountType,
+          discountValue: original.discountValue,
+        };
+      }
+    }
+
+    const previousPickupDate = booking.pickupDate;
+    const previousPickupTime = booking.pickupTime;
+    const previousReturnDate = booking.returnDate;
+    const previousReturnTime = booking.returnTime;
+
+    booking.pickupDate = new Date(newPickupAt);
+    booking.pickupTime = pickupTime;
+    booking.returnDate = new Date(newReturnAt);
+    booking.returnTime = returnTime;
+    booking.amount = newAmount;
+    booking.reschedules = booking.reschedules || [];
+    booking.reschedules.push({
+      requestedAt: new Date(),
+      requestedBy: new mongoose.Types.ObjectId(userId),
+      previousPickupDate,
+      previousPickupTime,
+      previousReturnDate,
+      previousReturnTime,
+      newPickupDate: booking.pickupDate,
+      newPickupTime: booking.pickupTime,
+      newReturnDate: booking.returnDate,
+      newReturnTime: booking.returnTime,
+      previousAmount,
+      newAmount,
+      additionalAmount: newAmount - previousAmount,
+      // "promo"/"loyalty" = freshly entered code for this reschedule;
+      // "carryover" = original checkout discount auto-continuing (capped);
+      // null = no discount applies.
+      appliedDiscount: rescheduleDiscount || null,
+    });
+
+    const updated = await booking.save();
+
+    // Only a freshly-entered code counts as a new redemption — a carried-
+    // over discount was already marked used at the original booking.
+    if (rescheduleDiscount) {
+      if (rescheduleDiscount.source === "promo") {
+        await mongoose
+          .model("Discount")
+          .findByIdAndUpdate(rescheduleDiscount.refId, {
+            $inc: { usedCount: 1 },
+          });
+      } else if (rescheduleDiscount.source === "loyalty") {
+        await User.updateOne(
+          { _id: userId, "loyaltyCodes._id": rescheduleDiscount.refId },
+          {
+            $set: {
+              "loyaltyCodes.$.usedAt": new Date(),
+              "loyaltyCodes.$.usedOnBookingId": updated._id,
+            },
+          },
+        );
+      }
+    }
+
+    await Motorcycle.findOneAndUpdate(
+      {
+        _id: motorcycleId,
+        "bookings.bookingId": booking._id,
+      },
+      {
+        $set: {
+          "bookings.$.pickupDate": booking.pickupDate,
+          "bookings.$.returnDate": booking.returnDate,
+        },
+      },
+    );
+
+    await updateMotorcycleStatus(motorcycleId);
+
+    await createSystemLog({
+      req,
+      actorType: "user",
+      action: "booking_rescheduled",
+      targetType: "booking",
+      targetId: updated._id,
+      summary: `Booking rescheduled: ${buildBookingLabel(updated)}`,
+      metadata: {
+        previousPickupDate,
+        previousPickupTime,
+        previousReturnDate,
+        previousReturnTime,
+        newPickupDate: booking.pickupDate,
+        newPickupTime: booking.pickupTime,
+        newReturnDate: booking.returnDate,
+        newReturnTime: booking.returnTime,
+        previousAmount,
+        newAmount,
+        appliedDiscount: rescheduleDiscount || null,
+      },
+    });
+
+    return res.json({
+      success: true,
+      booking: updated,
+      newAmount,
+      appliedDiscount: rescheduleDiscount || null,
       days,
     });
   } catch (err) {
@@ -1763,6 +2547,15 @@ export const requestBookingProofReupload = async (req, res, next) => {
       );
       await updateMotorcycleStatus(motorcycleId);
     }
+
+    notifyProofReuploadRequested(
+      updated.userId,
+      updated._id,
+      comment,
+      updated.adminReviewedAt,
+    ).catch((e) =>
+      console.error("[Push] notifyProofReuploadRequested:", e.message),
+    );
 
     return res.json({
       success: true,
@@ -1950,7 +2743,19 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
     }
 
     if (status === "completed" && motorcycleId) {
-      captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(() => {});
+      captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(
+        () => {},
+      );
+    }
+
+    if (
+      status === "completed" &&
+      previousStatus !== "completed" &&
+      updated.userId
+    ) {
+      evaluateLoyaltyAfterCompletion(updated.userId).catch((e) =>
+        console.error("[Loyalty] evaluateLoyaltyAfterCompletion:", e.message),
+      );
     }
 
     if (motorcycleId) {
@@ -1982,7 +2787,9 @@ export const updateMotorcycleBookingStatus = async (req, res, next) => {
       },
     });
 
-    notifyBookingStatusChange(updated.userId, status, updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange:", e.message));
+    notifyBookingStatusChange(updated.userId, status, updated._id).catch((e) =>
+      console.error("[Push] notifyBookingStatusChange:", e.message),
+    );
 
     res.json(updated);
   } catch (err) {
@@ -2003,26 +2810,22 @@ export const updateReturnInspection = async (req, res, next) => {
     }
 
     const motorcycleId = booking.motorcycle?.id;
+    const previousBookingStatus = booking.status;
 
     const {
       clearanceStatus,
-      damageNotes,
-      mechanicNotes,
-      repairEstimateAmount,
-      repairEstimateNotes,
+      inspectionDate,
       penaltyAmount,
       penaltySummary,
       penaltySettled,
       vehicleStatus,
+      violations: rawViolationsInput,
     } = req.body || {};
     const previousClearance = booking.returnInspection?.clearanceStatus;
 
     const inspection = {
       ...(booking.returnInspection || {}),
     };
-    const wasRepairAdded = Boolean(
-      booking.returnInspection?.repairEstimateAdded,
-    );
     const wasPenaltySettled = Boolean(booking.returnInspection?.penaltySettled);
 
     if (clearanceStatus) {
@@ -2032,24 +2835,44 @@ export const updateReturnInspection = async (req, res, next) => {
       inspection.clearanceStatus = clearanceStatus;
     }
 
-    // Only include fields relevant to clearance status
-    if (inspection.clearanceStatus === "damage_found") {
-      if (typeof damageNotes === "string") inspection.damageNotes = damageNotes;
-      if (typeof mechanicNotes === "string")
-        inspection.mechanicNotes = mechanicNotes;
-      if (typeof repairEstimateNotes === "string")
-        inspection.repairEstimateNotes = repairEstimateNotes;
-      if (repairEstimateAmount !== undefined) {
-        const parsed = Number(repairEstimateAmount);
-        if (!Number.isNaN(parsed)) inspection.repairEstimateAmount = parsed;
+    if (inspectionDate) {
+      const parsedDate = new Date(inspectionDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        inspection.inspectionDate = parsedDate;
       }
-      inspection.vehicleStatus = "maintenance";
-    } else if (inspection.clearanceStatus === "penalty_required") {
-      if (typeof penaltySummary === "string")
-        inspection.penaltySummary = penaltySummary;
-      if (penaltyAmount !== undefined) {
-        const parsed = Number(penaltyAmount);
-        if (!Number.isNaN(parsed)) inspection.penaltyAmount = parsed;
+    }
+
+    // Only include fields relevant to clearance status
+    if (inspection.clearanceStatus === "penalty_required") {
+      const parsedRawViolations = tryParseJSON(rawViolationsInput);
+      if (Array.isArray(parsedRawViolations)) {
+        const effectiveMatrix = await getEffectiveInspectionMatrix();
+        const { violations, total } = computeViolations(
+          parsedRawViolations,
+          effectiveMatrix,
+        );
+        inspection.violations = violations;
+        inspection.penaltyAmount = total;
+        inspection.penaltySummary =
+          typeof penaltySummary === "string" && penaltySummary
+            ? penaltySummary
+            : violations.length
+              ? violations
+                  .map((v) =>
+                    v.quantity > 1
+                      ? `${v.label} x${v.quantity} (₱${v.amount})`
+                      : `${v.label} (₱${v.amount})`,
+                  )
+                  .join(", ")
+              : "No violations found";
+      } else {
+        // Fallback for older clients that still send a raw amount/summary.
+        if (typeof penaltySummary === "string")
+          inspection.penaltySummary = penaltySummary;
+        if (penaltyAmount !== undefined) {
+          const parsed = Number(penaltyAmount);
+          if (!Number.isNaN(parsed)) inspection.penaltyAmount = parsed;
+        }
       }
       inspection.vehicleStatus = "maintenance";
     } else if (inspection.clearanceStatus === "pending_inspection") {
@@ -2063,6 +2886,7 @@ export const updateReturnInspection = async (req, res, next) => {
       delete inspection.penaltyAmount;
       delete inspection.penaltySummary;
       delete inspection.penaltySettled;
+      delete inspection.violations;
     }
 
     if (penaltySettled !== undefined) {
@@ -2071,25 +2895,9 @@ export const updateReturnInspection = async (req, res, next) => {
         penaltySettled === true;
     }
 
-    const damageFiles = req.files?.damagePhotos || [];
-    const penaltyFiles = req.files?.penaltyPhotos || []; // <--- 1. Extract the penalty files
+    const penaltyFiles = req.files?.penaltyPhotos || [];
 
-    // Only upload damage photos for damage_found status
-    if (inspection.clearanceStatus === "damage_found") {
-      const damageUrls = await getUploadedInspectionUrls(
-        damageFiles,
-        CLOUDINARY_RETURN_INSPECTION_FOLDER,
-      );
-
-      if (damageUrls.length) {
-        inspection.damagePhotos = [
-          ...(inspection.damagePhotos || []),
-          ...damageUrls,
-        ];
-      }
-    }
-    // <--- 2. Add this block to handle penalty photos!
-    else if (inspection.clearanceStatus === "penalty_required") {
+    if (inspection.clearanceStatus === "penalty_required") {
       const penaltyUrls = await getUploadedInspectionUrls(
         penaltyFiles,
         CLOUDINARY_RETURN_INSPECTION_FOLDER,
@@ -2105,19 +2913,6 @@ export const updateReturnInspection = async (req, res, next) => {
 
     inspection.updatedAt = new Date();
 
-    // Add repair estimate amount to booking revenue when inspection is cleared
-    if (
-      inspection.clearanceStatus === "cleared" &&
-      previousClearance === "damage_found" &&
-      Number(inspection.repairEstimateAmount || 0) > 0 &&
-      !wasRepairAdded
-    ) {
-      booking.amount =
-        Number(booking.amount || 0) +
-        Number(inspection.repairEstimateAmount || 0);
-      inspection.repairEstimateAdded = true;
-    }
-
     if (inspection.clearanceStatus === "cleared") {
       inspection.clearedAt = inspection.clearedAt || new Date();
       booking.status = "completed";
@@ -2126,8 +2921,7 @@ export const updateReturnInspection = async (req, res, next) => {
     // If penalty is settled, mark inspection as completed
     if (
       inspection.penaltySettled &&
-      (inspection.clearanceStatus === "damage_found" ||
-        inspection.clearanceStatus === "penalty_required")
+      inspection.clearanceStatus === "penalty_required"
     ) {
       if (!wasPenaltySettled) {
         const penaltyTotal = Number(inspection.penaltyAmount || 0);
@@ -2136,41 +2930,129 @@ export const updateReturnInspection = async (req, res, next) => {
         }
       }
 
-      // If there is a repair estimate from damage_found, add it to revenue when settling
-      if (
-        inspection.clearanceStatus === "damage_found" &&
-        Number(inspection.repairEstimateAmount || 0) > 0 &&
-        !wasRepairAdded
-      ) {
-        booking.amount =
-          Number(booking.amount || 0) +
-          Number(inspection.repairEstimateAmount || 0);
-        inspection.repairEstimateAdded = true;
-      }
-
       inspection.clearedAt = inspection.clearedAt || new Date();
       inspection.vehicleStatus = "available";
       booking.status = "completed";
     }
 
+    // ── Security deposit refund handling ──────────────────────────────────
+    // Fully automatic, no manual admin entry:
+    //   • Cleared          → full ₱ deposit refunded immediately, no
+    //                        deductions (there were no violations).
+    //   • Settle Penalty   → the server-recomputed penalty total is
+    //                        deducted (capped at the deposit amount) and the
+    //                        remaining balance is refunded in the same
+    //                        action. Any penalty beyond the deposit is
+    //                        recorded as a balance the customer still owes.
+    let depositRefundInfo = null;
+    if (
+      booking.securityDeposit?.collected &&
+      !booking.securityDeposit?.returned
+    ) {
+      const deposit = {
+        ...(booking.securityDeposit?.toObject?.() ||
+          booking.securityDeposit ||
+          {}),
+      };
+      const depositCap = Number(deposit.amount || 1000);
+
+      if (inspection.clearanceStatus === "cleared") {
+        deposit.deductions = 0;
+        deposit.balanceDue = 0;
+        deposit.returned = true;
+        deposit.returnedAt = new Date();
+        deposit.returnedAmount = depositCap;
+        deposit.deductionNotes = "";
+        deposit.refundReason =
+          "Full refund — no violations found during inspection.";
+        booking.securityDeposit = deposit;
+        depositRefundInfo = {
+          type: "full",
+          deducted: 0,
+          refunded: depositCap,
+          balanceDue: 0,
+        };
+      } else if (
+        inspection.clearanceStatus === "penalty_required" &&
+        inspection.penaltySettled &&
+        !wasPenaltySettled
+      ) {
+        const penaltyTotal = Number(inspection.penaltyAmount || 0);
+        const deduction = Math.min(depositCap, Math.max(0, penaltyTotal));
+        const balanceDue = Math.max(0, penaltyTotal - depositCap);
+        deposit.deductions = deduction;
+        deposit.balanceDue = balanceDue;
+        deposit.deductionNotes = inspection.penaltySummary || "";
+        deposit.returned = true;
+        deposit.returnedAt = new Date();
+        deposit.returnedAmount = Math.max(0, depositCap - deduction);
+        deposit.refundReason =
+          balanceDue > 0
+            ? `Partial refund — ₱${deduction.toLocaleString()} deducted for violations (${
+                inspection.penaltySummary || "see inspection details"
+              }). Customer still owes ₱${balanceDue.toLocaleString()}.`
+            : deduction > 0
+              ? `Partial refund — ₱${deduction.toLocaleString()} deducted for violations (${
+                  inspection.penaltySummary || "see inspection details"
+                }).`
+              : "Full refund — no deductions applied.";
+        booking.securityDeposit = deposit;
+        depositRefundInfo = {
+          type: "settlement",
+          deducted: deduction,
+          refunded: deposit.returnedAmount,
+          balanceDue,
+        };
+      }
+    }
+
     booking.returnInspection = inspection;
     const updated = await booking.save();
 
-    // Notify customer when clearance status changes to damage_found or penalty_required
+    if (
+      previousBookingStatus !== "completed" &&
+      updated.status === "completed" &&
+      updated.userId
+    ) {
+      evaluateLoyaltyAfterCompletion(updated.userId).catch((e) =>
+        console.error("[Loyalty] evaluateLoyaltyAfterCompletion:", e.message),
+      );
+    }
+
+    // Notify customer when clearance status changes to penalty_required,
+    // when the vehicle is cleared with no penalties, or when an existing
+    // penalty gets settled.
     if (updated.userId) {
       if (
-        inspection.clearanceStatus === "damage_found" &&
-        previousClearance !== "damage_found"
-      ) {
-        notifyDamageFound(updated.userId, updated._id, inspection.damageNotes).catch((e) =>
-          console.error("[Push] notifyDamageFound:", e.message)
-        );
-      } else if (
         inspection.clearanceStatus === "penalty_required" &&
         previousClearance !== "penalty_required"
       ) {
-        notifyPenaltyRequired(updated.userId, updated._id, inspection.penaltyAmount, inspection.penaltySummary).catch((e) =>
-          console.error("[Push] notifyPenaltyRequired:", e.message)
+        notifyPenaltyRequired(
+          updated.userId,
+          updated._id,
+          inspection.penaltyAmount,
+          inspection.penaltySummary,
+        ).catch((e) =>
+          console.error("[Push] notifyPenaltyRequired:", e.message),
+        );
+      } else if (
+        inspection.clearanceStatus === "cleared" &&
+        previousClearance !== "cleared"
+      ) {
+        notifyVehicleCleared(updated.userId, updated._id).catch((e) =>
+          console.error("[Push] notifyVehicleCleared:", e.message),
+        );
+      } else if (
+        inspection.clearanceStatus === "penalty_required" &&
+        inspection.penaltySettled &&
+        !wasPenaltySettled
+      ) {
+        notifyPenaltySettled(
+          updated.userId,
+          updated._id,
+          depositRefundInfo?.type === "settlement" ? depositRefundInfo : {},
+        ).catch((e) =>
+          console.error("[Push] notifyPenaltySettled:", e.message),
         );
       }
     }
@@ -2194,7 +3076,9 @@ export const updateReturnInspection = async (req, res, next) => {
             $set: { "bookings.$.status": "completed" },
           },
         );
-        captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(() => {});
+        captureTrackingSummaryOnCompletion(updated._id, motorcycleId).catch(
+          () => {},
+        );
       }
 
       await updateMotorcycleStatus(motorcycleId);
@@ -2211,8 +3095,40 @@ export const updateReturnInspection = async (req, res, next) => {
         clearanceStatus: updated.returnInspection?.clearanceStatus,
         penaltySettled: updated.returnInspection?.penaltySettled,
         bookingStatus: updated.status,
+        securityDepositReturned: updated.securityDeposit?.returned || false,
+        securityDepositReturnedAmount:
+          updated.securityDeposit?.returnedAmount || 0,
+        securityDepositDeductions: updated.securityDeposit?.deductions || 0,
       },
     });
+
+    // Dedicated audit-trail entry for the deposit refund itself, so the
+    // refund is clearly recorded in booking history independent of the
+    // general inspection-update log above.
+    if (depositRefundInfo) {
+      await createSystemLog({
+        req,
+        actorType: "admin",
+        action: "security_deposit_refunded",
+        targetType: "booking",
+        targetId: updated._id,
+        summary:
+          depositRefundInfo.type === "full"
+            ? `Full security deposit refunded (₱${depositRefundInfo.refunded.toLocaleString()}): ${buildBookingLabel(updated)}`
+            : `Security deposit settled — ₱${depositRefundInfo.deducted.toLocaleString()} deducted, ₱${depositRefundInfo.refunded.toLocaleString()} refunded${
+                depositRefundInfo.balanceDue > 0
+                  ? `, ₱${depositRefundInfo.balanceDue.toLocaleString()} balance due`
+                  : ""
+              }: ${buildBookingLabel(updated)}`,
+        metadata: {
+          refundType: depositRefundInfo.type,
+          deducted: depositRefundInfo.deducted,
+          refunded: depositRefundInfo.refunded,
+          balanceDue: depositRefundInfo.balanceDue,
+          refundReason: updated.securityDeposit?.refundReason || "",
+        },
+      });
+    }
 
     return res.json({ success: true, booking: updated });
   } catch (err) {
@@ -2294,7 +3210,16 @@ export const confirmFullPayment = async (req, res, next) => {
         },
       });
 
-      notifyBookingStatusChange(updated.userId, "pending_full_payment", updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange pending_full_payment:", e.message));
+      notifyBookingStatusChange(
+        updated.userId,
+        "pending_full_payment",
+        updated._id,
+      ).catch((e) =>
+        console.error(
+          "[Push] notifyBookingStatusChange pending_full_payment:",
+          e.message,
+        ),
+      );
 
       return res.json({
         success: true,
@@ -2305,6 +3230,21 @@ export const confirmFullPayment = async (req, res, next) => {
     }
 
     // Stage 2: Admin confirms full payment during pickup and activates booking.
+    // A ₱1,000 refundable security deposit must be collected before the
+    // motorcycle is released — this cannot be skipped.
+    const depositAlreadyCollected = Boolean(booking.securityDeposit?.collected);
+    const depositCollectedNow =
+      req.body.securityDepositCollected === true ||
+      String(req.body.securityDepositCollected).toLowerCase() === "true";
+
+    if (!depositAlreadyCollected && !depositCollectedNow) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "A ₱1,000 refundable security deposit must be collected before the motorcycle can be picked up.",
+      });
+    }
+
     booking.paymentStatus = "fully_paid";
     booking.status = "active";
     booking.fullPaymentConfirmedAt = new Date();
@@ -2312,6 +3252,23 @@ export const confirmFullPayment = async (req, res, next) => {
     // 👉 THIS IS THE MISSING FIX: Save the payment method from the request
     if (req.body.fullPaymentMethod) {
       booking.fullPaymentMethod = req.body.fullPaymentMethod;
+    }
+
+    if (!depositAlreadyCollected) {
+      booking.securityDeposit = {
+        ...(booking.securityDeposit?.toObject?.() ||
+          booking.securityDeposit ||
+          {}),
+        required: true,
+        amount: 1000,
+        collected: true,
+        collectedAt: new Date(),
+        collectionMethod:
+          req.body.securityDepositMethod ||
+          req.body.fullPaymentMethod ||
+          "Cash",
+        receivedBy: req.user?._id || req.user?.id || null,
+      };
     }
 
     const updated = await booking.save();
@@ -2345,11 +3302,19 @@ export const confirmFullPayment = async (req, res, next) => {
         status: updated.status,
         paymentStatus: updated.paymentStatus,
         fullPaymentMethod: updated.fullPaymentMethod, // Log it too
+        securityDepositCollected: updated.securityDeposit?.collected || false,
+        securityDepositAmount: updated.securityDeposit?.amount || 1000,
+        securityDepositMethod: updated.securityDeposit?.collectionMethod || "",
       },
     });
 
-    notifyPaymentConfirmed(updated.userId).catch((e) => console.error("[Push] notifyPaymentConfirmed:", e.message));
-    notifyBookingStatusChange(updated.userId, "active", updated._id).catch((e) => console.error("[Push] notifyBookingStatusChange active:", e.message));
+    notifyPaymentConfirmed(updated.userId).catch((e) =>
+      console.error("[Push] notifyPaymentConfirmed:", e.message),
+    );
+    notifyBookingStatusChange(updated.userId, "active", updated._id).catch(
+      (e) =>
+        console.error("[Push] notifyBookingStatusChange active:", e.message),
+    );
 
     res.json({
       success: true,
@@ -2553,14 +3518,14 @@ export const updateTrackingSummary = async (req, res, next) => {
         $set: {
           trackingSummary: {
             totalDistanceKm: Number(totalDistanceKm || 0),
-            avgSpeedKmh:     Number(avgSpeedKmh || 0),
-            maxSpeedKmh:     Number(maxSpeedKmh || 0),
-            stopsMade:       Number(stopsMade || 0),
-            lastUpdatedAt:   new Date(),
+            avgSpeedKmh: Number(avgSpeedKmh || 0),
+            maxSpeedKmh: Number(maxSpeedKmh || 0),
+            stopsMade: Number(stopsMade || 0),
+            lastUpdatedAt: new Date(),
           },
         },
       },
-      { new: true }
+      { new: true },
     );
     if (!booking) return res.status(404).json({ message: "Booking not found" });
     res.json({ success: true, trackingSummary: booking.trackingSummary });
@@ -2577,7 +3542,9 @@ export const backfillTrackingSummaries = async (req, res, next) => {
       status: "completed",
       trackingBaseline: { $exists: true },
       trackingSummary: { $exists: false },
-    }).select("_id motorcycle trackingBaseline").lean();
+    })
+      .select("_id motorcycle trackingBaseline")
+      .lean();
 
     if (!bookings.length) {
       return res.json({ message: "No bookings need backfill", processed: 0 });
@@ -2586,16 +3553,26 @@ export const backfillTrackingSummaries = async (req, res, next) => {
     const results = [];
     for (const booking of bookings) {
       try {
-        const moto = await Motorcycle.findById(booking.motorcycle).select("traccarDeviceId");
+        const moto = await Motorcycle.findById(booking.motorcycle).select(
+          "traccarDeviceId",
+        );
         const uniqueId = moto?.traccarDeviceId?.trim();
         if (!uniqueId) {
-          results.push({ id: booking._id, status: "skipped", reason: "no traccarDeviceId" });
+          results.push({
+            id: booking._id,
+            status: "skipped",
+            reason: "no traccarDeviceId",
+          });
           continue;
         }
 
         const device = await resolveTraccarDeviceId(uniqueId);
         if (!device) {
-          results.push({ id: booking._id, status: "skipped", reason: "device not found in Traccar" });
+          results.push({
+            id: booking._id,
+            status: "skipped",
+            reason: "device not found in Traccar",
+          });
           continue;
         }
 
@@ -2607,14 +3584,22 @@ export const backfillTrackingSummaries = async (req, res, next) => {
 
         const summary = await fetchTraccarSummary(device.id, from, to);
         if (!summary) {
-          results.push({ id: booking._id, status: "skipped", reason: "no Traccar summary data" });
+          results.push({
+            id: booking._id,
+            status: "skipped",
+            reason: "no Traccar summary data",
+          });
           continue;
         }
 
         await MotorcycleBooking.findByIdAndUpdate(booking._id, {
           $set: { trackingSummary: summary },
         });
-        results.push({ id: booking._id, status: "saved", distanceKm: summary.totalDistanceKm.toFixed(2) });
+        results.push({
+          id: booking._id,
+          status: "saved",
+          distanceKm: summary.totalDistanceKm.toFixed(2),
+        });
       } catch (err) {
         results.push({ id: booking._id, status: "error", reason: err.message });
       }

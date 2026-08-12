@@ -26,9 +26,21 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
+import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const baseURL = API_BASE_URL;
-const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
+const api = axios.create({
+  baseURL: baseURL,
+  headers: { Accept: "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 const PAGE_SIZE = 10;
 

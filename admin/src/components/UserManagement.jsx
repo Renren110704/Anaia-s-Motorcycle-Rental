@@ -16,8 +16,10 @@ import {
   FaTimes,
   FaUser,
   FaShieldAlt,
+  FaTrophy,
 } from "react-icons/fa";
 import { AlertTriangle, CheckCircle2, Trash2, Users } from "lucide-react";
+import { LoyaltyTierBadge } from "../components/DiscountBadge";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
@@ -384,13 +386,15 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-[9990] flex" onClick={onClose}>
-      <div className="flex-1 bg-black/30 backdrop-blur-sm" />
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md bg-[#f7f8fa] h-full overflow-y-auto shadow-2xl"
+        className="w-full max-w-md bg-[#f7f8fa] max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm rounded-t-2xl">
           <div>
             <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
               User Profile
@@ -434,8 +438,15 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
+
+            {/* --- NEW: Loyalty Badge added next to Verified Badge --- */}
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <VerifiedBadge isVerified={user.isVerified} />
+              {user.loyaltyTier && user.loyaltyTier !== "None" && (
+                <div className="scale-90">
+                  <LoyaltyTierBadge tier={user.loyaltyTier} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -454,6 +465,20 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
               icon={FaMapMarkerAlt}
               label="Full Address"
               value={buildFullAddress(user.address)}
+            />
+          </Section>
+
+          {/* --- NEW: Loyalty & Activity Section --- */}
+          <Section title="Loyalty & Activity">
+            <Row
+              icon={FaShieldAlt}
+              label="Current Tier"
+              value={user.loyaltyTier || "None"}
+            />
+            <Row
+              icon={FaTrophy}
+              label="Rentals"
+              value={`${user.completedRentalsCount || 0} completed`}
             />
           </Section>
 
@@ -482,6 +507,7 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
     { label: "User", key: "firstName", sortable: true },
     { label: "Contact", key: "email", sortable: true },
     { label: "Joined", key: "createdAt", sortable: true },
+    { label: "Tier", key: "loyaltyTier", sortable: true },
     { label: "Verified", key: "isVerified", sortable: true },
     { label: "Actions", key: null, sortable: false },
   ];
@@ -558,6 +584,19 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
                   </p>
                 </td>
 
+                {/* Tier */}
+                <td className="px-5 py-3.5">
+                  {user.loyaltyTier && user.loyaltyTier !== "None" ? (
+                    <div className="scale-[0.85] origin-left">
+                      <LoyaltyTierBadge tier={user.loyaltyTier} />
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      None
+                    </span>
+                  )}
+                </td>
+
                 {/* Verified */}
                 <td className="px-5 py-3.5">
                   <VerifiedBadge isVerified={user.isVerified} />
@@ -600,6 +639,8 @@ const UserManagement = () => {
   const [colSort, setColSort] = useState({ key: null, dir: null });
   const [drawerUser, setDrawerUser] = useState(null);
 
+  const TIER_RANKS = { Platinum: 4, Gold: 3, Silver: 2, None: 1 };
+
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -621,6 +662,8 @@ const UserManagement = () => {
         isVerified: u.isVerified || false,
         profilePicture: u.profilePicture || "",
         createdAt: u.createdAt || new Date().toISOString(),
+        loyaltyTier: u.loyaltyTier || "None",
+        completedRentalsCount: u.completedRentalsCount || 0,
       }));
       setUsers(mapped);
     } catch (err) {
@@ -673,7 +716,15 @@ const UserManagement = () => {
     }
 
     // Sort Logic
-    if (colSort.key && colSort.dir) {
+    if (colSort.key === "loyaltyTier" && colSort.dir) {
+      list.sort((a, b) => {
+        const rankA = TIER_RANKS[a.loyaltyTier || "None"] || 1;
+        const rankB = TIER_RANKS[b.loyaltyTier || "None"] || 1;
+        // Ascending: Lowest to Highest (None -> Platinum)
+        // Descending: Highest to Lowest (Platinum -> None)
+        return colSort.dir === "asc" ? rankA - rankB : rankB - rankA;
+      });
+    } else if (colSort.key && colSort.dir) {
       list.sort((a, b) => {
         let aVal = a[colSort.key],
           bVal = b[colSort.key];

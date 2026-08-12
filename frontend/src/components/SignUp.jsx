@@ -311,38 +311,58 @@ const iconBase = {
   pointerEvents: "none",
 };
 
-const Field = ({ icon: Icon, label, children }) => (
+const errorTextStyle = {
+  color: "#b50002",
+  fontSize: 11,
+  fontWeight: 600,
+  marginTop: 6,
+  fontFamily: "'Space Grotesk', sans-serif",
+};
+
+const Field = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
     <div
-      style={inputWrapBase}
+      style={{
+        ...inputWrapBase,
+        ...(error ? { borderColor: "#b50002", background: "#FDF0F0" } : null),
+      }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = "#b50002";
-        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#fff";
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-        e.currentTarget.style.background = "#F5F5F3";
+        e.currentTarget.style.borderColor = error
+          ? "#b50002"
+          : "rgba(0,0,0,0.09)";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#F5F5F3";
       }}
     >
       {Icon && <Icon style={iconBase} />}
       {children}
     </div>
+    {error && <p style={errorTextStyle}>{error}</p>}
   </div>
 );
 
-const SelectField = ({ icon: Icon, label, children }) => (
+const SelectField = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
     <div
-      style={{ ...inputWrapBase, position: "relative" }}
+      style={{
+        ...inputWrapBase,
+        position: "relative",
+        ...(error ? { borderColor: "#b50002", background: "#FDF0F0" } : null),
+      }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = "#b50002";
-        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#fff";
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-        e.currentTarget.style.background = "#F5F5F3";
+        e.currentTarget.style.borderColor = error
+          ? "#b50002"
+          : "rgba(0,0,0,0.09)";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#F5F5F3";
       }}
     >
       {Icon && <Icon style={iconBase} />}
@@ -357,6 +377,7 @@ const SelectField = ({ icon: Icon, label, children }) => (
         }}
       />
     </div>
+    {error && <p style={errorTextStyle}>{error}</p>}
   </div>
 );
 
@@ -660,7 +681,7 @@ const TermsModal = ({ onClose, onAccept }) => (
           ],
           [
             "3. Reservation and Cancellation",
-            "Cancellations made 2 days or more in advance of the scheduled date will receive a 100% refund. If the LESSEE/RENTER cancels the reservation with less notice, the LESSOR has all rights to forfeit the RESERVATION FEE paid.",
+            "Cancellations cannot be refunded. If the LESSEE/RENTER cancels the reservation with less notice, the LESSOR has all rights to forfeit the RESERVATION FEE paid.",
           ],
           [
             "4. Release and Return",
@@ -795,6 +816,11 @@ const SignUp = () => {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  // Set once the backend reports the 3-resend cap has been hit for this
+  // pending registration; disables further resend attempts until the user
+  // registers again (which starts a fresh OTP cycle on the backend).
+  const [resendLimitReached, setResendLimitReached] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const resendCooldown = useResendCooldown({
     storageKey: formData.email
@@ -815,8 +841,18 @@ const SignUp = () => {
     fetchBarangays,
   } = usePHAddress();
 
+  const clearError = (name) => {
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+    clearError(name);
     if (name === "phone") {
       setFormData((p) => ({ ...p, phone: value.replace(/\D/g, "") }));
       return;
@@ -824,7 +860,49 @@ const SignUp = () => {
     setFormData((p) => ({ ...p, [name]: value }));
   };
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateStep1 = () => {
+    const next = {};
+    if (!formData.firstName.trim()) next.firstName = "Name is required";
+    if (!formData.lastName.trim()) next.lastName = "Name is required";
+    if (!formData.email.trim()) {
+      next.email = "Email is required";
+    } else if (!EMAIL_RE.test(formData.email.trim())) {
+      next.email = "Enter a valid email address";
+    }
+    if (!formData.phone) {
+      next.phone = "Phone number is required";
+    } else if (!/^09\d{9}$/.test(formData.phone)) {
+      next.phone = "Enter 11 digits starting with 09";
+    }
+    if (!formData.password) {
+      next.password = "Password is required";
+    } else if (getPasswordStrength(formData.password) < 4) {
+      next.password = "Password must be Strong (meet all criteria)";
+    }
+    if (!formData.confirmPassword) {
+      next.confirmPassword = "Please confirm your password";
+    } else if (formData.password !== formData.confirmPassword) {
+      next.confirmPassword = "Passwords do not match";
+    }
+    return next;
+  };
+
+  const validateStep2 = () => {
+    const next = {};
+    if (!address.regionCode) next.region = "Region is required";
+    if (hasProvinces && !address.provinceCode)
+      next.province = "Province is required";
+    if (!address.cityCode) next.city = "City is required";
+    if (!address.barangayCode) next.barangay = "Barangay is required";
+    return next;
+  };
+
   const handleRegionChange = (e) => {
+    clearError("region");
+    clearError("province");
+    clearError("city");
     const code = e.target.value;
     const name = regions.find((r) => r.code === code)?.name || "";
     setAddress((p) => ({
@@ -841,6 +919,8 @@ const SignUp = () => {
     fetchProvinces(code);
   };
   const handleProvinceChange = (e) => {
+    clearError("province");
+    clearError("city");
     const code = e.target.value;
     const name = provinces.find((p) => p.code === code)?.name || "";
     setAddress((p) => ({
@@ -855,6 +935,8 @@ const SignUp = () => {
     fetchCities(code);
   };
   const handleCityChange = (e) => {
+    clearError("city");
+    clearError("barangay");
     const code = e.target.value;
     const name = cities.find((c) => c.code === code)?.name || "";
     setAddress((p) => ({
@@ -867,6 +949,7 @@ const SignUp = () => {
     fetchBarangays(code);
   };
   const handleBarangayChange = (e) => {
+    clearError("barangay");
     const code = e.target.value;
     const name = barangays.find((b) => b.code === code)?.name || "";
     setAddress((p) => ({ ...p, barangayCode: code, barangayName: name }));
@@ -874,46 +957,64 @@ const SignUp = () => {
 
   const getPasswordStrength = (pass) => {
     let s = 0;
-    if (pass.length >= 6) s++;
+    if (pass.length >= 8) s++;
     if (pass.match(/[a-z]/) && pass.match(/[A-Z]/)) s++;
     if (pass.match(/\d/)) s++;
     if (pass.match(/[^a-zA-Z\d]/)) s++;
     return s;
   };
 
-  const handleNextStep = (e) => {
+  const handleNextStep = async (e) => {
     e.preventDefault();
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      toast.error("First name and last name are required");
+    const stepErrors = validateStep1();
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      toast.error("Please fix the highlighted fields");
       return;
     }
-    if (!formData.email.trim()) {
-      toast.error("Email address is required");
-      return;
+
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/check-availability`, {
+        email: formData.email.trim(),
+        phone: formData.phone,
+      });
+      const { emailTaken, phoneTaken } = res.data || {};
+      const availabilityErrors = {};
+      if (emailTaken) {
+        availabilityErrors.email = "This email is already registered";
+      }
+      if (phoneTaken) {
+        availabilityErrors.phone = "This contact number is already registered";
+      }
+      if (Object.keys(availabilityErrors).length > 0) {
+        setErrors(availabilityErrors);
+        toast.error("Please fix the highlighted fields");
+        return;
+      }
+      setErrors({});
+      setStep(2);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          "Couldn't verify your details. Please try again.",
+      );
+    } finally {
+      setLoading(false);
     }
-    if (!formData.phone || !/^09\d{9}$/.test(formData.phone)) {
-      toast.error("Phone number must be in format 09xxxxxxxxx (11 digits)");
-      return;
-    }
-    if (getPasswordStrength(formData.password) < 4) {
-      toast.error("Password must be Strong (meet all criteria)");
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    setStep(2);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!acceptedTerms) {
-      toast.error("Please accept terms & conditions");
+    const stepErrors = validateStep2();
+    setErrors(stepErrors);
+    if (Object.keys(stepErrors).length > 0) {
+      toast.error("Please complete your address");
       return;
     }
-    if (!address.barangayCode || !address.cityCode) {
-      toast.error("Please complete your address (up to barangay)");
+    if (!acceptedTerms) {
+      toast.error("Please accept terms & conditions");
       return;
     }
     setLoading(true);
@@ -937,6 +1038,7 @@ const SignUp = () => {
           "Registration successful! Please check your email for OTP.",
         );
         resendCooldown.startCooldown();
+        setResendLimitReached(false);
         setStep(3);
       }
     } catch (err) {
@@ -974,20 +1076,32 @@ const SignUp = () => {
   };
 
   const handleResendOTP = async () => {
-    if (!resendCooldown.canResend || resending || loading) return;
+    if (!resendCooldown.canResend || resending || loading || resendLimitReached)
+      return;
     if (!formData.email) {
       toast.error("Email is missing");
       return;
     }
     setResending(true);
     try {
-      await axios.post(`${API_BASE}/api/auth/resend-verification-otp`, {
-        email: formData.email,
-      });
-      toast.success("OTP resent successfully!");
+      const res = await axios.post(
+        `${API_BASE}/api/auth/resend-verification-otp`,
+        { email: formData.email },
+      );
+      toast.success(res.data?.message || "OTP resent successfully!");
       resendCooldown.startCooldown();
-    } catch {
-      toast.error("Failed to resend OTP");
+    } catch (err) {
+      const data = err.response?.data;
+      if (err.response?.status === 429) {
+        setResendLimitReached(true);
+        toast.error(
+          data?.message ||
+            "OTP resend limit reached. Please try registering again.",
+          { autoClose: 6000 },
+        );
+      } else {
+        toast.error(data?.message || "Failed to resend OTP");
+      }
     } finally {
       setResending(false);
     }
@@ -1139,10 +1253,14 @@ const SignUp = () => {
                     Fill in your name, contact info, and password
                   </p>
                 </div>
-                <form onSubmit={handleNextStep} className="su-form">
+                <form onSubmit={handleNextStep} className="su-form" noValidate>
                   <div>
                     <div className="su-grid-2">
-                      <Field icon={FaUser} label="First Name *">
+                      <Field
+                        icon={FaUser}
+                        label="First Name *"
+                        error={errors.firstName}
+                      >
                         <input
                           type="text"
                           name="firstName"
@@ -1165,7 +1283,11 @@ const SignUp = () => {
                           style={inputBase}
                         />
                       </Field>
-                      <Field icon={FaUser} label="Last Name *">
+                      <Field
+                        icon={FaUser}
+                        label="Last Name *"
+                        error={errors.lastName}
+                      >
                         <input
                           type="text"
                           name="lastName"
@@ -1183,7 +1305,11 @@ const SignUp = () => {
                   <div>
                     {/* <p className="su-section-label">Contact</p> */}
                     <div className="su-grid-2">
-                      <Field icon={FaEnvelope} label="Email Address *">
+                      <Field
+                        icon={FaEnvelope}
+                        label="Email Address *"
+                        error={errors.email}
+                      >
                         <input
                           type="email"
                           name="email"
@@ -1195,7 +1321,11 @@ const SignUp = () => {
                           style={inputBase}
                         />
                       </Field>
-                      <Field icon={FaPhone} label="Phone Number *">
+                      <Field
+                        icon={FaPhone}
+                        label="Phone Number *"
+                        error={errors.phone}
+                      >
                         <input
                           type="tel"
                           name="phone"
@@ -1228,15 +1358,28 @@ const SignUp = () => {
                       <div>
                         <label style={labelStyle}>Password *</label>
                         <div
-                          style={inputWrapBase}
+                          style={{
+                            ...inputWrapBase,
+                            ...(errors.password
+                              ? {
+                                  borderColor: "#b50002",
+                                  background: "#FDF0F0",
+                                }
+                              : null),
+                          }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#b50002";
-                            e.currentTarget.style.background = "#fff";
+                            e.currentTarget.style.background = errors.password
+                              ? "#FDF0F0"
+                              : "#fff";
                           }}
                           onBlur={(e) => {
-                            e.currentTarget.style.borderColor =
-                              "rgba(0,0,0,0.09)";
-                            e.currentTarget.style.background = "#F5F5F3";
+                            e.currentTarget.style.borderColor = errors.password
+                              ? "#b50002"
+                              : "rgba(0,0,0,0.09)";
+                            e.currentTarget.style.background = errors.password
+                              ? "#FDF0F0"
+                              : "#F5F5F3";
                           }}
                         >
                           <FaLock style={iconBase} />
@@ -1268,6 +1411,9 @@ const SignUp = () => {
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
                           </button>
                         </div>
+                        {errors.password && (
+                          <p style={errorTextStyle}>{errors.password}</p>
+                        )}
                         {formData.password.length > 0 && (
                           <div style={{ marginTop: 8 }}>
                             <PasswordStrengthMeter
@@ -1280,15 +1426,27 @@ const SignUp = () => {
                       <div>
                         <label style={labelStyle}>Confirm Password *</label>
                         <div
-                          style={inputWrapBase}
+                          style={{
+                            ...inputWrapBase,
+                            ...(errors.confirmPassword
+                              ? {
+                                  borderColor: "#b50002",
+                                  background: "#FDF0F0",
+                                }
+                              : null),
+                          }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#b50002";
-                            e.currentTarget.style.background = "#fff";
+                            e.currentTarget.style.background =
+                              errors.confirmPassword ? "#FDF0F0" : "#fff";
                           }}
                           onBlur={(e) => {
                             e.currentTarget.style.borderColor =
-                              "rgba(0,0,0,0.09)";
-                            e.currentTarget.style.background = "#F5F5F3";
+                              errors.confirmPassword
+                                ? "#b50002"
+                                : "rgba(0,0,0,0.09)";
+                            e.currentTarget.style.background =
+                              errors.confirmPassword ? "#FDF0F0" : "#F5F5F3";
                           }}
                         >
                           <FaLock style={iconBase} />
@@ -1322,23 +1480,27 @@ const SignUp = () => {
                             {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                           </button>
                         </div>
-                        {formData.confirmPassword && (
-                          <p
-                            style={{
-                              fontSize: 11,
-                              marginTop: 6,
-                              fontWeight: 600,
-                              fontFamily: "'Space Grotesk', sans-serif",
-                              color:
-                                formData.password === formData.confirmPassword
-                                  ? "#166534"
-                                  : "#b50002",
-                            }}
-                          >
-                            {formData.password === formData.confirmPassword
-                              ? "Passwords match"
-                              : "Passwords do not match"}
-                          </p>
+                        {errors.confirmPassword ? (
+                          <p style={errorTextStyle}>{errors.confirmPassword}</p>
+                        ) : (
+                          formData.confirmPassword && (
+                            <p
+                              style={{
+                                fontSize: 11,
+                                marginTop: 6,
+                                fontWeight: 600,
+                                fontFamily: "'Space Grotesk', sans-serif",
+                                color:
+                                  formData.password === formData.confirmPassword
+                                    ? "#166534"
+                                    : "#b50002",
+                              }}
+                            >
+                              {formData.password === formData.confirmPassword
+                                ? "Passwords match"
+                                : "Passwords do not match"}
+                            </p>
+                          )
                         )}
                       </div>
                     </div>
@@ -1348,8 +1510,30 @@ const SignUp = () => {
                     <p className="su-link">
                       Have an account? <a href="/login">Sign in</a>
                     </p>
-                    <button type="submit" className="su-submit">
-                      Next <FaArrowRight style={{ fontSize: 9 }} />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="su-submit"
+                    >
+                      {loading ? (
+                        <>
+                          <div
+                            style={{
+                              width: 13,
+                              height: 13,
+                              border: "2px solid rgba(255,255,255,0.3)",
+                              borderTopColor: "#fff",
+                              borderRadius: "50%",
+                              animation: "spin 0.7s linear infinite",
+                            }}
+                          />{" "}
+                          Checking…
+                        </>
+                      ) : (
+                        <>
+                          Next <FaArrowRight style={{ fontSize: 9 }} />
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>
@@ -1372,11 +1556,16 @@ const SignUp = () => {
                     We need your address for booking purposes
                   </p>
                 </div>
-                <form onSubmit={handleSubmit} className="su-form">
+                <form onSubmit={handleSubmit} className="su-form" noValidate>
                   <div className="su-grid-2">
                     {/* Region */}
-                    <SelectField icon={FaMapMarkerAlt} label="Region *">
+                    <SelectField
+                      icon={FaMapMarkerAlt}
+                      label="Region *"
+                      error={errors.region}
+                    >
                       <select
+                        name="region"
                         value={address.regionCode}
                         onChange={handleRegionChange}
                         disabled={addrLoading.regions}
@@ -1400,8 +1589,13 @@ const SignUp = () => {
 
                     {/* Province */}
                     {address.regionCode && hasProvinces && (
-                      <SelectField icon={FaMapMarkerAlt} label="Province *">
+                      <SelectField
+                        icon={FaMapMarkerAlt}
+                        label="Province *"
+                        error={errors.province}
+                      >
                         <select
+                          name="province"
                           value={address.provinceCode}
                           onChange={handleProvinceChange}
                           disabled={addrLoading.provinces}
@@ -1431,8 +1625,10 @@ const SignUp = () => {
                       <SelectField
                         icon={FaMapMarkerAlt}
                         label="City / Municipality *"
+                        error={errors.city}
                       >
                         <select
+                          name="city"
                           value={address.cityCode}
                           onChange={handleCityChange}
                           disabled={
@@ -1463,8 +1659,13 @@ const SignUp = () => {
                     )}
 
                     {/* Barangay */}
-                    <SelectField icon={FaMapMarkerAlt} label="Barangay *">
+                    <SelectField
+                      icon={FaMapMarkerAlt}
+                      label="Barangay *"
+                      error={errors.barangay}
+                    >
                       <select
+                        name="barangay"
                         value={address.barangayCode}
                         onChange={handleBarangayChange}
                         disabled={!address.cityCode || addrLoading.barangays}
@@ -1673,15 +1874,40 @@ const SignUp = () => {
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={!resendCooldown.canResend || resending || loading}
+                    disabled={
+                      !resendCooldown.canResend ||
+                      resending ||
+                      loading ||
+                      resendLimitReached
+                    }
                     style={resendBtnStyle(
-                      resendCooldown.canResend && !resending && !loading,
+                      resendCooldown.canResend &&
+                        !resending &&
+                        !loading &&
+                        !resendLimitReached,
                     )}
                   >
-                    {!resendCooldown.canResend
-                      ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
-                      : "Didn't receive it? Resend OTP"}
+                    {resendLimitReached
+                      ? "Resend limit reached"
+                      : !resendCooldown.canResend
+                        ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
+                        : "Didn't receive it? Resend OTP"}
                   </button>
+
+                  {resendLimitReached && (
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#b50002",
+                        textAlign: "center",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginTop: -8,
+                      }}
+                    >
+                      You've reached the resend limit. Please start registration
+                      again to get a new code.
+                    </p>
+                  )}
 
                   <p
                     style={{

@@ -36,17 +36,42 @@ const motorcycleSummarySchema = new Schema(
   { _id: false },
 );
 
+// ── Security deposit sub-document ────────────────────────────────────────────
+// Tracks the refundable ₱1,000 security deposit that must be collected before
+// the renter can pick up the motorcycle, and whether/how much was returned.
+const securityDepositSchema = new Schema(
+  {
+    required: { type: Boolean, default: true },
+    amount: { type: Number, default: 1000 },
+    collected: { type: Boolean, default: false },
+    collectedAt: { type: Date, default: null },
+    collectionMethod: {
+      type: String,
+      enum: ["Cash", "GCash", "PayMaya", "Bank Transfer", ""],
+      default: "",
+    },
+    receivedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    returned: { type: Boolean, default: false },
+    returnedAt: { type: Date, default: null },
+    returnedAmount: { type: Number, default: 0 },
+    deductions: { type: Number, default: 0 },
+    deductionNotes: { type: String, default: "" },
+    // Amount still owed by the customer when a penalty exceeds the deposit.
+    balanceDue: { type: Number, default: 0 },
+    // Human-readable record of why the refund was full/partial — shown to
+    // both the admin and the renter as the refund's "booking history".
+    refundReason: { type: String, default: "" },
+  },
+  { _id: false, default: () => ({}) },
+);
+
 // ── Return inspection sub-document ─────────────────────────────────────────
 const returnInspectionSchema = new Schema(
   {
+    inspectionDate: { type: Date, default: null },
     clearanceStatus: {
       type: String,
-      enum: [
-        "pending_inspection",
-        "cleared",
-        "damage_found",
-        "penalty_required",
-      ],
+      enum: ["pending_inspection", "cleared", "penalty_required"],
       default: "pending_inspection",
     },
     damageNotes: { type: String, default: "" },
@@ -59,6 +84,22 @@ const returnInspectionSchema = new Schema(
     penaltyAmount: { type: Number, default: 0 },
     penaltySummary: { type: String, default: "" },
     penaltySettled: { type: Boolean, default: false },
+    // Standardized inspection-matrix violations selected by the admin during
+    // return inspection (e.g. Dirty, Minor Scratches, Late Return). Each
+    // entry captures enough detail to reconstruct the penalty breakdown later.
+    violations: {
+      type: [
+        {
+          key: { type: String, required: true },
+          label: { type: String, required: true },
+          unitAmount: { type: Number, default: 0 },
+          quantity: { type: Number, default: 1 },
+          amount: { type: Number, default: 0 },
+        },
+      ],
+      default: () => [],
+      _id: false,
+    },
     vehicleStatus: {
       type: String,
       enum: [
@@ -194,13 +235,20 @@ const motorcycleBookingSchema = new Schema(
     // ── The previously-missing details field ──────────────────────────────────
     details: { type: bookingDetailsSchema, default: () => ({}) },
 
+    // ── ₱1,000 refundable security deposit, collected at pickup ────────────
+    securityDeposit: { type: securityDepositSchema, default: () => ({}) },
+
     returnInspection: { type: returnInspectionSchema, default: () => ({}) },
 
     extensions: {
       type: [
         {
           requestedAt: { type: Date, default: Date.now },
-          requestedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+          requestedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+          },
           previousReturnDate: { type: Date, default: null },
           previousReturnTime: { type: String, default: "" },
           newReturnDate: { type: Date, default: null },
@@ -208,6 +256,71 @@ const motorcycleBookingSchema = new Schema(
           previousAmount: { type: Number, default: 0 },
           newAmount: { type: Number, default: 0 },
           additionalAmount: { type: Number, default: 0 },
+          // Promo/loyalty code applied to THIS extension specifically —
+          // intentionally separate from (and never copied from) the
+          // original booking's details.appliedDiscount. null when no code
+          // was entered for this extension.
+          appliedDiscount: {
+            type: {
+              source: { type: String, enum: ["promo", "loyalty"] },
+              refId: { type: Schema.Types.ObjectId, default: null },
+              code: { type: String, default: "" },
+              discountType: {
+                type: String,
+                enum: ["percentage", "fixed"],
+              },
+              discountValue: { type: Number, default: 0 },
+            },
+            default: null,
+            _id: false,
+          },
+        },
+      ],
+      default: () => [],
+    },
+
+    reschedules: {
+      type: [
+        {
+          requestedAt: { type: Date, default: Date.now },
+          requestedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+          },
+          previousPickupDate: { type: Date, default: null },
+          previousPickupTime: { type: String, default: "" },
+          previousReturnDate: { type: Date, default: null },
+          previousReturnTime: { type: String, default: "" },
+          newPickupDate: { type: Date, default: null },
+          newPickupTime: { type: String, default: "" },
+          newReturnDate: { type: Date, default: null },
+          newReturnTime: { type: String, default: "" },
+          previousAmount: { type: Number, default: 0 },
+          newAmount: { type: Number, default: 0 },
+          additionalAmount: { type: Number, default: 0 },
+          // Promo/loyalty code applied to THIS reschedule specifically —
+          // either a freshly-entered code ("promo"/"loyalty", applied in
+          // full to the new duration) or the ORIGINAL checkout discount
+          // automatically continuing to apply ("carryover", capped to the
+          // original booking's duration). null when no discount applies.
+          appliedDiscount: {
+            type: {
+              source: {
+                type: String,
+                enum: ["promo", "loyalty", "carryover"],
+              },
+              refId: { type: Schema.Types.ObjectId, default: null },
+              code: { type: String, default: "" },
+              discountType: {
+                type: String,
+                enum: ["percentage", "fixed"],
+              },
+              discountValue: { type: Number, default: 0 },
+            },
+            default: null,
+            _id: false,
+          },
         },
       ],
       default: () => [],
@@ -220,18 +333,18 @@ const motorcycleBookingSchema = new Schema(
     trackingSummary: {
       type: {
         totalDistanceKm: { type: Number, default: 0 },
-        avgSpeedKmh:     { type: Number, default: 0 },
-        maxSpeedKmh:     { type: Number, default: 0 },
-        stopsMade:       { type: Number, default: 0 },
-        lastUpdatedAt:   { type: Date,   default: null },
+        avgSpeedKmh: { type: Number, default: 0 },
+        maxSpeedKmh: { type: Number, default: 0 },
+        stopsMade: { type: Number, default: 0 },
+        lastUpdatedAt: { type: Date, default: null },
       },
       default: null,
     },
     trackingBaseline: {
       type: {
         totalDistanceKm: { type: Number, default: 0 },
-        stopsMade:       { type: Number, default: 0 },
-        capturedAt:      { type: Date, default: null },
+        stopsMade: { type: Number, default: 0 },
+        capturedAt: { type: Date, default: null },
       },
       default: null,
     },

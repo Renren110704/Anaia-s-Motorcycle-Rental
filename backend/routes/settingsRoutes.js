@@ -1,15 +1,34 @@
 import express from "express";
-import { getQRCodes, updateQRCode } from "../controllers/settingsController.js";
+import {
+  getPaymentMethods,
+  addPaymentMethod,
+  updatePaymentMethodQR,
+  togglePaymentMethod,
+  deletePaymentMethod,
+} from "../controllers/settingsController.js";
 import { uploads } from "../middlewares/uploads.js";
-
-// Note: Import your authentication middleware here if you want to protect the POST route
-// import { protect, admin } from "../middlewares/authMiddleware.js";
+import adminAuth from "../middlewares/adminAuth.js";
 
 const settingsRouter = express.Router();
 
-settingsRouter.get("/qrs", getQRCodes);
+// Public: list payment methods. Checkout should call this with ?activeOnly=true
+settingsRouter.get("/payment-methods", getPaymentMethods);
 
-// If you have auth middlewares, use: settingsRouter.post("/qrs", protect, admin, uploads.single("image"), updateQRCode);
-settingsRouter.post("/qrs", uploads.single("image"), updateQRCode);
+// Admin: manage payment methods
+// e.g. settingsRouter.post("/payment-methods", protect, admin, uploads.single("image"), addPaymentMethod);
+settingsRouter.post(
+  "/payment-methods",
+  adminAuth,
+  uploads.single("image"),
+  addPaymentMethod,
+);
+settingsRouter.post(
+  "/payment-methods/:id/qr",
+  adminAuth,
+  uploads.single("image"),
+  updatePaymentMethodQR,
+);
+settingsRouter.patch("/payment-methods/:id/toggle", adminAuth, togglePaymentMethod);
+settingsRouter.delete("/payment-methods/:id", adminAuth, deletePaymentMethod);
 
 export default settingsRouter;

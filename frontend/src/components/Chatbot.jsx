@@ -5,6 +5,7 @@ import { X, Send, Loader2 } from "lucide-react";
 // Use the colors from your theme
 const themeRed = "#b50002";
 const themeGray = "#e3e3e3";
+const MAX_CHARS = 500;
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,9 +36,10 @@ export default function Chatbot() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (input.trim().length > MAX_CHARS) return;
 
     const userText = input.trim();
-    
+
     // 1. Add user message to UI
     setMessages((prev) => [...prev, { sender: "user", text: userText }]);
     setInput("");
@@ -46,7 +48,10 @@ export default function Chatbot() {
     try {
       // 2. Format history to send to the backend
       const chatHistory = messages
-        .filter((msg) => msg.sender !== "bot" || !msg.text.includes("Hello! I'm Anaia's AI"))
+        .filter(
+          (msg) =>
+            msg.sender !== "bot" || !msg.text.includes("Hello! I'm Anaia's AI"),
+        )
         .map((msg) => ({
           role: msg.sender === "user" ? "user" : "model",
           parts: [{ text: msg.text }],
@@ -74,13 +79,18 @@ export default function Chatbot() {
       if (response.ok && data.success) {
         setMessages((prev) => [...prev, { sender: "bot", text: data.reply }]);
       } else {
-        throw new Error(data.message || "Failed to fetch response from backend");
+        throw new Error(
+          data.message || "Failed to fetch response from backend",
+        );
       }
     } catch (error) {
       console.error("Chatbot API error:", error);
       setMessages((prev) => [
         ...prev,
-        { sender: "bot", text: "I'm having trouble connecting to my servers right now. Please call or message our Facebook page directly!" },
+        {
+          sender: "bot",
+          text: "I'm having trouble connecting to my servers right now. Please call or message our Facebook page directly!",
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -152,10 +162,16 @@ export default function Chatbot() {
                 }
               >
                 {/* Simple Markdown Bold parsing for cleaner UI responses */}
-                <span dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} />
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: msg.text
+                      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                      .replace(/\n/g, "<br />"),
+                  }}
+                />
               </div>
             ))}
-            
+
             {/* Typing Indicator */}
             {isTyping && (
               <div className="bg-white border border-gray-100 text-gray-400 self-start rounded-2xl rounded-tl-sm p-3 shadow-sm flex items-center gap-2">
@@ -167,27 +183,45 @@ export default function Chatbot() {
           </div>
 
           {/* Input Area */}
-          <div className="p-3 bg-white border-t border-gray-100 flex gap-2 items-center">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Ask me anything about Anaia's..."
-              className={`flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none`}
-              style={{ "--tw-ring-color": themeRed }} 
-              disabled={isTyping}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isTyping}
-              className="bg-gray-100 text-gray-400 p-2.5 rounded-xl hover:text-white disabled:opacity-50 disabled:hover:bg-gray-100 disabled:hover:text-gray-400 transition-colors"
-              style={
-                input.trim() && !isTyping ? { backgroundColor: themeRed, color: "white" } : {}
-              }
-            >
-              <Send size={18} />
-            </button>
+          <div className="p-3 bg-white border-t border-gray-100 flex flex-col gap-1">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value.slice(0, MAX_CHARS))}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Ask me anything about Anaia's..."
+                maxLength={MAX_CHARS}
+                className={`flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none`}
+                style={{ "--tw-ring-color": themeRed }}
+                disabled={isTyping}
+              />
+              <button
+                onClick={handleSend}
+                disabled={
+                  !input.trim() || isTyping || input.trim().length > MAX_CHARS
+                }
+                className="bg-gray-100 text-gray-400 p-2.5 rounded-xl hover:text-white disabled:opacity-50 disabled:hover:bg-gray-100 disabled:hover:text-gray-400 transition-colors"
+                style={
+                  input.trim() && !isTyping
+                    ? { backgroundColor: themeRed, color: "white" }
+                    : {}
+                }
+              >
+                <Send size={18} />
+              </button>
+            </div>
+            {/* Character counter, only shows once nearing the limit */}
+            {input.length > MAX_CHARS * 0.8 && (
+              <span
+                className="text-[10px] self-end pr-1"
+                style={{
+                  color: input.length >= MAX_CHARS ? themeRed : "#9ca3af",
+                }}
+              >
+                {input.length}/{MAX_CHARS}
+              </span>
+            )}
           </div>
 
           {/* Footer Branding */}

@@ -63,24 +63,38 @@ const iconBase = {
   pointerEvents: "none",
 };
 
+const errorTextStyle = {
+  color: "#b50002",
+  fontSize: 11,
+  fontWeight: 600,
+  marginTop: 6,
+  fontFamily: "'Space Grotesk', sans-serif",
+};
+
 /* ── Field wrapper ───────────────────────────────────────────────── */
-const Field = ({ icon: Icon, label, children }) => (
+const Field = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
     <div
-      style={inputWrapBase}
+      style={{
+        ...inputWrapBase,
+        ...(error ? { borderColor: "#b50002", background: "#FDF0F0" } : null),
+      }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = "#b50002";
-        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#fff";
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-        e.currentTarget.style.background = "#F5F5F3";
+        e.currentTarget.style.borderColor = error
+          ? "#b50002"
+          : "rgba(0,0,0,0.09)";
+        e.currentTarget.style.background = error ? "#FDF0F0" : "#F5F5F3";
       }}
     >
       {Icon && <Icon style={iconBase} />}
       {children}
     </div>
+    {error && <p style={errorTextStyle}>{error}</p>}
   </div>
 );
 
@@ -362,6 +376,11 @@ const ForgotPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  // Set once the backend reports the 3-resend cap has been hit for this
+  // pending reset OTP; disables further resend attempts until the OTP
+  // naturally expires (or the user requests a fresh reset).
+  const [resendLimitReached, setResendLimitReached] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const resendCooldown = useResendCooldown({
     storageKey: email ? `otpCooldown:forgotPassword:${email}` : null,
@@ -370,15 +389,28 @@ const ForgotPassword = () => {
 
   const getPasswordStrength = (pass) => {
     let s = 0;
-    if (pass.length >= 6) s++;
+    if (pass.length >= 8) s++;
     if (pass.match(/[a-z]/) && pass.match(/[A-Z]/)) s++;
     if (pass.match(/\d/)) s++;
     if (pass.match(/[^a-zA-Z\d]/)) s++;
     return s;
   };
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const handleRequestReset = async (e) => {
     e.preventDefault();
+    const next = {};
+    if (!email.trim()) {
+      next.email = "Email is required";
+    } else if (!EMAIL_RE.test(email.trim())) {
+      next.email = "Enter a valid email address";
+    }
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
     setLoading(true);
     try {
       const res = await axios.post(
@@ -388,6 +420,7 @@ const ForgotPassword = () => {
       if (res.status >= 200 && res.status < 300) {
         toast.success("Password reset OTP sent to your email!");
         resendCooldown.startCooldown();
+        setResendLimitReached(false);
         setStep(2);
       }
     } catch (err) {
@@ -399,12 +432,20 @@ const ForgotPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (getPasswordStrength(newPassword) < 4) {
-      toast.error("Password must be Strong (meet all criteria)");
-      return;
+    const next = {};
+    if (!newPassword) {
+      next.newPassword = "Password is required";
+    } else if (getPasswordStrength(newPassword) < 4) {
+      next.newPassword = "Password must be Strong (meet all criteria)";
     }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
+    if (!confirmPassword) {
+      next.confirmPassword = "Please confirm your password";
+    } else if (newPassword !== confirmPassword) {
+      next.confirmPassword = "Passwords do not match";
+    }
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
       return;
     }
     setLoading(true);
@@ -428,16 +469,28 @@ const ForgotPassword = () => {
   };
 
   const handleResendOTP = async () => {
-    if (!resendCooldown.canResend || resending || loading) return;
+    if (!resendCooldown.canResend || resending || loading || resendLimitReached)
+      return;
     setResending(true);
     try {
-      await axios.post(`${API_BASE}/api/auth/request-password-reset`, {
-        email,
-      });
-      toast.success("OTP resent successfully!");
+      const res = await axios.post(
+        `${API_BASE}/api/auth/request-password-reset`,
+        { email },
+      );
+      toast.success(res.data?.message || "OTP resent successfully!");
       resendCooldown.startCooldown();
-    } catch {
-      toast.error("Failed to resend OTP");
+    } catch (err) {
+      const data = err.response?.data;
+      if (err.response?.status === 429) {
+        setResendLimitReached(true);
+        toast.error(
+          data?.message ||
+            "OTP resend limit reached. Please wait for the current code to expire and try again.",
+          { autoClose: 6000 },
+        );
+      } else {
+        toast.error(data?.message || "Failed to resend OTP");
+      }
     } finally {
       setResending(false);
     }
@@ -584,12 +637,28 @@ const ForgotPassword = () => {
                     Enter your email to receive a reset code
                   </p>
                 </div>
-                <form onSubmit={handleRequestReset} className="fp-form">
-                  <Field icon={FaEnvelope} label="Email Address">
+                <form
+                  onSubmit={handleRequestReset}
+                  className="fp-form"
+                  noValidate
+                >
+                  <Field
+                    icon={FaEnvelope}
+                    label="Email Address"
+                    error={errors.email}
+                  >
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errors.email)
+                          setErrors((p) => {
+                            const n = { ...p };
+                            delete n.email;
+                            return n;
+                          });
+                      }}
                       placeholder="juan@email.com"
                       required
                       maxLength={254}
@@ -647,7 +716,11 @@ const ForgotPassword = () => {
                     Enter your OTP and choose a new password
                   </p>
                 </div>
-                <form onSubmit={handleResetPassword} className="fp-form">
+                <form
+                  onSubmit={handleResetPassword}
+                  className="fp-form"
+                  noValidate
+                >
                   <div className="fp-notice">
                     <FaEnvelope
                       style={{
@@ -681,21 +754,40 @@ const ForgotPassword = () => {
                   <div>
                     <label style={labelStyle}>New Password</label>
                     <div
-                      style={inputWrapBase}
+                      style={{
+                        ...inputWrapBase,
+                        ...(errors.newPassword
+                          ? { borderColor: "#b50002", background: "#FDF0F0" }
+                          : null),
+                      }}
                       onFocus={(e) => {
                         e.currentTarget.style.borderColor = "#b50002";
-                        e.currentTarget.style.background = "#fff";
+                        e.currentTarget.style.background = errors.newPassword
+                          ? "#FDF0F0"
+                          : "#fff";
                       }}
                       onBlur={(e) => {
-                        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-                        e.currentTarget.style.background = "#F5F5F3";
+                        e.currentTarget.style.borderColor = errors.newPassword
+                          ? "#b50002"
+                          : "rgba(0,0,0,0.09)";
+                        e.currentTarget.style.background = errors.newPassword
+                          ? "#FDF0F0"
+                          : "#F5F5F3";
                       }}
                     >
                       <FaLock style={iconBase} />
                       <input
                         type={showPassword ? "text" : "password"}
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          if (errors.newPassword)
+                            setErrors((p) => {
+                              const n = { ...p };
+                              delete n.newPassword;
+                              return n;
+                            });
+                        }}
                         placeholder="Create new password"
                         required
                         maxLength={64}
@@ -719,6 +811,9 @@ const ForgotPassword = () => {
                         {showPassword ? <FaEyeSlash /> : <FaEye />}
                       </button>
                     </div>
+                    {errors.newPassword && (
+                      <p style={errorTextStyle}>{errors.newPassword}</p>
+                    )}
                     {newPassword.length > 0 && (
                       <div style={{ marginTop: 8 }}>
                         <PasswordStrengthMeter password={newPassword} />
@@ -730,21 +825,39 @@ const ForgotPassword = () => {
                   <div>
                     <label style={labelStyle}>Confirm Password</label>
                     <div
-                      style={inputWrapBase}
+                      style={{
+                        ...inputWrapBase,
+                        ...(errors.confirmPassword
+                          ? { borderColor: "#b50002", background: "#FDF0F0" }
+                          : null),
+                      }}
                       onFocus={(e) => {
                         e.currentTarget.style.borderColor = "#b50002";
-                        e.currentTarget.style.background = "#fff";
+                        e.currentTarget.style.background =
+                          errors.confirmPassword ? "#FDF0F0" : "#fff";
                       }}
                       onBlur={(e) => {
-                        e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)";
-                        e.currentTarget.style.background = "#F5F5F3";
+                        e.currentTarget.style.borderColor =
+                          errors.confirmPassword
+                            ? "#b50002"
+                            : "rgba(0,0,0,0.09)";
+                        e.currentTarget.style.background =
+                          errors.confirmPassword ? "#FDF0F0" : "#F5F5F3";
                       }}
                     >
                       <FaLock style={iconBase} />
                       <input
                         type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (errors.confirmPassword)
+                            setErrors((p) => {
+                              const n = { ...p };
+                              delete n.confirmPassword;
+                              return n;
+                            });
+                        }}
                         placeholder="Repeat new password"
                         required
                         maxLength={64}
@@ -770,30 +883,39 @@ const ForgotPassword = () => {
                         {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                       </button>
                     </div>
-                    {confirmPassword && (
-                      <p
-                        style={{
-                          fontSize: 11,
-                          marginTop: 6,
-                          fontWeight: 600,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          color:
-                            newPassword === confirmPassword
-                              ? "#166534"
-                              : "#b50002",
-                        }}
-                      >
-                        {newPassword === confirmPassword
-                          ? "Passwords match"
-                          : "Passwords do not match"}
-                      </p>
+                    {errors.confirmPassword ? (
+                      <p style={errorTextStyle}>{errors.confirmPassword}</p>
+                    ) : (
+                      confirmPassword && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            marginTop: 6,
+                            fontWeight: 600,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            color:
+                              newPassword === confirmPassword
+                                ? "#166534"
+                                : "#b50002",
+                          }}
+                        >
+                          {newPassword === confirmPassword
+                            ? "Passwords match"
+                            : "Passwords do not match"}
+                        </p>
+                      )
                     )}
                   </div>
 
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={!resendCooldown.canResend || resending || loading}
+                    disabled={
+                      !resendCooldown.canResend ||
+                      resending ||
+                      loading ||
+                      resendLimitReached
+                    }
                     style={{
                       fontSize: 12,
                       fontWeight: 600,
@@ -803,19 +925,41 @@ const ForgotPassword = () => {
                       padding: 0,
                       textAlign: "left",
                       cursor:
-                        resendCooldown.canResend && !resending && !loading
+                        resendCooldown.canResend &&
+                        !resending &&
+                        !loading &&
+                        !resendLimitReached
                           ? "pointer"
                           : "not-allowed",
                       color:
-                        resendCooldown.canResend && !resending && !loading
+                        resendCooldown.canResend &&
+                        !resending &&
+                        !loading &&
+                        !resendLimitReached
                           ? "#b50002"
                           : "rgba(0,0,0,0.3)",
                     }}
                   >
-                    {!resendCooldown.canResend
-                      ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
-                      : "Didn't receive it? Resend OTP"}
+                    {resendLimitReached
+                      ? "Resend limit reached"
+                      : !resendCooldown.canResend
+                        ? `Resend OTP in ${formatCooldown(resendCooldown.remainingSeconds)}`
+                        : "Didn't receive it? Resend OTP"}
                   </button>
+
+                  {resendLimitReached && (
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#b50002",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginTop: -4,
+                      }}
+                    >
+                      You've reached the resend limit. Please wait for the
+                      current code to expire and request a new one.
+                    </p>
+                  )}
 
                   <div className="fp-footer">
                     <button

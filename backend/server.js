@@ -1,4 +1,7 @@
 import "dotenv/config";
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -6,6 +9,7 @@ import helmet from "helmet";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import userRouter from "./routes/userRoutes.js";
+import adminAuthRouter from "./routes/adminAuthRoutes.js";
 import motorcycleRouter from "./routes/motorcycleRoutes.js";
 import motorcycleBookingRouter from "./routes/motorcycleBookingRoutes.js";
 import motorcyclePaymentRouter from "./routes/motorcyclePaymentRoutes.js";
@@ -17,6 +21,12 @@ import { startMaintenanceScheduler } from "./utils/maintenanceScheduler.js";
 import contactMessageRouter from "./routes/contactMessageRoutes.js";
 import settingsRouter from "./routes/settingsRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+import favoriteRoutes from "./routes/favoriteRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+
+// NEW: Import http and socket.io for real-time live chat
+import http from "http";
+import { Server } from "socket.io";
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -61,10 +71,7 @@ const normalizeOrigin = (value) => {
   try {
     return new URL(sanitizedValue).origin.toLowerCase();
   } catch {
-    return String(sanitizedValue)
-      .trim()
-      .toLowerCase()
-      .replace(/\/+$/, "");
+    return String(sanitizedValue).trim().toLowerCase().replace(/\/+$/, "");
   }
 };
 
@@ -114,9 +121,9 @@ const corsOptions = isDev
         }
         callback(
           new Error(
-            `Not allowed by CORS: ${origin || "unknown-origin"}. Allowed: ${rawAllowedOrigins.join(
-              ", ",
-            ) || "(none)"}`,
+            `Not allowed by CORS: ${origin || "unknown-origin"}. Allowed: ${
+              rawAllowedOrigins.join(", ") || "(none)"
+            }`,
           ),
         );
       },
@@ -131,13 +138,13 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
-        fontSrc: ["'self'", 'https:', 'data:'],
+        fontSrc: ["'self'", "https:", "data:"],
         formAction: ["'self'"],
         frameAncestors: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
+        imgSrc: ["'self'", "data:", "https:"],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+        styleSrc: ["'self'", "https:", "'unsafe-inline'"],
         upgradeInsecureRequests: [],
       },
     },
@@ -155,8 +162,9 @@ app.use(
   express.static(path.join(__dirname, "uploads")),
 );
 
-// ROUTES 
+// ROUTES
 app.use("/api/auth", userRouter);
+app.use("/api/admin", adminAuthRouter);
 app.use("/api/motorcycles", motorcycleRouter);
 app.use("/api/motorcycle-bookings", motorcycleBookingRouter);
 app.use("/api/motorcycle-payments", motorcyclePaymentRouter);
@@ -167,6 +175,8 @@ app.use("/api/discounts", discountRoutes);
 app.use("/api/contact-messages", contactMessageRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/favorites", favoriteRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/api/ping", (req, res) =>
   res.json({
@@ -175,11 +185,72 @@ app.get("/api/ping", (req, res) =>
   }),
 );
 
-// LISTEN
 app.get("/", (req, res) => {
   res.send("MOTORCYCLE RENTAL API WORKING");
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+// ==========================================
+// NEW: WEBSOCKET CONFIGURATION FOR LIVE CHAT
+// ==========================================
+
+const server = http.createServer(app);
+const io = new Server(server, { cors: corsOptions });
+
+let currentAdminStatus = "Active";
+const chatSessions = {}; // Memory storage for chats
+
+io.on("connection", (socket) => {
+  // console.log(`🟢 Socket connected: ${socket.id}`);
+
+  socket.emit("admin_status_update", currentAdminStatus);
+
+  // --- Admin Events ---
+  socket.on("set_admin_status", (status) => {
+    currentAdminStatus = status;
+    io.emit("admin_status_update", status);
+  });
+
+  socket.on("get_admin_chats", () => {
+    socket.emit("sync_admin_chats", chatSessions);
+  });
+
+  socket.on("send_admin_message", (msg) => {
+    if (chatSessions[msg.chatId]) {
+      chatSessions[msg.chatId].messages.push(msg);
+    }
+    socket.broadcast.emit("receive_message", msg);
+  });
+
+  // --- User Events ---
+  socket.on("get_user_history", (chatId) => {
+    if (chatSessions[chatId]) {
+      socket.emit("sync_user_history", chatSessions[chatId].messages);
+    }
+  });
+
+  socket.on("send_message", (msg) => {
+    // console.log("📨 Server received message from user:", msg.text); // Debug log
+    if (!chatSessions[msg.chatId]) {
+      chatSessions[msg.chatId] = { name: msg.name, messages: [] };
+    }
+    chatSessions[msg.chatId].messages.push(msg);
+
+    socket.broadcast.emit("receive_user_message", msg);
+  });
+
+  socket.on("update_message_status", (data) => {
+    Object.values(chatSessions).forEach((session) => {
+      const msg = session.messages.find((m) => m.id === data.messageId);
+      if (msg) msg.status = data.status;
+    });
+    io.emit("message_status_update", data);
+  });
+
+  socket.on("disconnect", () => {
+    // console.log(`🔴 Socket disconnected: ${socket.id}`);
+  });
+});
+
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -30,15 +30,32 @@ import {
   FaChevronUp,
   FaFileDownload,
   FaStar,
+  FaRegStar,
+  FaTimes,
+  FaShieldAlt,
+  FaSearch,
 } from "react-icons/fa";
 import Navbar from "../components/Navbar";
 import API_BASE_URL from "../apiBase";
 import ReviewModal from "../components/ReviewModal";
+import { fetchLoyaltyStatus } from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;
 const TIMEOUT = 30000;
 const ITEMS_PER_PAGE = 8;
 const DOWNPAYMENT = 200;
+const MAX_PROOF_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PROOF_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
+const PROOF_IMAGE_TOO_LARGE_MSG =
+  "That image is too large. Please upload a photo up to 5 MB.";
+const PROOF_IMAGE_INVALID_TYPE_MSG =
+  "Unsupported file type. Please upload a JPG, PNG, WEBP, or HEIC photo.";
 const BOOKINGS_CACHE_KEY = "my-bookings-cache-v1";
 const MAINTENANCE_STORAGE_KEY = "moto_maintenance_schedules";
 const loadMaintenanceSchedules = () => {
@@ -838,11 +855,11 @@ const getTodayStart = () => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
-// const sevenDaysFromToday = () => {
-//   const d = getTodayStart();
-//   d.setDate(d.getDate() + 7);
-//   return d;
-// };
+const sevenDaysFromToday = () => {
+  const d = getTodayStart();
+  d.setDate(d.getDate() + 7);
+  return d;
+};
 // const sixMonthsFromToday = () => {
 //   const d = getTodayStart();
 //   d.setMonth(d.getMonth() + 6);
@@ -1006,6 +1023,7 @@ const normalizeBooking = (booking) => {
     helmetRequested: details.helmetRequested ?? false,
     destinationCity: details.destinationCity ?? "",
     returnInspection: booking.returnInspection || {},
+    securityDeposit: booking.securityDeposit || {},
     downpayment: details.downpayment ?? booking.reservationFee ?? DOWNPAYMENT,
     status: rawStatus || "pending_reservation",
     isDeleted: booking.isDeleted || false,
@@ -1140,6 +1158,35 @@ const STATUS_BADGE_CONFIG = {
     color: "#374151",
     icon: FaTrash,
   },
+};
+
+const StarRating = ({ rating }) => {
+  const numericRating = Number(rating || 0);
+  const rounded = Math.round(numericRating);
+  const value = Math.max(0, Math.min(5, rounded));
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+      {[...Array(5)].map((_, i) =>
+        i < value ? (
+          <FaStar key={i} style={{ color: "#f59e0b", fontSize: 13 }} />
+        ) : (
+          <FaRegStar key={i} style={{ color: "#e5e7eb", fontSize: 13 }} />
+        ),
+      )}
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: "rgba(14,14,14,0.45)",
+          marginLeft: 6,
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        {numericRating > 0 ? numericRating.toFixed(1) : "0.0"}/5.0
+      </span>
+    </div>
+  );
 };
 
 const StatusBadge = ({ status, isDeleted }) => {
@@ -1360,6 +1407,7 @@ const BookingRow = ({
   calBookings = [],
   maintenanceRanges = [],
   discounts = [],
+  onImagePreview,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [reuploadRef, setReuploadRef] = useState(
@@ -1391,6 +1439,31 @@ const BookingRow = ({
   const dueAtPickup = Math.max(0, grossTotal - downpayment);
   const needsReupload =
     booking.requiresProofReupload || booking.paymentStatus === "rejected";
+
+  // True original return date/time BEFORE any extensions were made. Used to
+  // keep the promo code applied at checkout pinned to the amount it actually
+  // discounted at the time — `days`/`baseRental` above reflect the CURRENT
+  // (post-extension) duration and grow every time the booking is extended,
+  // so computing the original discount against them would make it look like
+  // it's stacking/accumulating even though it was only ever applied once.
+  const firstExtensionRecord =
+    Array.isArray(booking.raw?.extensions) && booking.raw.extensions.length > 0
+      ? booking.raw.extensions[0]
+      : null;
+  const originalBookingReturnDate =
+    firstExtensionRecord?.previousReturnDate || booking.dates.return;
+  const originalBookingReturnTime =
+    firstExtensionRecord?.previousReturnTime || booking.times.return || "08:00";
+  const originalBookingDays = Math.max(
+    1,
+    daysBetweenWithTime(
+      booking.dates.pickup,
+      booking.times.pickup || "08:00",
+      originalBookingReturnDate,
+      originalBookingReturnTime,
+    ),
+  );
+  const originalBookingBaseRental = dailyRate * originalBookingDays;
 
   const currentMotoId =
     booking.raw?.motorcycle?._id ||
@@ -1475,6 +1548,7 @@ const BookingRow = ({
   };
 
   const originalPickupDateInput = toDateInput(booking.dates.pickup);
+  const originalPickupTime = booking.times.pickup || "08:00";
   const originalReturnDateInput = toDateInput(booking.dates.return);
   const originalReturnTime = booking.times.return || "08:00";
 
@@ -1488,6 +1562,84 @@ const BookingRow = ({
     returnDate: originalReturnDateInput,
     returnTime: originalReturnTime,
   });
+  // Promo code for the extension itself — NOT auto-inherited from the
+  // original booking's promo code. Users may manually enter another valid
+  // code here; promo codes are otherwise only redeemable on checkout via
+  // the Motorcycle Detail page.
+  const [extensionPromoInput, setExtensionPromoInput] = useState("");
+  const [extensionPromoStatus, setExtensionPromoStatus] = useState("idle"); // idle | checking | valid | invalid
+  const [extensionPromoMessage, setExtensionPromoMessage] = useState("");
+  const [extensionAppliedDiscount, setExtensionAppliedDiscount] =
+    useState(null);
+
+  // Promo code for the reschedule itself — NOT auto-inherited from the
+  // original booking's promo code. Users may manually enter another valid
+  // code here; promo codes are otherwise only redeemable on checkout via
+  // the Motorcycle Detail page.
+  const [reschedulePromoInput, setReschedulePromoInput] = useState("");
+  const [reschedulePromoStatus, setReschedulePromoStatus] = useState("idle"); // idle | checking | valid | invalid
+  const [reschedulePromoMessage, setReschedulePromoMessage] = useState("");
+  const [rescheduleAppliedDiscount, setRescheduleAppliedDiscount] =
+    useState(null);
+
+  // The signed-in user's own active promo/reward codes, so they can pick one
+  // from a dropdown on either field instead of having to remember or
+  // re-copy it. Shared between the reschedule and extension promo fields.
+  const [myPromoCodes, setMyPromoCodes] = useState([]);
+  const [showReschedulePromoPicker, setShowReschedulePromoPicker] =
+    useState(false);
+  const [showExtensionPromoPicker, setShowExtensionPromoPicker] =
+    useState(false);
+  const reschedulePromoPickerRef = useRef(null);
+  const extensionPromoPickerRef = useRef(null);
+
+  useEffect(() => {
+    const userId = booking.raw?.userId;
+    if (!userId) return;
+    fetchLoyaltyStatus(userId)
+      .then((data) => setMyPromoCodes(data?.activeCodes || []))
+      .catch(() => setMyPromoCodes([]));
+  }, [booking.raw?.userId]);
+
+  useEffect(() => {
+    if (!showReschedulePromoPicker && !showExtensionPromoPicker) return;
+    const handleClickOutside = (e) => {
+      if (
+        showReschedulePromoPicker &&
+        reschedulePromoPickerRef.current &&
+        !reschedulePromoPickerRef.current.contains(e.target)
+      ) {
+        setShowReschedulePromoPicker(false);
+      }
+      if (
+        showExtensionPromoPicker &&
+        extensionPromoPickerRef.current &&
+        !extensionPromoPickerRef.current.contains(e.target)
+      ) {
+        setShowExtensionPromoPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showReschedulePromoPicker, showExtensionPromoPicker]);
+
+  const handleSelectReschedulePromoCode = (code) => {
+    setReschedulePromoInput(code.code);
+    setShowReschedulePromoPicker(false);
+    if (reschedulePromoStatus !== "idle") {
+      setReschedulePromoStatus("idle");
+      setReschedulePromoMessage("");
+    }
+  };
+
+  const handleSelectExtensionPromoCode = (code) => {
+    setExtensionPromoInput(code.code);
+    setShowExtensionPromoPicker(false);
+    if (extensionPromoStatus !== "idle") {
+      setExtensionPromoStatus("idle");
+      setExtensionPromoMessage("");
+    }
+  };
 
   const canReschedule =
     ["pending", "pending_reservation", "pending_full_payment"].includes(
@@ -1506,6 +1658,14 @@ const BookingRow = ({
       returnDate: toDateInput(booking.dates.return),
       returnTime: booking.times.return || "08:00",
     });
+    setExtensionPromoInput("");
+    setExtensionPromoStatus("idle");
+    setExtensionPromoMessage("");
+    setExtensionAppliedDiscount(null);
+    setReschedulePromoInput("");
+    setReschedulePromoStatus("idle");
+    setReschedulePromoMessage("");
+    setRescheduleAppliedDiscount(null);
   }, [
     booking.dates.pickup,
     booking.dates.return,
@@ -1561,30 +1721,54 @@ const BookingRow = ({
       ? ALL_TIME_SLOTS.filter((s) => s.value > rescheduleForm.pickupTime)
       : ALL_TIME_SLOTS;
 
-  // 1. EXTRACT AND VALIDATE THE DISCOUNT
+  // 1. EXTRACT AND VALIDATE THE ORIGINAL CHECKOUT DISCOUNT (for possible
+  // carry-over onto a reschedule — see RESCHEDULE LOGIC below)
   const appliedDiscountSnapshot = booking.raw?.details?.appliedDiscount || null;
   let appliedDiscount = null;
 
   if (appliedDiscountSnapshot) {
-    // Check against live discounts to ensure it's still active
-    const liveDiscount = discounts.find(
-      (d) => String(d._id || d.id) === String(appliedDiscountSnapshot.id),
-    );
+    if (appliedDiscountSnapshot.isLoyaltyCode) {
+      // Loyalty codes were redeemed specifically for this booking already,
+      // so they stay honored on it regardless of the code's live state.
+      appliedDiscount = appliedDiscountSnapshot;
+    } else {
+      // Check against live discounts to ensure it's still active
+      const liveDiscount = discounts.find(
+        (d) => String(d._id || d.id) === String(appliedDiscountSnapshot.id),
+      );
 
-    if (liveDiscount) {
-      const now = new Date();
-      const isActive = liveDiscount.isActive !== false;
-      const isStarted =
-        !liveDiscount.startDate || new Date(liveDiscount.startDate) <= now;
-      const isNotExpired =
-        !liveDiscount.endDate || new Date(liveDiscount.endDate) >= now;
+      if (liveDiscount) {
+        const now = new Date();
+        const isActive = liveDiscount.isActive !== false;
+        const isStarted =
+          !liveDiscount.startDate || new Date(liveDiscount.startDate) <= now;
+        const isNotExpired =
+          !liveDiscount.endDate || new Date(liveDiscount.endDate) >= now;
 
-      // Only use the discount if it hasn't been set to inactive or expired
-      if (isActive && isStarted && isNotExpired) {
-        appliedDiscount = appliedDiscountSnapshot;
+        // Only use the discount if it hasn't been set to inactive or expired
+        if (isActive && isStarted && isNotExpired) {
+          appliedDiscount = appliedDiscountSnapshot;
+        }
       }
     }
   }
+
+  // True original pickup/return BEFORE any reschedule was ever made for
+  // this booking — the carried-over discount can only cover up to this
+  // many days; any extra days are charged at the regular rate.
+  const firstRescheduleRecord =
+    Array.isArray(booking.raw?.reschedules) &&
+    booking.raw.reschedules.length > 0
+      ? booking.raw.reschedules[0]
+      : null;
+  const originalPickupForDiscount =
+    firstRescheduleRecord?.previousPickupDate || booking.dates.pickup;
+  const originalReturnForDiscount =
+    firstRescheduleRecord?.previousReturnDate || booking.dates.return;
+  const originalDaysForDiscount = Math.max(
+    1,
+    daysBetween(originalPickupForDiscount, originalReturnForDiscount),
+  );
 
   // 2. RESCHEDULE LOGIC
   const rescheduledDays = Math.max(
@@ -1593,14 +1777,33 @@ const BookingRow = ({
   );
 
   const rescheduledBaseRental = dailyRate * rescheduledDays;
-  const rescheduledDiscountAmount = appliedDiscount
-    ? appliedDiscount.discountType === "percentage"
-      ? (rescheduledBaseRental * appliedDiscount.discountValue) / 100
-      : Math.min(appliedDiscount.discountValue, rescheduledBaseRental)
+  // A manually-entered code takes priority (fresh, full redemption over the
+  // whole new duration). Otherwise, fall back to auto-continuing the
+  // original checkout discount, capped to the days it originally covered.
+  const effectiveRescheduleDiscount =
+    rescheduleAppliedDiscount || appliedDiscount;
+  const isCarryoverDiscount = !rescheduleAppliedDiscount && !!appliedDiscount;
+  const rescheduleDiscountDays = isCarryoverDiscount
+    ? Math.min(rescheduledDays, originalDaysForDiscount)
+    : rescheduledDays;
+  const rescheduleExtraDays = rescheduledDays - rescheduleDiscountDays;
+  const rescheduleDiscountBase = dailyRate * rescheduleDiscountDays;
+  // Note: intentionally uses effectiveRescheduleDiscount (manually entered
+  // OR carried-over original), NOT a blind reapplication of the original —
+  // promo codes are not auto-carried over beyond their original duration.
+  const rescheduledDiscountAmount = effectiveRescheduleDiscount
+    ? effectiveRescheduleDiscount.discountType === "percentage"
+      ? (rescheduleDiscountBase * effectiveRescheduleDiscount.discountValue) /
+        100
+      : Math.min(
+          effectiveRescheduleDiscount.discountValue,
+          rescheduleDiscountBase,
+        )
     : 0;
 
   const discountedRescheduledBase = Math.round(
-    Math.max(0, rescheduledBaseRental - rescheduledDiscountAmount),
+    Math.max(0, rescheduleDiscountBase - rescheduledDiscountAmount) +
+      dailyRate * rescheduleExtraDays,
   );
 
   const rescheduledGrossTotal =
@@ -1614,33 +1817,35 @@ const BookingRow = ({
   );
 
   // 3. EXTENSION LOGIC
+  // extensionDays = INCREMENTAL days being added (current return → new
+  // return), not the booking's total duration. The extension fee is based
+  // solely on the motorcycle's daily rate for these incremental days.
   const extensionDays = daysBetweenWithTime(
-    originalPickupDateInput,
-    booking.times.pickup || "08:00",
+    originalReturnDateInput,
+    originalReturnTime,
     extensionForm.returnDate,
     extensionForm.returnTime,
   );
 
   const extensionBaseRental = dailyRate * Math.max(extensionDays, 1);
-  const extensionDiscountAmount = appliedDiscount
-    ? appliedDiscount.discountType === "percentage"
-      ? (extensionBaseRental * appliedDiscount.discountValue) / 100
-      : Math.min(appliedDiscount.discountValue, extensionBaseRental)
+  // Note: intentionally uses extensionAppliedDiscount (manually entered for
+  // this extension request), NOT the original booking's appliedDiscount —
+  // promo codes are not auto-carried over to extensions.
+  const extensionDiscountAmount = extensionAppliedDiscount
+    ? extensionAppliedDiscount.discountType === "percentage"
+      ? (extensionBaseRental * extensionAppliedDiscount.discountValue) / 100
+      : Math.min(extensionAppliedDiscount.discountValue, extensionBaseRental)
     : 0;
 
   const discountedExtensionBase = Math.round(
     Math.max(0, extensionBaseRental - extensionDiscountAmount),
   );
 
-  const extensionGrossTotal =
-    dailyRate > 0
-      ? discountedExtensionBase + booking.distanceFee + booking.helmetFee
-      : grossTotal;
-
-  const extensionAdditionalAmount = Math.max(
-    0,
-    extensionGrossTotal - grossTotal,
-  );
+  // The extension fee IS the (possibly discounted) incremental cost — no
+  // one-time fees to re-add, and no diffing against the original total
+  // (which would re-introduce/cancel whatever discount applied at checkout).
+  const extensionGrossTotal = grossTotal + discountedExtensionBase;
+  const extensionAdditionalAmount = discountedExtensionBase;
   const latestExtension = Array.isArray(booking.raw?.extensions)
     ? booking.raw.extensions[booking.raw.extensions.length - 1]
     : null;
@@ -1656,7 +1861,9 @@ const BookingRow = ({
     if (!originalPickup) return formatDateInput(today);
     return formatDateInput(originalPickup > today ? originalPickup : today);
   }, [originalPickupDateInput]);
-  const maxPickupDate = null;
+  const maxPickupDate = useMemo(() => {
+    return formatDateInput(sevenDaysFromToday());
+  }, []);
   // const maxReturnDate = null;
   // Min return date for reschedule = day after pickup
   const rescheduleMinReturnDate = addDaysToDateInput(
@@ -1695,6 +1902,17 @@ const BookingRow = ({
       return false;
     }
     if (
+      pickupDate === originalPickupDateInput &&
+      pickupTime === originalPickupTime &&
+      returnDate === originalReturnDateInput &&
+      returnTime === originalReturnTime
+    ) {
+      await alertModal("Please select new dates to reschedule your booking.", {
+        isError: true,
+      });
+      return false;
+    }
+    if (
       !isTimeWithinRentalHours(pickupTime) ||
       !isTimeWithinRentalHours(returnTime)
     ) {
@@ -1716,6 +1934,15 @@ const BookingRow = ({
     if (pickupDateObj < minAllowedPickup) {
       await alertModal(
         "Pickup date cannot be earlier than original or in the past.",
+        { isError: true },
+      );
+      return false;
+    }
+
+    const sevenDayLimit = sevenDaysFromToday();
+    if (pickupDateObj > sevenDayLimit) {
+      await alertModal(
+        "Pickup date can only be rescheduled within the next 7 days.",
         { isError: true },
       );
       return false;
@@ -1843,6 +2070,14 @@ const BookingRow = ({
       });
       return;
     }
+    if (!ALLOWED_PROOF_IMAGE_TYPES.includes(reuploadFile.type)) {
+      await alertModal(PROOF_IMAGE_INVALID_TYPE_MSG, { isError: true });
+      return;
+    }
+    if (reuploadFile.size > MAX_PROOF_IMAGE_BYTES) {
+      await alertModal(PROOF_IMAGE_TOO_LARGE_MSG, { isError: true });
+      return;
+    }
     try {
       setReuploading(true);
       await onReupload(booking.id, {
@@ -1870,12 +2105,84 @@ const BookingRow = ({
       setRescheduling(true);
       await onReschedule(booking.id, {
         ...rescheduleForm,
-        amount: rescheduledGrossTotal,
+        promoCode: rescheduleAppliedDiscount?.code || undefined,
       });
       setIsRescheduling(false);
     } finally {
       setRescheduling(false);
     }
+  };
+
+  const handleApplyReschedulePromoCode = async () => {
+    const trimmed = reschedulePromoInput.trim();
+    if (!trimmed) return;
+    setReschedulePromoStatus("checking");
+    setReschedulePromoMessage("");
+    try {
+      const res = await axios.post(`${API_BASE}/api/discounts/validate-code`, {
+        code: trimmed,
+        userId: booking.raw?.userId,
+        rentalDays: Math.max(rescheduledDays, 1),
+      });
+      setRescheduleAppliedDiscount(res.data);
+      setReschedulePromoStatus("valid");
+      setReschedulePromoMessage(
+        `"${res.data.code}" applied — ${
+          res.data.discountType === "percentage"
+            ? `${res.data.discountValue}% off`
+            : `${formatPrice(res.data.discountValue)} off`
+        } this reschedule.`,
+      );
+    } catch (err) {
+      setRescheduleAppliedDiscount(null);
+      setReschedulePromoStatus("invalid");
+      setReschedulePromoMessage(
+        err?.response?.data?.message || "Invalid promo code.",
+      );
+    }
+  };
+
+  const handleClearReschedulePromoCode = () => {
+    setReschedulePromoInput("");
+    setRescheduleAppliedDiscount(null);
+    setReschedulePromoStatus("idle");
+    setReschedulePromoMessage("");
+  };
+
+  const handleApplyExtensionPromoCode = async () => {
+    const trimmed = extensionPromoInput.trim();
+    if (!trimmed) return;
+    setExtensionPromoStatus("checking");
+    setExtensionPromoMessage("");
+    try {
+      const res = await axios.post(`${API_BASE}/api/discounts/validate-code`, {
+        code: trimmed,
+        userId: booking.raw?.userId,
+        rentalDays: Math.max(extensionDays, 1),
+      });
+      setExtensionAppliedDiscount(res.data);
+      setExtensionPromoStatus("valid");
+      setExtensionPromoMessage(
+        `"${res.data.code}" applied — ${
+          res.data.discountType === "percentage"
+            ? `${res.data.discountValue}% off`
+            : `${formatPrice(res.data.discountValue)} off`
+        } this extension.`,
+      );
+    } catch (err) {
+      setExtensionAppliedDiscount(null);
+      setExtensionPromoStatus("invalid");
+      setExtensionPromoMessage(
+        err?.response?.data?.message || "Invalid promo code.",
+      );
+    }
+  };
+
+  const handleClearExtensionPromoCode = () => {
+    setExtensionPromoInput("");
+    setExtensionAppliedDiscount(null);
+    setExtensionPromoStatus("idle");
+    setExtensionPromoMessage("");
   };
 
   const submitExtension = async () => {
@@ -1891,6 +2198,7 @@ const BookingRow = ({
       await onExtend(booking.id, {
         returnDate: extensionForm.returnDate,
         returnTime: extensionForm.returnTime,
+        promoCode: extensionAppliedDiscount?.code || undefined,
       });
       setIsExtending(false);
     } finally {
@@ -2496,12 +2804,12 @@ const BookingRow = ({
                       -
                       {formatPrice(
                         appliedDiscountSnapshot.discountType === "percentage"
-                          ? (baseRental *
+                          ? (originalBookingBaseRental *
                               appliedDiscountSnapshot.discountValue) /
                               100
                           : Math.min(
                               appliedDiscountSnapshot.discountValue,
-                              baseRental,
+                              originalBookingBaseRental,
                             ),
                       )}
                     </span>
@@ -2613,6 +2921,44 @@ const BookingRow = ({
                   </div>
                 )}
 
+                {/* Promo code(s) used specifically on an extension — kept
+                    separate from the original checkout promo shown above. */}
+                {(booking.raw?.extensions || [])
+                  .filter((ext) => ext.appliedDiscount?.code)
+                  .map((ext, idx) => (
+                    <div
+                      key={ext._id || idx}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 7,
+                        paddingLeft: 14,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(14,14,14,0.4)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        ↳ Promo ({ext.appliedDiscount.code}) on extension
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#16a34a",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {ext.appliedDiscount.discountType === "percentage"
+                          ? `${ext.appliedDiscount.discountValue}% off`
+                          : `-${formatPrice(ext.appliedDiscount.discountValue)}`}
+                      </span>
+                    </div>
+                  ))}
+
                 {/* Reschedule Fee */}
                 {((booking.raw?.rescheduleFee ||
                   booking.raw?.details?.rescheduleFee) > 0 ||
@@ -2655,6 +3001,44 @@ const BookingRow = ({
                     </span>
                   </div>
                 )}
+
+                {/* Promo code(s) used specifically on a reschedule — kept
+                    separate from the original checkout promo shown above. */}
+                {(booking.raw?.reschedules || [])
+                  .filter((res) => res.appliedDiscount?.code)
+                  .map((res, idx) => (
+                    <div
+                      key={res._id || idx}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 7,
+                        paddingLeft: 14,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(14,14,14,0.4)",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        ↳ Promo ({res.appliedDiscount.code}) on reschedule
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#16a34a",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {res.appliedDiscount.discountType === "percentage"
+                          ? `${res.appliedDiscount.discountValue}% off`
+                          : `-${formatPrice(res.appliedDiscount.discountValue)}`}
+                      </span>
+                    </div>
+                  ))}
 
                 {/* Penalty */}
                 {booking.raw?.returnInspection?.clearanceStatus ===
@@ -2795,18 +3179,229 @@ const BookingRow = ({
                           {formatPrice(dueAtPickup)}
                         </span>
                       </div>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "#6b7280",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          marginTop: 4,
+                        }}
+                      >
+                        Plus a ₱1,000 refundable security deposit collected at
+                        pickup.
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Security Deposit Status */}
+              {booking.securityDeposit?.collected && (
+                <div
+                  style={{
+                    background: !booking.securityDeposit.returned
+                      ? "#fffbeb"
+                      : booking.securityDeposit.deductions > 0
+                        ? "#fff7ed"
+                        : "#ecfdf5",
+                    border: `1.5px solid ${
+                      !booking.securityDeposit.returned
+                        ? "#fde68a"
+                        : booking.securityDeposit.deductions > 0
+                          ? "#fed7aa"
+                          : "#a7f3d0"
+                    }`,
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginTop: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <FaShieldAlt
+                        style={{
+                          color: !booking.securityDeposit.returned
+                            ? "#b45309"
+                            : booking.securityDeposit.deductions > 0
+                              ? "#c2410c"
+                              : "#059669",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          color: !booking.securityDeposit.returned
+                            ? "#92400e"
+                            : booking.securityDeposit.deductions > 0
+                              ? "#9a3412"
+                              : "#065f46",
+                        }}
+                      >
+                        Security Deposit (₱
+                        {(
+                          booking.securityDeposit.amount || 1000
+                        ).toLocaleString()}
+                        )
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        color: !booking.securityDeposit.returned
+                          ? "#b45309"
+                          : booking.securityDeposit.deductions > 0
+                            ? "#c2410c"
+                            : "#059669",
+                      }}
+                    >
+                      {!booking.securityDeposit.returned
+                        ? "Held (Refundable)"
+                        : booking.securityDeposit.deductions > 0
+                          ? "Partially Refunded"
+                          : "Fully Refunded"}
+                    </span>
+                  </div>
+
+                  {/* Breakdown once the return inspection has settled the deposit */}
+                  {booking.securityDeposit.returned && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        paddingTop: 10,
+                        borderTop: `1px solid ${
+                          booking.securityDeposit.deductions > 0
+                            ? "#fed7aa"
+                            : "#a7f3d0"
+                        }`,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 5,
+                      }}
+                    >
+                      {booking.securityDeposit.deductions > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#9a3412",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Deducted for violations
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#c2410c",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            −{formatPrice(booking.securityDeposit.deductions)}
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "#6b7280",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Refunded to you
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color:
+                              booking.securityDeposit.deductions > 0
+                                ? "#c2410c"
+                                : "#059669",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {formatPrice(
+                            booking.securityDeposit.returnedAmount || 0,
+                          )}
+                        </span>
+                      </div>
+                      {booking.securityDeposit.balanceDue > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#b50002",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Balance you still owe
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: "#b50002",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {formatPrice(booking.securityDeposit.balanceDue)}
+                          </span>
+                        </div>
+                      )}
+                      {booking.securityDeposit.refundReason && (
+                        <p
+                          style={{
+                            fontSize: 10,
+                            color: "#9ca3af",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            marginTop: 2,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {booking.securityDeposit.refundReason}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Inspection Section */}
             {(booking.status === "inspection" ||
               (booking.returnInspection &&
-                ["penalty_required", "damage_found"].includes(
-                  booking.returnInspection.clearanceStatus,
-                ))) &&
+                booking.returnInspection.clearanceStatus ===
+                  "penalty_required")) &&
               booking.returnInspection && (
                 <div
                   style={{
@@ -2846,7 +3441,7 @@ const BookingRow = ({
                     }}
                   >
                     {booking.status === "inspection"
-                      ? "Your motorcycle is under inspection. Please wait for the admin to settle any penalties or repair estimates."
+                      ? "Your motorcycle is under inspection. Please wait for the admin to clear it or settle any penalties."
                       : "Return inspection details and settled fees."}
                   </p>
 
@@ -2933,12 +3528,16 @@ const BookingRow = ({
                                       key={i}
                                       src={resolveImageUrl(photo)}
                                       alt="Penalty evidence"
+                                      onClick={() =>
+                                        onImagePreview(resolveImageUrl(photo))
+                                      }
                                       style={{
                                         height: 60,
                                         width: 80,
                                         objectFit: "cover",
                                         borderRadius: 8,
                                         border: "1.5px solid #fecaca",
+                                        cursor: "pointer",
                                       }}
                                     />
                                   ),
@@ -2948,175 +3547,6 @@ const BookingRow = ({
                           )}
                       </div>
                     )}
-
-                  {/* DAMAGE FOUND BLOCK */}
-                  {booking.returnInspection.clearanceStatus ===
-                    "damage_found" && (
-                    <div
-                      style={{
-                        background: "#fffbeb",
-                        border: "1.5px solid #fde68a",
-                        borderRadius: 10,
-                        padding: 12,
-                        marginTop: 10,
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          letterSpacing: "1.5px",
-                          textTransform: "uppercase",
-                          color: "#b45309",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Damage Found
-                      </p>
-
-                      {booking.returnInspection.damageNotes && (
-                        <div style={{ marginBottom: 6 }}>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#b45309",
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            Notes:{" "}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: "#92400e",
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            {booking.returnInspection.damageNotes}
-                          </span>
-                        </div>
-                      )}
-
-                      {booking.returnInspection.mechanicNotes && (
-                        <div style={{ marginBottom: 6 }}>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#b45309",
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            Mechanic:{" "}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: "#92400e",
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            {booking.returnInspection.mechanicNotes}
-                          </span>
-                        </div>
-                      )}
-
-                      {booking.returnInspection.repairEstimateAmount > 0 && (
-                        <div
-                          style={{
-                            marginTop: 10,
-                            paddingTop: 10,
-                            borderTop: "1px solid #fde68a",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              letterSpacing: "1.5px",
-                              textTransform: "uppercase",
-                              color: "#b45309",
-                              display: "block",
-                              marginBottom: 4,
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            Repair Estimate
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 22,
-                              fontWeight: 800,
-                              color: "#d97706",
-                              fontFamily: "'Space Grotesk', sans-serif",
-                            }}
-                          >
-                            ₱
-                            {booking.returnInspection.repairEstimateAmount.toLocaleString()}
-                          </span>
-                          {booking.returnInspection.repairEstimateNotes && (
-                            <p
-                              style={{
-                                fontSize: 12,
-                                color: "#92400e",
-                                marginTop: 4,
-                                fontFamily: "'Space Grotesk', sans-serif",
-                              }}
-                            >
-                              {booking.returnInspection.repairEstimateNotes}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Display Damage Photos */}
-                      {Array.isArray(booking.returnInspection.damagePhotos) &&
-                        booking.returnInspection.damagePhotos.length > 0 && (
-                          <div style={{ marginTop: 12 }}>
-                            <p
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                letterSpacing: "1.5px",
-                                textTransform: "uppercase",
-                                color: "#b45309",
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                marginBottom: 6,
-                              }}
-                            >
-                              Damage Photos
-                            </p>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                overflowX: "auto",
-                                paddingBottom: 4,
-                              }}
-                            >
-                              {booking.returnInspection.damagePhotos.map(
-                                (photo, i) => (
-                                  <img
-                                    key={i}
-                                    src={resolveImageUrl(photo)}
-                                    alt="Damage evidence"
-                                    style={{
-                                      height: 60,
-                                      width: 80,
-                                      objectFit: "cover",
-                                      borderRadius: 8,
-                                      border: "1.5px solid #fde68a",
-                                    }}
-                                  />
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -3206,10 +3636,33 @@ const BookingRow = ({
                       </span>
                       <input
                         type="file"
-                        accept="image/*"
-                        onChange={(e) =>
-                          setReuploadFile(e.target.files?.[0] || null)
-                        }
+                        accept={ALLOWED_PROOF_IMAGE_TYPES.join(",")}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0] || null;
+                          // Reset the input value so selecting the same file
+                          // again (after a validation failure) still fires
+                          // onChange and re-validates it.
+                          e.target.value = "";
+                          if (!file) {
+                            setReuploadFile(null);
+                            return;
+                          }
+                          if (!ALLOWED_PROOF_IMAGE_TYPES.includes(file.type)) {
+                            await alertModal(PROOF_IMAGE_INVALID_TYPE_MSG, {
+                              isError: true,
+                            });
+                            setReuploadFile(null);
+                            return;
+                          }
+                          if (file.size > MAX_PROOF_IMAGE_BYTES) {
+                            await alertModal(PROOF_IMAGE_TOO_LARGE_MSG, {
+                              isError: true,
+                            });
+                            setReuploadFile(null);
+                            return;
+                          }
+                          setReuploadFile(file);
+                        }}
                         style={{ display: "none" }}
                       />
                     </label>
@@ -3483,6 +3936,241 @@ const BookingRow = ({
                       </div>
                     )}
 
+                    {/* Promo code entry — manually entering a code here
+                        overrides the default behavior below, applying in
+                        full to the new duration instead of being capped. */}
+                    <div
+                      style={{ marginBottom: 10 }}
+                      ref={reschedulePromoPickerRef}
+                    >
+                      {isCarryoverDiscount && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "rgba(14,14,14,0.45)",
+                            marginBottom: 6,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Your original code ({appliedDiscount.code}) will carry
+                          over automatically, covering up to{" "}
+                          {originalDaysForDiscount} day
+                          {originalDaysForDiscount !== 1 ? "s" : ""}. Enter a
+                          different code below to override it.
+                        </p>
+                      )}
+                      {myPromoCodes.length > 0 &&
+                        !rescheduleAppliedDiscount && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowReschedulePromoPicker((v) => !v)
+                            }
+                            style={{
+                              display: "block",
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              marginBottom: 6,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#b50002",
+                              cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Choose from my codes ({myPromoCodes.length})
+                          </button>
+                        )}
+                      <div style={{ position: "relative" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input
+                            type="text"
+                            value={reschedulePromoInput}
+                            onChange={(e) => {
+                              setReschedulePromoInput(
+                                e.target.value.toUpperCase(),
+                              );
+                              if (reschedulePromoStatus !== "idle") {
+                                setReschedulePromoStatus("idle");
+                                setReschedulePromoMessage("");
+                              }
+                            }}
+                            placeholder="Have a promo code?"
+                            style={{ ...inputStyle, flex: 1 }}
+                          />
+                          {rescheduleAppliedDiscount ? (
+                            <button
+                              type="button"
+                              onClick={handleClearReschedulePromoCode}
+                              style={{
+                                padding: "9px 14px",
+                                borderRadius: 8,
+                                border: "1.5px solid rgba(0,0,0,0.1)",
+                                background: "#fff",
+                                color: "#0E0E0E",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              Clear
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleApplyReschedulePromoCode}
+                              disabled={
+                                !reschedulePromoInput.trim() ||
+                                reschedulePromoStatus === "checking"
+                              }
+                              style={{
+                                padding: "9px 14px",
+                                borderRadius: 8,
+                                border: "none",
+                                background: "#16a34a",
+                                color: "#fff",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor:
+                                  !reschedulePromoInput.trim() ||
+                                  reschedulePromoStatus === "checking"
+                                    ? "default"
+                                    : "pointer",
+                                opacity:
+                                  !reschedulePromoInput.trim() ||
+                                  reschedulePromoStatus === "checking"
+                                    ? 0.6
+                                    : 1,
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {reschedulePromoStatus === "checking"
+                                ? "Checking…"
+                                : "Apply"}
+                            </button>
+                          )}
+
+                          {showReschedulePromoPicker &&
+                            myPromoCodes.length > 0 && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(100% + 6px)",
+                                  left: 0,
+                                  right: 0,
+                                  zIndex: 20,
+                                  background: "#fff",
+                                  border: "1.5px solid rgba(0,0,0,0.1)",
+                                  borderRadius: 10,
+                                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                  maxHeight: 220,
+                                  overflowY: "auto",
+                                  padding: 6,
+                                }}
+                              >
+                                {myPromoCodes.map((c) => (
+                                  <button
+                                    key={c._id || c.code}
+                                    type="button"
+                                    onClick={() =>
+                                      handleSelectReschedulePromoCode(c)
+                                    }
+                                    style={{
+                                      width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      gap: 8,
+                                      background: "none",
+                                      border: "none",
+                                      borderRadius: 8,
+                                      padding: "8px 10px",
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      fontFamily: "'Space Grotesk', sans-serif",
+                                    }}
+                                    onMouseEnter={(e) =>
+                                      (e.currentTarget.style.background =
+                                        "rgba(181,0,2,0.06)")
+                                    }
+                                    onMouseLeave={(e) =>
+                                      (e.currentTarget.style.background =
+                                        "none")
+                                    }
+                                  >
+                                    <span style={{ minWidth: 0 }}>
+                                      <span
+                                        style={{
+                                          display: "block",
+                                          fontFamily: "monospace",
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          color: "#0E0E0E",
+                                        }}
+                                      >
+                                        {c.code}
+                                      </span>
+                                      {c.description && (
+                                        <span
+                                          style={{
+                                            display: "block",
+                                            fontSize: 10,
+                                            color: "rgba(0,0,0,0.4)",
+                                            marginTop: 2,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {c.description}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span
+                                      style={{
+                                        flexShrink: 0,
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        color: "#16a34a",
+                                        background: "rgba(22,163,74,0.08)",
+                                        border:
+                                          "1px solid rgba(22,163,74,0.25)",
+                                        borderRadius: 6,
+                                        padding: "2px 6px",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {c.discountType === "percentage"
+                                        ? `${c.discountValue}% off`
+                                        : `${formatPrice(c.discountValue)} off`}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                      {reschedulePromoMessage && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            marginTop: 6,
+                            marginBottom: 0,
+                            color:
+                              reschedulePromoStatus === "valid"
+                                ? "#16a34a"
+                                : "#b50002",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {reschedulePromoStatus === "valid" ? "✓ " : "✕ "}
+                          {reschedulePromoMessage}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Price preview */}
                     <div
                       style={{
@@ -3501,9 +4189,12 @@ const BookingRow = ({
                           `₱${dailyRate.toLocaleString()} × ${rescheduledDays}d`,
                           formatPrice(rescheduledBaseRental),
                         ],
-                        // ADD THE DISCOUNT ROW HERE 👇
-                        appliedDiscount && [
-                          `Promo (${appliedDiscount.code || "Discount"})`,
+                        effectiveRescheduleDiscount && [
+                          `Promo (${effectiveRescheduleDiscount.code || "Discount"})${
+                            isCarryoverDiscount && rescheduleExtraDays > 0
+                              ? ` — first ${rescheduleDiscountDays}d only`
+                              : ""
+                          }`,
                           `-${formatPrice(Math.round(rescheduledDiscountAmount))}`,
                         ],
                         booking.distanceFee > 0 && [
@@ -3669,7 +4360,7 @@ const BookingRow = ({
 
                 {isExtending && (
                   <div style={{ marginTop: 14 }}>
-                    <div
+                    {/* <div
                       style={{
                         background: "#fff",
                         border: "1.5px solid #bbf7d0",
@@ -3689,7 +4380,7 @@ const BookingRow = ({
                       {(originalReturnTimeFromExtension ||
                         booking.times.return) &&
                         ` · ${formatTime(originalReturnTimeFromExtension || booking.times.return)}`}
-                    </div>
+                    </div> */}
 
                     <div
                       style={{
@@ -3796,8 +4487,226 @@ const BookingRow = ({
                         </span>
                       </div>
 
-                      {/* ADD THE DISCOUNT ROW HERE 👇 */}
-                      {appliedDiscount && (
+                      {/* Promo code entry — scoped to this extension only.
+                          Not inherited from the original booking. */}
+                      <div
+                        style={{ marginBottom: 10 }}
+                        ref={extensionPromoPickerRef}
+                      >
+                        {myPromoCodes.length > 0 &&
+                          !extensionAppliedDiscount && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowExtensionPromoPicker((v) => !v)
+                              }
+                              style={{
+                                display: "block",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                marginBottom: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#b50002",
+                                cursor: "pointer",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              Choose from my codes ({myPromoCodes.length})
+                            </button>
+                          )}
+                        <div style={{ position: "relative" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <input
+                              type="text"
+                              value={extensionPromoInput}
+                              onChange={(e) => {
+                                setExtensionPromoInput(
+                                  e.target.value.toUpperCase(),
+                                );
+                                if (extensionPromoStatus !== "idle") {
+                                  setExtensionPromoStatus("idle");
+                                  setExtensionPromoMessage("");
+                                }
+                              }}
+                              placeholder="Have a promo code?"
+                              style={{ ...inputStyle, flex: 1 }}
+                            />
+                            {extensionAppliedDiscount ? (
+                              <button
+                                type="button"
+                                onClick={handleClearExtensionPromoCode}
+                                style={{
+                                  padding: "9px 14px",
+                                  borderRadius: 8,
+                                  border: "1.5px solid rgba(0,0,0,0.1)",
+                                  background: "#fff",
+                                  color: "#0E0E0E",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                }}
+                              >
+                                Clear
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleApplyExtensionPromoCode}
+                                disabled={
+                                  !extensionPromoInput.trim() ||
+                                  extensionPromoStatus === "checking"
+                                }
+                                style={{
+                                  padding: "9px 14px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#16a34a",
+                                  color: "#fff",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor:
+                                    !extensionPromoInput.trim() ||
+                                    extensionPromoStatus === "checking"
+                                      ? "default"
+                                      : "pointer",
+                                  opacity:
+                                    !extensionPromoInput.trim() ||
+                                    extensionPromoStatus === "checking"
+                                      ? 0.6
+                                      : 1,
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                }}
+                              >
+                                {extensionPromoStatus === "checking"
+                                  ? "Checking…"
+                                  : "Apply"}
+                              </button>
+                            )}
+
+                            {showExtensionPromoPicker &&
+                              myPromoCodes.length > 0 && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "calc(100% + 6px)",
+                                    left: 0,
+                                    right: 0,
+                                    zIndex: 20,
+                                    background: "#fff",
+                                    border: "1.5px solid rgba(0,0,0,0.1)",
+                                    borderRadius: 10,
+                                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                    maxHeight: 220,
+                                    overflowY: "auto",
+                                    padding: 6,
+                                  }}
+                                >
+                                  {myPromoCodes.map((c) => (
+                                    <button
+                                      key={c._id || c.code}
+                                      type="button"
+                                      onClick={() =>
+                                        handleSelectExtensionPromoCode(c)
+                                      }
+                                      style={{
+                                        width: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: 8,
+                                        background: "none",
+                                        border: "none",
+                                        borderRadius: 8,
+                                        padding: "8px 10px",
+                                        cursor: "pointer",
+                                        textAlign: "left",
+                                        fontFamily:
+                                          "'Space Grotesk', sans-serif",
+                                      }}
+                                      onMouseEnter={(e) =>
+                                        (e.currentTarget.style.background =
+                                          "rgba(181,0,2,0.06)")
+                                      }
+                                      onMouseLeave={(e) =>
+                                        (e.currentTarget.style.background =
+                                          "none")
+                                      }
+                                    >
+                                      <span style={{ minWidth: 0 }}>
+                                        <span
+                                          style={{
+                                            display: "block",
+                                            fontFamily: "monospace",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: "#0E0E0E",
+                                          }}
+                                        >
+                                          {c.code}
+                                        </span>
+                                        {c.description && (
+                                          <span
+                                            style={{
+                                              display: "block",
+                                              fontSize: 10,
+                                              color: "rgba(0,0,0,0.4)",
+                                              marginTop: 2,
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
+                                              whiteSpace: "nowrap",
+                                            }}
+                                          >
+                                            {c.description}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span
+                                        style={{
+                                          flexShrink: 0,
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          color: "#16a34a",
+                                          background: "rgba(22,163,74,0.08)",
+                                          border:
+                                            "1px solid rgba(22,163,74,0.25)",
+                                          borderRadius: 6,
+                                          padding: "2px 6px",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {c.discountType === "percentage"
+                                          ? `${c.discountValue}% off`
+                                          : `${formatPrice(c.discountValue)} off`}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                        {extensionPromoMessage && (
+                          <p
+                            style={{
+                              fontSize: 11,
+                              marginTop: 6,
+                              marginBottom: 0,
+                              color:
+                                extensionPromoStatus === "valid"
+                                  ? "#16a34a"
+                                  : "#b50002",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {extensionPromoStatus === "valid" ? "✓ " : "✕ "}
+                            {extensionPromoMessage}
+                          </p>
+                        )}
+                      </div>
+
+                      {extensionAppliedDiscount && (
                         <div
                           style={{
                             display: "flex",
@@ -3812,7 +4721,8 @@ const BookingRow = ({
                               fontFamily: "'Space Grotesk', sans-serif",
                             }}
                           >
-                            Promo ({appliedDiscount.code || "Discount"})
+                            Promo ({extensionAppliedDiscount.code || "Discount"}
+                            )
                           </span>
                           <span
                             style={{
@@ -3837,7 +4747,7 @@ const BookingRow = ({
                           alignItems: "center",
                         }}
                       >
-                        <span
+                        {/* <span
                           style={{
                             fontSize: 12,
                             fontWeight: 700,
@@ -3856,7 +4766,7 @@ const BookingRow = ({
                           }}
                         >
                           +{formatPrice(extensionAdditionalAmount)}
-                        </span>
+                        </span> */}
                       </div>
                       <p
                         style={{
@@ -3933,38 +4843,146 @@ const BookingRow = ({
                   </p>
                 ) : bookingReview ? (
                   <div>
+                    {/* Overall Rating */}
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 4,
-                        marginBottom: 8,
+                        gap: 8,
+                        marginBottom: 14,
                       }}
                     >
-                      {[...Array(5)].map((_, i) => (
-                        <FaStar
-                          key={i}
-                          style={{
-                            color:
-                              i < (bookingReview.rating || 5)
-                                ? "#f59e0b"
-                                : "#e5e7eb",
-                            fontSize: 14,
-                          }}
-                        />
-                      ))}
-                      {/* <span
+                      <span
                         style={{
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 700,
-                          marginLeft: 4,
-                          color: "rgba(14,14,14,0.45)",
+                          color: "rgba(14,14,14,0.6)",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
                           fontFamily: "'Space Grotesk', sans-serif",
                         }}
                       >
-                        ({bookingReview.status || "pending"})
-                      </span> */}
+                        Overall
+                      </span>
+                      <StarRating rating={bookingReview.rating} />
                     </div>
+
+                    {/* Sub-Criteria Grid */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(140px, 1fr))",
+                        gap: "10px 16px",
+                        marginBottom: 16,
+                        padding: "12px",
+                        background: "#F5F5F3",
+                        borderRadius: "10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(14,14,14,0.4)",
+                            textTransform: "uppercase",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Performance
+                        </span>
+                        <StarRating rating={bookingReview.performance} />
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(14,14,14,0.4)",
+                            textTransform: "uppercase",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Condition
+                        </span>
+                        <StarRating rating={bookingReview.condition} />
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(14,14,14,0.4)",
+                            textTransform: "uppercase",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Customer Service
+                        </span>
+                        <StarRating rating={bookingReview.customerService} />
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(14,14,14,0.4)",
+                            textTransform: "uppercase",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Value for Money
+                        </span>
+                        <StarRating rating={bookingReview.valueForMoney} />
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(14,14,14,0.4)",
+                            textTransform: "uppercase",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          Ride Comfort
+                        </span>
+                        <StarRating rating={bookingReview.rideComfort} />
+                      </div>
+                    </div>
+
+                    {/* Feedback Description */}
                     {bookingReview.feedbackDescription && (
                       <p
                         style={{
@@ -3980,6 +4998,8 @@ const BookingRow = ({
                         "{bookingReview.feedbackDescription}"
                       </p>
                     )}
+
+                    {/* Admin Reply */}
                     {bookingReview.adminReplyMessage && (
                       <div
                         style={{
@@ -4168,6 +5188,17 @@ const MyBookings = () => {
   const [calBookings, setCalBookings] = useState([]);
   const [maintenanceRanges, setMaintenanceRanges] = useState([]);
   const [discounts, setDiscounts] = useState([]);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Escape key listener for closing the lightbox
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setPreviewImage(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -4366,6 +5397,13 @@ const MyBookings = () => {
       { confirmLabel: "Yes, Cancel" },
     );
     if (!confirmed) return;
+
+    const confirmed2 = await confirmModal(
+      "Please note that the reservation fee is non-refundable if you cancel your reservation. Do you still want to proceed?",
+      { confirmLabel: "Confirm Cancellation" },
+    );
+    if (!confirmed2) return;
+
     try {
       const token = localStorage.getItem("token");
       const headers = {
@@ -4417,8 +5455,12 @@ const MyBookings = () => {
         response?.data?.message || "Payment proof re-uploaded successfully.",
       );
     } catch (err) {
+      const isTooLarge =
+        err.response?.status === 413 || /too large/i.test(err.message || "");
       await alertModal(
-        err.response?.data?.message || "Failed to re-upload payment proof.",
+        isTooLarge
+          ? PROOF_IMAGE_TOO_LARGE_MSG
+          : err.response?.data?.message || "Failed to re-upload payment proof.",
         { isError: true },
       );
       throw err;
@@ -4432,18 +5474,20 @@ const MyBookings = () => {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       };
-      const response = await axios.put(
-        `${API_BASE}/api/motorcycle-bookings/${bookingId}`,
+      const response = await axios.patch(
+        `${API_BASE}/api/motorcycle-bookings/${bookingId}/reschedule`,
         {
           pickupDate: payload.pickupDate,
           pickupTime: payload.pickupTime,
           returnDate: payload.returnDate,
           returnTime: payload.returnTime,
-          amount: payload.amount,
+          promoCode: payload.promoCode,
         },
         { headers },
       );
-      const updated = normalizeBooking(response?.data || { _id: bookingId });
+      const updated = normalizeBooking(
+        response?.data?.booking || response?.data || { _id: bookingId },
+      );
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? updated : b)),
       );
@@ -4466,7 +5510,11 @@ const MyBookings = () => {
       };
       const response = await axios.patch(
         `${API_BASE}/api/motorcycle-bookings/${bookingId}/extend`,
-        { returnDate: payload.returnDate, returnTime: payload.returnTime },
+        {
+          returnDate: payload.returnDate,
+          returnTime: payload.returnTime,
+          promoCode: payload.promoCode,
+        },
         { headers },
       );
       const updated = normalizeBooking(
@@ -4536,17 +5584,39 @@ const MyBookings = () => {
         (b) =>
           !b.isDeleted &&
           b.status === "inspection" &&
-          ["damage_found", "penalty_required"].includes(
-            b.raw?.returnInspection?.clearanceStatus,
-          ),
+          b.raw?.returnInspection?.clearanceStatus === "penalty_required",
       ).length,
     [bookings],
   );
 
-  const filteredBookings = useMemo(() => {
+  const tabFilteredBookings = useMemo(() => {
     if (activeTab === "rejected") return bookings.filter((b) => b.isDeleted);
     return bookings.filter((b) => !b.isDeleted && b.status === activeTab);
   }, [bookings, activeTab]);
+
+  const filteredBookings = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return tabFilteredBookings;
+    return tabFilteredBookings.filter((b) => {
+      const haystack = [
+        b.id,
+        b.motorcycle?.make,
+        b.motorcycle?.model,
+        b.motorcycle?.category,
+        b.user?.name,
+        b.user?.email,
+        b.user?.phone,
+        b.location,
+        b.destination,
+        b.dates?.pickup,
+        b.dates?.return,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [tabFilteredBookings, searchTerm]);
 
   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
   const paginatedBookings = useMemo(() => {
@@ -4557,6 +5627,16 @@ const MyBookings = () => {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    setCurrentPage(1);
   };
 
   const activeTabConfig =
@@ -4684,6 +5764,80 @@ const MyBookings = () => {
               >
                 {filteredBookings.length} {activeTabConfig.label.toLowerCase()}{" "}
                 {filteredBookings.length === 1 ? "booking" : "bookings"}
+              </div>
+            </div>
+
+            {/* Search bar */}
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  position: "relative",
+                  maxWidth: 420,
+                }}
+              >
+                <FaSearch
+                  style={{
+                    position: "absolute",
+                    left: 14,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "rgba(0,0,0,0.32)",
+                    fontSize: 13,
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  placeholder="Search by vehicle, location, or reference..."
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: searchTerm
+                      ? "10px 38px 10px 38px"
+                      : "10px 14px 10px 38px",
+                    borderRadius: 10,
+                    border: "1.5px solid rgba(0,0,0,0.1)",
+                    background: "#F5F5F3",
+                    fontSize: 13.5,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#0E0E0E",
+                    outline: "none",
+                    transition: "border-color 0.2s",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#b50002")}
+                  onBlur={(e) =>
+                    (e.target.style.borderColor = "rgba(0,0,0,0.1)")
+                  }
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: "none",
+                      background: "rgba(0,0,0,0.08)",
+                      color: "rgba(0,0,0,0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      fontSize: 10,
+                      padding: 0,
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -4863,9 +6017,15 @@ const MyBookings = () => {
                   boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
                 }}
               >
-                <FaMotorcycle
-                  style={{ color: "rgba(14,14,14,0.2)", fontSize: 28 }}
-                />
+                {searchTerm ? (
+                  <FaSearch
+                    style={{ color: "rgba(14,14,14,0.2)", fontSize: 24 }}
+                  />
+                ) : (
+                  <FaMotorcycle
+                    style={{ color: "rgba(14,14,14,0.2)", fontSize: 28 }}
+                  />
+                )}
               </div>
               <div>
                 <h3
@@ -4878,51 +6038,79 @@ const MyBookings = () => {
                     letterSpacing: "-0.5px",
                   }}
                 >
-                  No {activeTabConfig.label.toLowerCase()} bookings
+                  {searchTerm
+                    ? "No matching bookings"
+                    : `No ${activeTabConfig.label.toLowerCase()} bookings`}
                 </h3>
                 <p
                   style={{
                     fontSize: 13,
                     color: "rgba(14,14,14,0.4)",
                     fontFamily: "'Space Grotesk', sans-serif",
+                    maxWidth: 320,
                   }}
                 >
-                  {activeTab === "pending_reservation"
-                    ? "You don't have any pending reservation requests."
-                    : activeTab === "pending_full_payment"
-                      ? "No bookings awaiting full payment."
-                      : activeTab === "active"
-                        ? "You don't have any active rentals."
-                        : activeTab === "completed"
-                          ? "You haven't completed any trips yet."
-                          : activeTab === "cancelled"
-                            ? "No cancelled bookings."
-                            : activeTab === "rejected"
-                              ? "No rejected bookings."
-                              : `No ${activeTabConfig.label.toLowerCase()} bookings found.`}
+                  {searchTerm
+                    ? `We couldn't find any ${activeTabConfig.label.toLowerCase()} bookings matching "${searchTerm}".`
+                    : activeTab === "pending_reservation"
+                      ? "You don't have any pending reservation requests."
+                      : activeTab === "pending_full_payment"
+                        ? "No bookings awaiting full payment."
+                        : activeTab === "active"
+                          ? "You don't have any active rentals."
+                          : activeTab === "completed"
+                            ? "You haven't completed any trips yet."
+                            : activeTab === "cancelled"
+                              ? "No cancelled bookings."
+                              : activeTab === "rejected"
+                                ? "No rejected bookings."
+                                : `No ${activeTabConfig.label.toLowerCase()} bookings found.`}
                 </p>
               </div>
-              <Link
-                to="/motorcycles"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 22px",
-                  borderRadius: 10,
-                  background: "#b50002",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  boxShadow: "0 4px 16px rgba(181,0,2,0.2)",
-                  transition: "all 0.18s",
-                }}
-              >
-                <FaMotorcycle style={{ fontSize: 12 }} /> Browse Motorcycles{" "}
-                <FaArrowRight style={{ fontSize: 10 }} />
-              </Link>
+              {searchTerm ? (
+                <button
+                  onClick={clearSearch}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 22px",
+                    borderRadius: 10,
+                    background: "#0E0E0E",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.18s",
+                  }}
+                >
+                  <FaTimes style={{ fontSize: 11 }} /> Clear Search
+                </button>
+              ) : (
+                <Link
+                  to="/motorcycles"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 22px",
+                    borderRadius: 10,
+                    background: "#b50002",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    boxShadow: "0 4px 16px rgba(181,0,2,0.2)",
+                    transition: "all 0.18s",
+                  }}
+                >
+                  <FaMotorcycle style={{ fontSize: 12 }} /> Browse Motorcycles{" "}
+                  <FaArrowRight style={{ fontSize: 10 }} />
+                </Link>
+              )}
             </div>
           )}
 
@@ -4944,6 +6132,7 @@ const MyBookings = () => {
                     calBookings={calBookings}
                     maintenanceRanges={maintenanceRanges}
                     discounts={discounts}
+                    onImagePreview={setPreviewImage}
                   />
                 </div>
               ))}
@@ -4960,6 +6149,57 @@ const MyBookings = () => {
           )}
         </div>
       </div>
+      {/* Lightbox Modal */}
+      {previewImage &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.8)",
+              backdropFilter: "blur(4px)",
+              zIndex: 99999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+            }}
+            onClick={() => setPreviewImage(null)}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              style={{
+                position: "absolute",
+                top: 24,
+                right: 32,
+                background: "transparent",
+                border: "none",
+                color: "#fff",
+                fontSize: 32,
+                cursor: "pointer",
+                padding: 8,
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#d1d5db")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#fff")}
+            >
+              <FaTimes />
+            </button>
+            <img
+              src={previewImage}
+              alt="Full screen preview"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "90vh",
+                objectFit: "contain",
+                borderRadius: 12,
+                boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+              }}
+              onClick={(e) => e.stopPropagation()} // Prevent clicking the image from closing the modal
+            />
+          </div>,
+          document.body,
+        )}
     </>
   );
 };

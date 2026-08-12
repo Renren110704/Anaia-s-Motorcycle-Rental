@@ -26,13 +26,20 @@ import {
   FaStar,
   FaChevronLeft,
   FaChevronRight,
+  FaTimes,
 } from "react-icons/fa";
 import { GiFullMotorcycleHelmet } from "react-icons/gi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
-import { computeDiscountedPrice, useApplicableDiscount } from "./DiscountBadge";
+import {
+  computeDiscountedPrice,
+  useApplicableDiscount,
+  validatePromoCode,
+  redeemLoyaltyCode,
+  fetchLoyaltyStatus,
+} from "./DiscountBadge";
 
 const API_BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
@@ -43,6 +50,18 @@ const api = axios.create({
 
 const DOWNPAYMENT = 200;
 const HELMET_FEE = 50;
+const MAX_PROOF_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PROOF_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
+const PROOF_IMAGE_TOO_LARGE_MSG =
+  "That image is too large. Please upload a photo up to 5 MB.";
+const PROOF_IMAGE_INVALID_TYPE_MSG =
+  "Unsupported file type. Please upload a JPG, PNG, WEBP, or HEIC photo.";
 const CHECKOUT_LOCK_FALLBACK_MINUTES = 10;
 const PICKUP_LOCATION =
   "Soldiers Hills IV, Block 9 Lot 1 PH2 Lily, Bacoor, 4102 Cavite";
@@ -51,6 +70,9 @@ const PAYMENT_QR_PATHS = {
   PayMaya: "/images/qr-gcash.jpeg",
   "Bank Transfer": "/images/qr-gcash.jpeg",
 };
+// Fallback image shown for any payment method (built-in or admin-added) that
+// doesn't have a QR code uploaded yet.
+const DEFAULT_QR_FALLBACK = "/images/qr-gcash.jpeg";
 
 const resolveQrPath = (path) => {
   if (!path) return null;
@@ -352,6 +374,18 @@ const S = {
     color: "#0E0E0E",
     outline: "none",
   },
+  inputError: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "10px 12px 10px 38px",
+    borderRadius: 10,
+    border: "1.5px solid #b50002",
+    background: "#FDF0F0",
+    fontSize: 13,
+    fontFamily: "'Space Grotesk',sans-serif",
+    color: "#0E0E0E",
+    outline: "none",
+  },
   select: {
     width: "100%",
     boxSizing: "border-box",
@@ -421,6 +455,121 @@ const S = {
     border: "none",
     cursor: "pointer",
   },
+};
+
+// Resolve a profile picture reference (relative path, Cloudinary path, or
+// full URL) into a usable <img> src.
+const makeImageUrl = (filename) => {
+  if (!filename) return "";
+  const s = String(filename).trim();
+  if (!s) return "";
+  if (/^data:image\//i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/dxta0nmdy/") || s.startsWith("dxta0nmdy/"))
+    return `https://res.cloudinary.com/${s.replace(/^\/+/, "")}`;
+  const cleanPath = s.replace(/^\/+/, "").replace(/^uploads\//, "");
+  return `${API_BASE_URL}/uploads/${cleanPath}`;
+};
+
+/* ── Reviewer avatar (profile picture w/ letter fallback) ──────────── */
+const ReviewerAvatar = ({ name, photo, size = 40 }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      background: "rgba(181,0,2,0.1)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontSize: size * 0.4,
+      fontWeight: 800,
+      color: "#b50002",
+      flexShrink: 0,
+      overflow: "hidden",
+    }}
+  >
+    {photo ? (
+      <img
+        src={photo}
+        alt={name || "Reviewer"}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+    ) : (
+      (name || "R").charAt(0).toUpperCase()
+    )}
+  </div>
+);
+
+/* ── Accurate fractional star rating ───────────────────────────────── */
+// Each star is its own self-contained fill unit: a gray star underneath and
+// an amber star clipped to that star's own fraction filled (0-100%). This
+// makes the visual fill match the numeric rating exactly (e.g. 2.8/5 shows
+// 2 full stars + the 3rd star 80% filled) instead of rounding to the
+// nearest whole star.
+const StarRating = ({ rating, size = 12, showValue = true, naLabel }) => {
+  const numericRating = Math.max(0, Math.min(5, Number(rating) || 0));
+  const isNA = naLabel && (!rating || Number(rating) <= 0);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", gap: 2 }}>
+        {[1, 2, 3, 4, 5].map((i) => {
+          const starFill = isNA
+            ? 0
+            : Math.max(0, Math.min(1, numericRating - (i - 1)));
+          return (
+            <span
+              key={i}
+              style={{
+                position: "relative",
+                display: "inline-block",
+                width: size,
+                height: size,
+                lineHeight: 0,
+              }}
+            >
+              <FaStar
+                size={size}
+                style={{ display: "block", color: "rgba(0,0,0,0.12)" }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  overflow: "hidden",
+                  width: `${starFill * 100}%`,
+                  height: "100%",
+                }}
+              >
+                <FaStar
+                  size={size}
+                  style={{ display: "block", color: "#f59e0b" }}
+                />
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      {showValue && (
+        <span
+          style={{
+            fontSize: Math.max(10, size - 1),
+            fontWeight: 700,
+            color: "rgba(0,0,0,0.5)",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          {isNA ? "N/A" : `${numericRating.toFixed(1)}/5.0`}
+        </span>
+      )}
+    </div>
+  );
 };
 
 /* ── Inline Calendar Picker ────────────────────────────────────── */
@@ -833,8 +982,193 @@ const InlineDatePicker = ({
   );
 };
 
+const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
+  const [viewMonth, setViewMonth] = useState(new Date());
+  const monthGrid = getMonthGrid(viewMonth);
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const todayKey = toDateKey(new Date());
+
+  return (
+    <div style={{ padding: "10px 0" }}>
+      {/* Month Navigation */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+          style={S.btnSecondary}
+        >
+          <FaChevronLeft size={12} />
+        </button>
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 800,
+            color: "#0E0E0E",
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          {monthLabel}
+        </span>
+        <button
+          type="button"
+          onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+          style={S.btnSecondary}
+        >
+          <FaChevronRight size={12} />
+        </button>
+      </div>
+
+      {/* Day Headers */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7,1fr)",
+          gap: 4,
+          marginBottom: 8,
+        }}
+      >
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div
+            key={d}
+            style={{
+              textAlign: "center",
+              fontSize: 11,
+              fontWeight: 800,
+              color: "rgba(0,0,0,0.3)",
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7,1fr)",
+          gap: 4,
+        }}
+      >
+        {monthGrid.map((date, idx) => {
+          const inMonth = date.getMonth() === viewMonth.getMonth();
+          const dk = toDateKey(date);
+
+          const isBooked = bookingRanges.some(
+            (b) =>
+              dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+          );
+          const isMaintenance = maintenanceRanges.some(
+            (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
+          );
+          // FIX: using addDaysHelper instead of addDays
+          const isBuffer = maintenanceRanges.some(
+            (m) => dk === toDateKey(addDaysHelper(m.startDate, -1)),
+          );
+          const isToday = dk === todayKey;
+
+          let bg = "transparent";
+          let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
+          let border = "1.5px solid transparent";
+
+          if (isMaintenance) {
+            bg = "rgba(124,58,237,0.08)";
+            color = "#7c3aed";
+            border = "1.5px solid rgba(124,58,237,0.2)";
+          } else if (isBuffer) {
+            bg = "rgba(245,158,11,0.08)";
+            color = "#b45309";
+            border = "1.5px solid rgba(245,158,11,0.25)";
+          } else if (isBooked) {
+            bg = "rgba(181,0,2,0.08)";
+            color = "#b50002";
+            border = "1.5px solid rgba(181,0,2,0.2)";
+          } else if (isToday && inMonth) {
+            border = "1.5px solid rgba(0,0,0,0.2)";
+          }
+
+          return (
+            <div
+              key={idx}
+              style={{
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: bg,
+                color: color,
+                border: border,
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: isBooked || isMaintenance || isToday ? 800 : 600,
+                fontFamily: "'Space Grotesk',sans-serif",
+                opacity: inMonth ? 1 : 0.3,
+              }}
+            >
+              {date.getDate()}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div
+        style={{
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: "1px solid rgba(0,0,0,0.06)",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        {[
+          { dot: "rgba(181,0,2,0.5)", label: "Booked" },
+          { dot: "#7c3aed", label: "Maintenance" },
+          { dot: "#f59e0b", label: "Buffer Day" },
+        ].map(({ dot, label }) => (
+          <div
+            key={label}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: dot,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                color: "rgba(0,0,0,0.5)",
+                fontFamily: "'Space Grotesk',sans-serif",
+                fontWeight: 600,
+              }}
+            >
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 /* ── Field wrapper ─────────────────────────────────────────────── */
-const Field = ({ icon: Icon, label, hint, children }) => (
+const Field = ({ icon: Icon, label, hint, error, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
     {label && <label style={S.label}>{label}</label>}
     <div
@@ -854,17 +1188,31 @@ const Field = ({ icon: Icon, label, hint, children }) => (
       )}
       {children}
     </div>
-    {hint && (
+    {error ? (
       <p
         style={{
           fontSize: 11,
-          color: "rgba(0,0,0,0.35)",
+          fontWeight: 600,
+          color: "#b50002",
           marginTop: 2,
           fontFamily: "'Space Grotesk',sans-serif",
         }}
       >
-        {hint}
+        {error}
       </p>
+    ) : (
+      hint && (
+        <p
+          style={{
+            fontSize: 11,
+            color: "rgba(0,0,0,0.35)",
+            marginTop: 2,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          {hint}
+        </p>
+      )
     )}
   </div>
 );
@@ -963,6 +1311,121 @@ const alertModal = (message, { isError = false, title } = {}) =>
         isError={isError}
         title={title}
         onClose={cleanup}
+      />,
+    );
+  });
+
+/* ── Confirm Modal ───────────────────────────────────────────────── */
+const ConfirmModal = ({
+  message,
+  onConfirm,
+  onCancel,
+  confirmLabel,
+  title,
+}) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(4px)",
+      zIndex: 9999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    }}
+    onClick={onCancel}
+  >
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 20,
+        padding: 28,
+        maxWidth: 400,
+        width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center" }}>
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(181,0,2,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 14px",
+          }}
+        >
+          <FaInfoCircle style={{ color: "#b50002", fontSize: 20 }} />
+        </div>
+        <h3
+          style={{
+            fontSize: 17,
+            fontWeight: 800,
+            color: "#0E0E0E",
+            marginBottom: 8,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          {title || "Confirm Action"}
+        </h3>
+        <p
+          style={{
+            fontSize: 13,
+            color: "rgba(0,0,0,0.55)",
+            marginBottom: 20,
+            fontFamily: "'Space Grotesk',sans-serif",
+            lineHeight: 1.5,
+          }}
+        >
+          {message}
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              ...S.btnSecondary,
+              flex: 1,
+              justifyContent: "center",
+              background: "#F5F5F3",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{ ...S.btnPrimary, flex: 1, justifyContent: "center" }}
+          >
+            {confirmLabel || "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const confirmModal = (message, { confirmLabel, title } = {}) =>
+  new Promise((resolve) => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = ReactDOM.createRoot(container);
+    const cleanup = (result) => {
+      root.unmount();
+      document.body.removeChild(container);
+      resolve(result);
+    };
+    root.render(
+      <ConfirmModal
+        message={message}
+        confirmLabel={confirmLabel}
+        title={title}
+        onConfirm={() => cleanup(true)}
+        onCancel={() => cleanup(false)}
       />,
     );
   });
@@ -1794,7 +2257,7 @@ const PriceSummary = ({
       />
       {discountAmount > 0 && (
         <ReviewRow
-          label={`Promo${discount?.code ? ` (${discount.code})` : ""}`}
+          label={`Discount${discount?.code ? ` (${discount.code})` : ""}`}
           value={`−₱${Math.round(discountAmount)}`}
           deduct
         />
@@ -1901,6 +2364,791 @@ const PriceSummary = ({
   );
 };
 
+const AvailabilityCalendarModal = ({
+  onClose,
+  bookingRanges,
+  maintenanceRanges,
+}) => {
+  const [viewMonth, setViewMonth] = useState(new Date());
+  const monthGrid = getMonthGrid(viewMonth);
+
+  const monthLabel = viewMonth.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const todayKey = toDateKey(new Date());
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          padding: 24,
+          maxWidth: 450,
+          width: "100%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: "#0E0E0E",
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            Vehicle Availability
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(0,0,0,0.4)",
+            }}
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
+
+        {/* Month Navigation */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          <button
+            onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+            style={S.btnSecondary}
+          >
+            <FaChevronLeft size={12} />
+          </button>
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#0E0E0E",
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            {monthLabel}
+          </span>
+          <button
+            onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+            style={S.btnSecondary}
+          >
+            <FaChevronRight size={12} />
+          </button>
+        </div>
+
+        {/* Day Headers */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7,1fr)",
+            gap: 4,
+            marginBottom: 8,
+          }}
+        >
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div
+              key={d}
+              style={{
+                textAlign: "center",
+                fontSize: 11,
+                fontWeight: 800,
+                color: "rgba(0,0,0,0.3)",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7,1fr)",
+            gap: 4,
+          }}
+        >
+          {monthGrid.map((date, idx) => {
+            const inMonth = date.getMonth() === viewMonth.getMonth();
+            const dk = toDateKey(date);
+
+            const isBooked = bookingRanges.some(
+              (b) =>
+                dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+            );
+            const isMaintenance = maintenanceRanges.some(
+              (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
+            );
+            const isBuffer = maintenanceRanges.some(
+              (m) => dk === toDateKey(addDaysHelper(m.startDate, -1)),
+            );
+            const isToday = dk === todayKey;
+
+            let bg = "transparent";
+            let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
+            let border = "1.5px solid transparent";
+
+            if (isMaintenance) {
+              bg = "rgba(124,58,237,0.08)";
+              color = "#7c3aed";
+              border = "1.5px solid rgba(124,58,237,0.2)";
+            } else if (isBuffer) {
+              bg = "rgba(245,158,11,0.08)";
+              color = "#b45309";
+              border = "1.5px solid rgba(245,158,11,0.25)";
+            } else if (isBooked) {
+              bg = "rgba(181,0,2,0.08)";
+              color = "#b50002";
+              border = "1.5px solid rgba(181,0,2,0.2)";
+            } else if (isToday && inMonth) {
+              border = "1.5px solid rgba(0,0,0,0.2)";
+            }
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  height: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: bg,
+                  color: color,
+                  border: border,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: isBooked || isMaintenance || isToday ? 800 : 600,
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  opacity: inMonth ? 1 : 0.3,
+                }}
+              >
+                {date.getDate()}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div
+          style={{
+            marginTop: 20,
+            paddingTop: 16,
+            borderTop: "1px solid rgba(0,0,0,0.06)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {[
+            { dot: "rgba(181,0,2,0.5)", label: "Booked" },
+            { dot: "#7c3aed", label: "Maintenance" },
+            { dot: "#f59e0b", label: "Buffer Day" },
+          ].map(({ dot, label }) => (
+            <div
+              key={label}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: dot,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "rgba(0,0,0,0.5)",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  fontWeight: 600,
+                }}
+              >
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── All Reviews Modal ─────────────────────────────────────────── */
+const ALL_REVIEWS_PAGE_SIZE = 8;
+const RATING_FILTER_OPTIONS = [5, 4, 3, 2, 1];
+
+const AllReviewsModal = ({ motorcycleId, motorcycleName, onClose }) => {
+  const [page, setPage] = useState(1);
+  const [ratingFilter, setRatingFilter] = useState(null); // null = all, else 1-5
+  const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [previewImage, setPreviewImage] = useState(null);
+
+  const applyRatingFilter = (star) => {
+    setRatingFilter(star);
+    setPage(1);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchPage = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const params = { page, limit: ALL_REVIEWS_PAGE_SIZE };
+        if (ratingFilter) params.rating = ratingFilter;
+        const res = await api.get(`/api/reviews/motorcycle/${motorcycleId}`, {
+          params,
+        });
+        const data = res.data || {};
+        if (!mounted) return;
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+        setStats(data.stats || null);
+        setPagination(data.pagination || { total: 0, pages: 1 });
+      } catch (err) {
+        if (mounted)
+          setError(err.response?.data?.message || "Failed to load reviews");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchPage();
+    return () => {
+      mounted = false;
+    };
+  }, [motorcycleId, page, ratingFilter]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      if (previewImage) setPreviewImage(null);
+      else onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, previewImage]);
+
+  const totalPages = pagination.pages || 1;
+  const totalReviews = stats?.totalReviews ?? pagination.total ?? 0;
+  const avgRating = stats?.avgRating || 0;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: 640,
+          maxHeight: "88vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1.5px solid rgba(0,0,0,0.06)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            flexShrink: 0,
+            gap: 12,
+          }}
+        >
+          <div>
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "#0E0E0E",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              All Reviews{motorcycleName ? ` · ${motorcycleName}` : ""}
+            </h3>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 8,
+              }}
+            >
+              <StarRating rating={avgRating} size={15} />
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "rgba(0,0,0,0.4)",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                }}
+              >
+                · {totalReviews} review{totalReviews === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(0,0,0,0.4)",
+              flexShrink: 0,
+            }}
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
+
+        {/* Rating filter */}
+        <div
+          style={{
+            padding: "14px 24px",
+            borderBottom: "1.5px solid rgba(0,0,0,0.06)",
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={() => applyRatingFilter(null)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "'Space Grotesk',sans-serif",
+              border:
+                ratingFilter === null
+                  ? "1.5px solid #b50002"
+                  : "1.5px solid rgba(0,0,0,0.1)",
+              background: ratingFilter === null ? "rgba(181,0,2,0.06)" : "#fff",
+              color: ratingFilter === null ? "#b50002" : "rgba(0,0,0,0.55)",
+            }}
+          >
+            All
+          </button>
+          {RATING_FILTER_OPTIONS.map((star) => (
+            <button
+              key={star}
+              onClick={() => applyRatingFilter(star)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "6px 12px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk',sans-serif",
+                border:
+                  ratingFilter === star
+                    ? "1.5px solid #b50002"
+                    : "1.5px solid rgba(0,0,0,0.1)",
+                background:
+                  ratingFilter === star ? "rgba(181,0,2,0.06)" : "#fff",
+                color: ratingFilter === star ? "#b50002" : "rgba(0,0,0,0.55)",
+              }}
+            >
+              {star}
+              <FaStar
+                size={10}
+                style={{
+                  color: ratingFilter === star ? "#b50002" : "#f59e0b",
+                }}
+              />
+              {typeof stats?.ratingCounts?.[star] === "number" && (
+                <span style={{ opacity: 0.6 }}>
+                  ({stats.ratingCounts[star]})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "18px 24px", overflowY: "auto", flex: 1 }}>
+          {loading && (
+            <p
+              style={{
+                fontSize: 13,
+                color: "rgba(0,0,0,0.4)",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              Loading reviews…
+            </p>
+          )}
+          {!loading && error && (
+            <p
+              style={{
+                fontSize: 13,
+                color: "#b50002",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              {error}
+            </p>
+          )}
+          {!loading && !error && reviews.length === 0 && (
+            <p
+              style={{
+                fontSize: 13,
+                color: "rgba(0,0,0,0.4)",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              {ratingFilter
+                ? `No ${ratingFilter}-star reviews yet.`
+                : "No reviews yet."}
+            </p>
+          )}
+          {!loading &&
+            !error &&
+            reviews.map((r) => {
+              const p = r.performance || 0;
+              const c = r.condition || 0;
+              const cs = r.customerService || 0;
+              const vm = r.valueForMoney || 0;
+              const rc = r.rideComfort || 0;
+              const overall = r.rating || 0;
+
+              return (
+                <div
+                  key={r._id || r.id}
+                  className="md-review"
+                  style={{ marginBottom: 14 }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: 12,
+                      gap: 10,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <ReviewerAvatar
+                        name={r.renterName || r.name}
+                        photo={makeImageUrl(r.profilePicture)}
+                        size={38}
+                      />
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "#0E0E0E",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {r.renterName || r.name || "Anonymous"}
+                        </p>
+                        <StarRating rating={overall} size={11} />
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "rgba(0,0,0,0.35)",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {new Date(
+                        r.createdAt || r.created_at || Date.now(),
+                      ).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {/* Detailed rating breakdown */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(110px, 1fr))",
+                      gap: "8px 12px",
+                      marginBottom: 12,
+                      padding: "10px",
+                      background: "rgba(0,0,0,0.03)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    {[
+                      { label: "Performance", value: p },
+                      { label: "Condition", value: c },
+                      { label: "Customer Service", value: cs },
+                      { label: "Value for Money", value: vm },
+                      { label: "Ride Comfort", value: rc },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 3,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            color: "rgba(0,0,0,0.4)",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                        <StarRating rating={item.value} size={10} naLabel />
+                      </div>
+                    ))}
+                  </div>
+
+                  {(r.feedbackDescription || r.comment) && (
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "rgba(0,0,0,0.65)",
+                        lineHeight: 1.65,
+                        fontFamily: "'Space Grotesk',sans-serif",
+                        marginBottom:
+                          Array.isArray(r.reviewImages) && r.reviewImages.length
+                            ? 10
+                            : 0,
+                      }}
+                    >
+                      {r.feedbackDescription || r.comment}
+                    </p>
+                  )}
+
+                  {Array.isArray(r.reviewImages) &&
+                    r.reviewImages.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          marginBottom: r.adminReplyMessage ? 10 : 0,
+                        }}
+                      >
+                        {r.reviewImages.map((img, idx) => (
+                          <img
+                            key={idx}
+                            src={img}
+                            alt="Review attachment"
+                            onClick={() => setPreviewImage(img)}
+                            style={{
+                              width: 64,
+                              height: 64,
+                              objectFit: "cover",
+                              borderRadius: 10,
+                              border: "1.5px solid rgba(0,0,0,0.08)",
+                              cursor: "pointer",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                  {r.adminReplyMessage && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        background: "rgba(181,0,2,0.04)",
+                        border: "1px solid rgba(181,0,2,0.1)",
+                        borderRadius: 10,
+                        padding: "8px 12px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Admin Reply
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#0E0E0E",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        {r.adminReplyMessage}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Pagination footer */}
+        {!loading && !error && totalPages > 1 && (
+          <div
+            style={{
+              padding: "14px 24px",
+              borderTop: "1.5px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page === 1}
+              style={{
+                ...S.btnSecondary,
+                opacity: page === 1 ? 0.4 : 1,
+                cursor: page === 1 ? "default" : "pointer",
+              }}
+            >
+              <FaChevronLeft size={10} /> Prev
+            </button>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "rgba(0,0,0,0.5)",
+                fontFamily: "'Space Grotesk',sans-serif",
+              }}
+            >
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages}
+              style={{
+                ...S.btnSecondary,
+                opacity: page === totalPages ? 0.4 : 1,
+                cursor: page === totalPages ? "default" : "pointer",
+              }}
+            >
+              Next <FaChevronRight size={10} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox for review images */}
+      {previewImage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewImage(null);
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewImage(null);
+            }}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 24,
+              background: "none",
+              border: "none",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            <FaTimes size={26} />
+          </button>
+          <img
+            src={previewImage}
+            alt="Review attachment full size"
+            style={{
+              maxWidth: "100%",
+              maxHeight: "90vh",
+              borderRadius: 12,
+              objectFit: "contain",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Main Component ────────────────────────────────────────────── */
 const MotorcycleDetail = () => {
   const { id } = useParams();
@@ -1929,7 +3177,22 @@ const MotorcycleDetail = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
   const [votingReviewId, setVotingReviewId] = useState("");
-  const [dynamicQrs, setDynamicQrs] = useState(PAYMENT_QR_PATHS);
+  const [reviewStats, setReviewStats] = useState(null);
+  const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
+  // Active (enabled) payment methods, fetched from the admin-managed list.
+  // Falls back to the built-in three while loading so the UI never looks empty.
+  const [activePaymentMethods, setActivePaymentMethods] = useState(
+    Object.keys(PAYMENT_QR_PATHS).map((name) => ({
+      _id: name,
+      name,
+      qrCode: "",
+      enabled: true,
+    })),
+  );
+
+  const [showAvailabilityCalendar, setShowAvailabilityCalendar] = useState(
+    () => location.state?.showCalendar || false,
+  );
 
   // Calendar data state
   const [calBookings, setCalBookings] = useState([]);
@@ -1964,6 +3227,30 @@ const MotorcycleDetail = () => {
     paymentSentAmount: String(DOWNPAYMENT),
     paymentProofImage: null,
   });
+  const [errors, setErrors] = useState({});
+  const [paymentProofPreviewUrl, setPaymentProofPreviewUrl] = useState("");
+  const [isPaymentProofZoomed, setIsPaymentProofZoomed] = useState(false);
+
+  // Build (and clean up) a local preview URL whenever a new payment proof
+  // image is selected, so the user can see and zoom into what they picked.
+  useEffect(() => {
+    if (!formData.paymentProofImage) {
+      setPaymentProofPreviewUrl("");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(formData.paymentProofImage);
+    setPaymentProofPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [formData.paymentProofImage]);
+
+  useEffect(() => {
+    if (!isPaymentProofZoomed) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setIsPaymentProofZoomed(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPaymentProofZoomed]);
 
   const getNextUnavailableDate = (pickupDateISO) => {
     if (!pickupDateISO) return null;
@@ -1987,10 +3274,13 @@ const MotorcycleDetail = () => {
 
   const availablePickupSlots = getAvailablePickupSlots(formData.pickupDate);
   const noSlotsAvailable = availablePickupSlots.length === 0;
+  const selectedMethod = activePaymentMethods.find(
+    (m) => m.name === formData.reservationPaymentMethod,
+  );
   const rawPath =
-    dynamicQrs[formData.reservationPaymentMethod] ||
-    dynamicQrs.GCash ||
-    PAYMENT_QR_PATHS[formData.reservationPaymentMethod];
+    selectedMethod?.qrCode ||
+    PAYMENT_QR_PATHS[formData.reservationPaymentMethod] ||
+    DEFAULT_QR_FALLBACK;
   const selectedQrPath = resolveQrPath(rawPath);
   const fetchControllerRef = useRef(null);
   const submitControllerRef = useRef(null);
@@ -2003,6 +3293,88 @@ const MotorcycleDetail = () => {
   );
   const days = calculateDays(formData.pickupDate, formData.returnDate);
   const applicableDiscount = useApplicableDiscount(motorcycle, days);
+
+  // ── Manual promo / loyalty code entry ─────────────────────────────────────
+  // Users can type in a promo code (global or a personal loyalty reward code).
+  // A valid manually-entered code takes priority over the best auto-applied
+  // discount so people can redeem specific rewards rather than always getting
+  // whichever promo happens to be "best".
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [manualDiscount, setManualDiscount] = useState(null);
+  const [promoCodeStatus, setPromoCodeStatus] = useState("idle"); // idle | checking | valid | invalid
+  const [promoCodeMessage, setPromoCodeMessage] = useState("");
+
+  // The signed-in user's own active promo/reward codes, so they can pick one
+  // from a dropdown instead of having to remember or re-copy it.
+  const [myPromoCodes, setMyPromoCodes] = useState([]);
+  const [showCodePicker, setShowCodePicker] = useState(false);
+  const codePickerRef = useRef(null);
+
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+    if (!storedUser?.id) return;
+    fetchLoyaltyStatus(storedUser.id)
+      .then((data) => setMyPromoCodes(data?.activeCodes || []))
+      .catch(() => setMyPromoCodes([]));
+  }, []);
+
+  useEffect(() => {
+    if (!showCodePicker) return;
+    const handleClickOutside = (e) => {
+      if (codePickerRef.current && !codePickerRef.current.contains(e.target)) {
+        setShowCodePicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showCodePicker]);
+
+  const handleSelectMyPromoCode = (code) => {
+    setPromoCodeInput(code.code);
+    setShowCodePicker(false);
+    if (promoCodeStatus !== "idle") {
+      setPromoCodeStatus("idle");
+      setPromoCodeMessage("");
+    }
+  };
+
+  const handleApplyPromoCode = async () => {
+    const trimmed = promoCodeInput.trim();
+    if (!trimmed) return;
+    setPromoCodeStatus("checking");
+    setPromoCodeMessage("");
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+      const result = await validatePromoCode({
+        code: trimmed,
+        userId: storedUser?.id,
+        rentalDays: days || 1,
+      });
+      setManualDiscount(result);
+      setPromoCodeStatus("valid");
+      setPromoCodeMessage(
+        result.discountType === "percentage"
+          ? `${result.discountValue}% off applied!`
+          : `₱${result.discountValue} off applied!`,
+      );
+    } catch (err) {
+      setManualDiscount(null);
+      setPromoCodeStatus("invalid");
+      setPromoCodeMessage(
+        err.response?.data?.message || "Invalid or expired promo code.",
+      );
+    }
+  };
+
+  const handleClearPromoCode = () => {
+    setPromoCodeInput("");
+    setManualDiscount(null);
+    setPromoCodeStatus("idle");
+    setPromoCodeMessage("");
+  };
+
+  // A valid manually-entered code always wins over the auto-applied one.
+  const effectiveDiscount = manualDiscount || applicableDiscount;
 
   // Build booking ranges for the calendar
   const currentMotoId = motorcycle?._id || motorcycle?.id;
@@ -2043,14 +3415,22 @@ const MotorcycleDetail = () => {
 
   useEffect(() => {
     api
-      .get("/api/settings/qrs")
+      .get("/api/settings/payment-methods", { params: { activeOnly: true } })
       .then((res) => {
-        if (res.data?.data) {
-          setDynamicQrs((prev) => ({ ...prev, ...res.data.data }));
+        const methods = res.data?.data;
+        if (Array.isArray(methods) && methods.length > 0) {
+          setActivePaymentMethods(methods);
+          // If the currently selected method got disabled/removed, fall back
+          // to the first still-active method so checkout never gets stuck.
+          setFormData((prev) =>
+            methods.some((m) => m.name === prev.reservationPaymentMethod)
+              ? prev
+              : { ...prev, reservationPaymentMethod: methods[0].name },
+          );
         }
       })
       .catch((err) =>
-        console.log("Failed to load dynamic QRs, using defaults."),
+        console.log("Failed to load payment methods, using defaults."),
       );
   }, []);
 
@@ -2330,10 +3710,12 @@ const MotorcycleDetail = () => {
           params: { limit: 6 },
         });
         const data = res.data || {};
-        if (mounted)
+        if (mounted) {
           setReviews(
             Array.isArray(data.reviews) ? data.reviews : data.reviews || [],
           );
+          setReviewStats(data.stats || null);
+        }
       } catch (err) {
         if (mounted)
           setReviewsError(
@@ -2474,10 +3856,10 @@ const MotorcycleDetail = () => {
   } = getDistanceFee(formData.destinationCity, formData.destination);
   const helmetFee = formData.wantsHelmet ? HELMET_FEE : 0;
   const baseRental = days * price;
-  const discountAmount = applicableDiscount
-    ? applicableDiscount.discountType === "percentage"
-      ? (baseRental * applicableDiscount.discountValue) / 100
-      : Math.min(applicableDiscount.discountValue, baseRental)
+  const discountAmount = effectiveDiscount
+    ? effectiveDiscount.discountType === "percentage"
+      ? (baseRental * effectiveDiscount.discountValue) / 100
+      : Math.min(effectiveDiscount.discountValue, baseRental)
     : 0;
   const discountedBaseRental = Math.round(
     Math.max(0, baseRental - discountAmount),
@@ -2487,6 +3869,12 @@ const MotorcycleDetail = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     if (name === "zipCode") {
       const n = value.replace(/\D/g, "");
       if (n.length > 4) return;
@@ -2502,9 +3890,35 @@ const MotorcycleDetail = () => {
       return;
     }
     if (name === "paymentProofImage") {
+      const file = e.target.files?.[0] || null;
+      // Reset the input so re-selecting the same file (after a validation
+      // failure) still fires onChange and re-validates it.
+      e.target.value = "";
+      if (!file) {
+        setFormData((p) => ({ ...p, paymentProofImage: null }));
+        return;
+      }
+      if (!ALLOWED_PROOF_IMAGE_TYPES.includes(file.type)) {
+        setErrors((p) => ({
+          ...p,
+          paymentProofImage: PROOF_IMAGE_INVALID_TYPE_MSG,
+        }));
+        toast.error(PROOF_IMAGE_INVALID_TYPE_MSG);
+        setFormData((p) => ({ ...p, paymentProofImage: null }));
+        return;
+      }
+      if (file.size > MAX_PROOF_IMAGE_BYTES) {
+        setErrors((p) => ({
+          ...p,
+          paymentProofImage: PROOF_IMAGE_TOO_LARGE_MSG,
+        }));
+        toast.error(PROOF_IMAGE_TOO_LARGE_MSG);
+        setFormData((p) => ({ ...p, paymentProofImage: null }));
+        return;
+      }
       setFormData((p) => ({
         ...p,
-        paymentProofImage: e.target.files?.[0] || null,
+        paymentProofImage: file,
       }));
       return;
     }
@@ -2547,6 +3961,12 @@ const MotorcycleDetail = () => {
   };
 
   const handleDestinationChange = (destString, cityName) => {
+    setErrors((p) => {
+      if (!("destination" in p)) return p;
+      const n = { ...p };
+      delete n.destination;
+      return n;
+    });
     setFormData((p) => ({
       ...p,
       destination: destString,
@@ -2574,6 +3994,7 @@ const MotorcycleDetail = () => {
         "approved",
         "rented",
         "reserved",
+        "inspection", // Added inspection status
       ];
       const active = raw.find((b) => {
         if (b.isDeleted) return false;
@@ -2597,14 +4018,24 @@ const MotorcycleDetail = () => {
     }
   };
 
-  const handleStep1Next = (e) => {
+  const handleStep1Next = async (e) => {
     e.preventDefault();
-    if (!formData.returnDate) {
-      toast.error("Please select a return date.");
+    if (!formData.destination || formData.destination.trim() === "") {
+      setErrors((p) => ({
+        ...p,
+        destination: "Please select your destination",
+      }));
+      toast.error("Please select your destination.");
       return;
     }
-    if (!formData.destination || formData.destination.trim() === "") {
-      toast.error("Please select your destination.");
+    setErrors((p) => {
+      if (!("destination" in p)) return p;
+      const n = { ...p };
+      delete n.destination;
+      return n;
+    });
+    if (!formData.returnDate) {
+      toast.error("Please select a return date.");
       return;
     }
     if (new Date(formData.returnDate) <= new Date(formData.pickupDate)) {
@@ -2670,6 +4101,14 @@ const MotorcycleDetail = () => {
       );
       return;
     }
+
+    // --- NEW CHECK: Prevent moving to Step 2 if user has an active/inspection booking ---
+    const existingBooking = await checkExistingActiveBooking();
+    if (existingBooking) {
+      await activeBookingBlockModal(existingBooking, navigate);
+      return; // Stop execution, keeping them on step 1
+    }
+
     if (motorcycle) {
       const rawStart =
         motorcycle.maintenanceScheduleStartAt ||
@@ -2734,12 +4173,21 @@ const MotorcycleDetail = () => {
     e.preventDefault();
     if (hasSubmittedRef.current || submitting) return;
     hasSubmittedRef.current = true;
+
     if (!formData.paymentReferenceId.trim()) {
+      setErrors((p) => ({
+        ...p,
+        paymentReferenceId: "Reference ID is required",
+      }));
       toast.error("Please enter your payment reference ID.");
       hasSubmittedRef.current = false;
       return;
     }
     if (!formData.paymentSentAt) {
+      setErrors((p) => ({
+        ...p,
+        paymentSentAt: "Payment sent time is required",
+      }));
       toast.error("Please enter when the payment was sent.");
       hasSubmittedRef.current = false;
       return;
@@ -2750,7 +4198,29 @@ const MotorcycleDetail = () => {
       return;
     }
     if (!formData.paymentProofImage) {
+      setErrors((p) => ({
+        ...p,
+        paymentProofImage: "Payment proof image is required",
+      }));
       toast.error("Please upload your payment proof image.");
+      hasSubmittedRef.current = false;
+      return;
+    }
+    if (!ALLOWED_PROOF_IMAGE_TYPES.includes(formData.paymentProofImage.type)) {
+      setErrors((p) => ({
+        ...p,
+        paymentProofImage: PROOF_IMAGE_INVALID_TYPE_MSG,
+      }));
+      toast.error(PROOF_IMAGE_INVALID_TYPE_MSG);
+      hasSubmittedRef.current = false;
+      return;
+    }
+    if (formData.paymentProofImage.size > MAX_PROOF_IMAGE_BYTES) {
+      setErrors((p) => ({
+        ...p,
+        paymentProofImage: PROOF_IMAGE_TOO_LARGE_MSG,
+      }));
+      toast.error(PROOF_IMAGE_TOO_LARGE_MSG);
       hasSubmittedRef.current = false;
       return;
     }
@@ -2760,6 +4230,17 @@ const MotorcycleDetail = () => {
       await activeBookingBlockModal(existingBooking, navigate);
       return;
     }
+
+    const confirmed = await confirmModal(
+      "Are you sure you want to book this motorcycle? Please note that the reservation fee is non-refundable if you cancel your reservation.",
+      { confirmLabel: "Yes, Confirm", title: "Confirm Booking" },
+    );
+
+    if (!confirmed) {
+      hasSubmittedRef.current = false;
+      return;
+    }
+
     setSubmitting(true);
     if (submitControllerRef.current) {
       try {
@@ -2801,16 +4282,17 @@ const MotorcycleDetail = () => {
           helmetFee,
           destinationCity: formData.destinationCity,
           downpayment: DOWNPAYMENT,
-          appliedDiscount: applicableDiscount
+          appliedDiscount: effectiveDiscount
             ? {
-                id: applicableDiscount._id,
-                name: applicableDiscount.name,
-                code: applicableDiscount.code || "",
-                discountType: applicableDiscount.discountType,
-                discountValue: applicableDiscount.discountValue,
+                id: effectiveDiscount._id,
+                name: effectiveDiscount.name,
+                code: effectiveDiscount.code || "",
+                discountType: effectiveDiscount.discountType,
+                discountValue: effectiveDiscount.discountValue,
                 discountAmount: Math.round(discountAmount),
                 discountedBaseRental: Math.round(discountedBaseRental),
                 discountedTotalAmount: Math.round(totalAmount),
+                isLoyaltyCode: Boolean(effectiveDiscount.isLoyaltyCode),
               }
             : null,
         },
@@ -2845,14 +4327,20 @@ const MotorcycleDetail = () => {
         headers,
         signal: controller.signal,
       });
-      if (applicableDiscount?._id)
+      if (effectiveDiscount?.isLoyaltyCode) {
+        redeemLoyaltyCode({
+          userId: user?.id,
+          code: effectiveDiscount.code,
+        }).catch(() => {});
+      } else if (effectiveDiscount?._id) {
         api
           .patch(
-            `/api/discounts/${applicableDiscount._id}/increment-usage`,
+            `/api/discounts/${effectiveDiscount._id}/increment-usage`,
             {},
             { headers },
           )
           .catch(() => {});
+      }
       clearLockTimer();
       setCheckoutLock({
         expiresAt: "",
@@ -2903,12 +4391,14 @@ const MotorcycleDetail = () => {
         setBookingStep(1);
       }
       toast.error(
-        String(
-          err?.response?.data?.message ||
-            err?.response?.data ||
-            err.message ||
-            "Booking failed",
-        ),
+        err?.response?.status === 413 || /too large/i.test(err.message || "")
+          ? PROOF_IMAGE_TOO_LARGE_MSG
+          : String(
+              err?.response?.data?.message ||
+                err?.response?.data ||
+                err.message ||
+                "Booking failed",
+            ),
       );
     } finally {
       setSubmitting(false);
@@ -2975,6 +4465,53 @@ const MotorcycleDetail = () => {
             navigate("/bookings");
           }}
         />
+      )}
+
+      {/* Payment proof zoom preview */}
+      {isPaymentProofZoomed && paymentProofPreviewUrl && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setIsPaymentProofZoomed(false)}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPaymentProofZoomed(false);
+            }}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 24,
+              background: "none",
+              border: "none",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            <FaTimes size={26} />
+          </button>
+          <img
+            src={paymentProofPreviewUrl}
+            alt="Payment proof full size"
+            style={{
+              maxWidth: "100%",
+              maxHeight: "90vh",
+              borderRadius: 12,
+              objectFit: "contain",
+              cursor: "zoom-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
 
       <div className="md-page">
@@ -3072,7 +4609,7 @@ const MotorcycleDetail = () => {
                   </p>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  {applicableDiscount ? (
+                  {effectiveDiscount ? (
                     <>
                       <p
                         style={{
@@ -3094,7 +4631,7 @@ const MotorcycleDetail = () => {
                       >
                         ₱
                         {Math.round(
-                          computeDiscountedPrice(price, applicableDiscount),
+                          computeDiscountedPrice(price, effectiveDiscount),
                         )}
                         <span
                           style={{
@@ -3118,9 +4655,9 @@ const MotorcycleDetail = () => {
                           fontFamily: "'Space Grotesk',sans-serif",
                         }}
                       >
-                        {applicableDiscount.discountType === "percentage"
-                          ? `−${applicableDiscount.discountValue}% off`
-                          : `₱${applicableDiscount.discountValue} off`}
+                        {effectiveDiscount.discountType === "percentage"
+                          ? `−${effectiveDiscount.discountValue}% off`
+                          : `₱${effectiveDiscount.discountValue} off`}
                       </span>
                     </>
                   ) : (
@@ -3298,7 +4835,35 @@ const MotorcycleDetail = () => {
 
             {/* Reviews card */}
             <div style={S.card}>
-              <p style={{ ...S.label, marginBottom: 14 }}>Customer Reviews</p>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 14,
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <p style={{ ...S.label, marginBottom: 0 }}>Customer Reviews</p>
+                {!reviewsLoading && reviewStats?.totalReviews > 0 && (
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <StarRating rating={reviewStats.avgRating || 0} size={13} />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(0,0,0,0.4)",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      · {reviewStats.totalReviews} review
+                      {reviewStats.totalReviews === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                )}
+              </div>
               {reviewsLoading && (
                 <p
                   style={{
@@ -3333,1278 +4898,1881 @@ const MotorcycleDetail = () => {
                 </p>
               )}
               {!reviewsLoading &&
-                reviews.slice(0, 6).map((r) => (
-                  <div
-                    key={r._id || r.id}
-                    className="md-review"
-                    style={{ marginBottom: 10 }}
-                  >
+                reviews.slice(0, 2).map((r) => {
+                  const p = r.performance || 0;
+                  const c = r.condition || 0;
+                  const cs = r.customerService || 0;
+                  const vm = r.valueForMoney || 0;
+                  const rc = r.rideComfort || 0;
+
+                  const criteriaValues = [p, c, cs, vm, rc].filter(
+                    (val) => val > 0,
+                  );
+                  const calculatedAvg =
+                    criteriaValues.length > 0
+                      ? criteriaValues.reduce((a, b) => a + b, 0) /
+                        criteriaValues.length
+                      : r.rating || 0;
+
+                  return (
                     <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        marginBottom: 6,
-                      }}
+                      key={r._id || r.id}
+                      className="md-review"
+                      style={{ marginBottom: 10 }}
                     >
-                      <div>
-                        <p
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          marginBottom: 12,
+                          gap: 10,
+                        }}
+                      >
+                        <div
                           style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: "#0E0E0E",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <ReviewerAvatar
+                            name={r.renterName || r.name}
+                            photo={makeImageUrl(r.profilePicture)}
+                            size={36}
+                          />
+                          <div>
+                            <p
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#0E0E0E",
+                                fontFamily: "'Space Grotesk',sans-serif",
+                              }}
+                            >
+                              {r.renterName || r.name || "Anonymous"}
+                            </p>
+                            <div style={{ marginTop: 4 }}>
+                              <StarRating rating={calculatedAvg} size={12} />
+                            </div>
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "rgba(0,0,0,0.35)",
                             fontFamily: "'Space Grotesk',sans-serif",
                           }}
                         >
-                          {r.renterName || r.name || "Anonymous"}
-                        </p>
-                        <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <FaStar
-                              key={i}
+                          {new Date(
+                            r.createdAt || r.created_at || Date.now(),
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Detailed Rating Breakdown */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(110px, 1fr))",
+                          gap: "8px 12px",
+                          marginBottom: 12,
+                          padding: "10px",
+                          background: "rgba(0,0,0,0.03)",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        {[
+                          { label: "Performance", value: p },
+                          { label: "Condition", value: c },
+                          { label: "Customer Service", value: cs },
+                          { label: "Value for Money", value: vm },
+                          { label: "Ride Comfort", value: rc },
+                        ].map((item) => (
+                          <div
+                            key={item.label}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            <span
                               style={{
-                                fontSize: 10,
-                                color:
-                                  i <= (r.rating || 0)
-                                    ? "#f59e0b"
-                                    : "rgba(0,0,0,0.12)",
+                                fontSize: 9,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                color: "rgba(0,0,0,0.4)",
+                                fontFamily: "'Space Grotesk',sans-serif",
                               }}
-                            />
-                          ))}
+                            >
+                              {item.label}
+                            </span>
+                            <StarRating rating={item.value} size={10} naLabel />
+                          </div>
+                        ))}
+                      </div>
+
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "rgba(0,0,0,0.65)",
+                          lineHeight: 1.65,
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        {r.feedbackDescription || r.comment || ""}
+                      </p>
+
+                      {r.adminReplyMessage && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            background: "rgba(181,0,2,0.04)",
+                            border: "1px solid rgba(181,0,2,0.1)",
+                            borderRadius: 10,
+                            padding: "8px 12px",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#b50002",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Admin Reply
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#0E0E0E",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            {r.adminReplyMessage}
+                          </p>
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                        <button
+                          className="md-vote-btn"
+                          disabled={votingReviewId === (r._id || r.id)}
+                          onClick={() => voteOnReview(r._id || r.id, "like")}
+                          style={{
+                            borderColor: "rgba(22,163,74,0.25)",
+                            background: "rgba(22,163,74,0.06)",
+                            color: "#16a34a",
+                          }}
+                        >
+                          <FaThumbsUp size={10} /> Helpful (
+                          {r.helpfulLikeCount ?? 0})
+                        </button>
+                        <button
+                          className="md-vote-btn"
+                          disabled={votingReviewId === (r._id || r.id)}
+                          onClick={() => voteOnReview(r._id || r.id, "dislike")}
+                          style={{
+                            borderColor: "rgba(181,0,2,0.2)",
+                            background: "rgba(181,0,2,0.05)",
+                            color: "#b50002",
+                          }}
+                        >
+                          <FaThumbsDown size={10} /> Not Helpful (
+                          {r.helpfulDislikeCount ?? 0})
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              {!reviewsLoading &&
+                !reviewsError &&
+                (reviewStats?.totalReviews ?? reviews.length) > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllReviewsModal(true)}
+                    style={{
+                      ...S.btnSecondary,
+                      justifyContent: "center",
+                      width: "100%",
+                      marginTop: 4,
+                      padding: "10px 0",
+                      borderRadius: 12,
+                      border: "1.5px solid rgba(0,0,0,0.09)",
+                      color: "#b50002",
+                    }}
+                  >
+                    See All Reviews (
+                    {reviewStats?.totalReviews ?? reviews.length}){" "}
+                    <FaArrowRight size={10} />
+                  </button>
+                )}
+            </div>
+          </div>
+
+          {showAllReviewsModal && (
+            <AllReviewsModal
+              motorcycleId={motorcycle._id || motorcycle.id || id}
+              motorcycleName={
+                motorcycle.name ||
+                `${motorcycle.make || ""} ${motorcycle.model || ""}`.trim()
+              }
+              onClose={() => setShowAllReviewsModal(false)}
+            />
+          )}
+
+          {/* ── RIGHT COLUMN — Booking Form ── */}
+          {motorcycle?.status === "inspection" ? (
+            <div className="md-form-card">
+              <div className="md-form-header">
+                <div>
+                  <h1
+                    style={{
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 16,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Temporarily Unavailable
+                  </h1>
+                </div>
+              </div>
+              <div className="md-form-body">
+                <div
+                  style={{
+                    background: "#fffbeb",
+                    border: "1.5px solid #fde68a",
+                    borderRadius: 12,
+                    padding: "20px",
+                    display: "flex",
+                    gap: 14,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <FaExclamationTriangle
+                    style={{
+                      color: "#f59e0b",
+                      fontSize: 24,
+                      marginTop: 2,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: "#78350f",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                      }}
+                    >
+                      Under Inspection
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "#92400e",
+                        fontFamily: "'Space Grotesk',sans-serif",
+                        marginTop: 8,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      This motorcycle is currently under inspection. We are
+                      doing our best to ensure it is in excellent condition and
+                      will make it available for booking as soon as the
+                      inspection is complete. Thank you for your patience and
+                      understanding.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : showAvailabilityCalendar ? (
+            <div className="md-form-card">
+              <div className="md-form-header">
+                <div>
+                  <h1
+                    style={{
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 16,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Vehicle Availability
+                  </h1>
+                  <p
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontSize: 12,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    This vehicle is currently rented or unavailable.
+                  </p>
+                </div>
+              </div>
+              <div className="md-form-body">
+                <InlineFullCalendar
+                  bookingRanges={bookingRanges}
+                  maintenanceRanges={currentMaintenanceRanges}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="md-form-card">
+              <div className="md-form-header">
+                <div>
+                  <h1
+                    style={{
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 16,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Reserve Your Ride
+                  </h1>
+                  <p
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontSize: 12,
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    Pay ₱{DOWNPAYMENT} downpayment to secure your booking
+                  </p>
+                </div>
+                <div
+                  style={{
+                    background: "#b50002",
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    padding: "6px 12px",
+                    borderRadius: 10,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Step {bookingStep} / 3
+                </div>
+              </div>
+
+              <div className="md-form-body">
+                <StepIndicator step={bookingStep} />
+
+                {/* ── STEP 1 ── */}
+                {bookingStep === 1 && (
+                  <form
+                    onSubmit={handleStep1Next}
+                    noValidate
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 16,
+                    }}
+                  >
+                    <p style={S.label}>Schedule</p>
+
+                    {/* <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setShowAvailabilityCalendar(true)}
+                        style={{
+                          ...S.btnSecondary,
+                          fontSize: 11,
+                          color: "#b50002",
+                          background: "rgba(181,0,2,0.06)",
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                        }}
+                      >
+                        <FaCalendarAlt size={10} /> View Full Calendar
+                      </button>
+                    </div> */}
+
+                    {showAvailabilityCalendar && (
+                      <AvailabilityCalendarModal
+                        onClose={() => setShowAvailabilityCalendar(false)}
+                        bookingRanges={bookingRanges}
+                        maintenanceRanges={currentMaintenanceRanges}
+                      />
+                    )}
+
+                    {noSlotsAvailable && formData.pickupDate === todayISO() && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1.5px solid rgba(181,0,2,0.2)",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          display: "flex",
+                          gap: 8,
+                          fontSize: 12,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                        }}
+                      >
+                        <FaExclamationTriangle
+                          style={{ flexShrink: 0, marginTop: 1 }}
+                        />
+                        No pickup hours available for today. Please select a
+                        future date.
+                      </div>
+                    )}
+
+                    {/* Pickup Date + Time */}
+                    <div className="md-grid-2">
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          height: "100%",
+                        }}
+                      >
+                        <label style={S.label}>Pickup Date</label>
+                        <p
+                          style={{
+                            fontSize: 10,
+                            color: "rgba(0,0,0,0.35)",
+                            marginBottom: 6,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          Select available dates
+                        </p>
+                        <div style={{ marginTop: "auto" }}>
+                          <InlineDatePicker
+                            value={formData.pickupDate}
+                            onChange={handlePickupDateChange}
+                            minDate={todayISO()}
+                            maxDate={addDaysToISODate(todayISO(), 7)}
+                            label="Pickup Date"
+                            mode="pickup"
+                            maintenanceRanges={currentMaintenanceRanges}
+                            bookingRanges={bookingRanges}
+                          />
                         </div>
                       </div>
-                      <span
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          height: "100%",
+                        }}
+                      >
+                        <label style={S.label}>Pickup Time</label>
+                        <div
+                          style={{
+                            marginTop: "auto",
+                            position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <FaClock
+                            style={{
+                              position: "absolute",
+                              left: 12,
+                              color: "#b50002",
+                              fontSize: 13,
+                              pointerEvents: "none",
+                              zIndex: 1,
+                            }}
+                          />
+                          <select
+                            name="pickupTime"
+                            value={formData.pickupTime}
+                            onChange={handleInputChange}
+                            style={S.select}
+                            required
+                            disabled={noSlotsAvailable}
+                          >
+                            {noSlotsAvailable ? (
+                              <option value="">No hours available</option>
+                            ) : (
+                              availablePickupSlots.map((s) => (
+                                <option key={s.value} value={s.value}>
+                                  {s.label}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 11,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Return Date + Time */}
+                    <div className="md-grid-2">
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          height: "100%",
+                        }}
+                      >
+                        <label style={S.label}>Return Date</label>
+                        <p
+                          style={{
+                            fontSize: 10,
+                            color: "rgba(0,0,0,0.35)",
+                            marginBottom: 6,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          Must be after pickup
+                        </p>
+                        <div style={{ marginTop: "auto" }}>
+                          <InlineDatePicker
+                            value={formData.returnDate}
+                            onChange={handleReturnDateChange}
+                            minDate={addDaysToISODate(formData.pickupDate, 1)}
+                            maxDate={getNextUnavailableDate(
+                              formData.pickupDate,
+                            )}
+                            label="Return Date"
+                            mode="return"
+                            pickupDateISO={formData.pickupDate}
+                            maintenanceRanges={currentMaintenanceRanges}
+                            bookingRanges={bookingRanges}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          height: "100%",
+                        }}
+                      >
+                        <label style={S.label}>Return Time</label>
+                        <div
+                          style={{
+                            marginTop: "auto",
+                            position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <FaClock
+                            style={{
+                              position: "absolute",
+                              left: 12,
+                              color: "#b50002",
+                              fontSize: 13,
+                              pointerEvents: "none",
+                              zIndex: 1,
+                            }}
+                          />
+                          <select
+                            name="returnTime"
+                            value={formData.returnTime}
+                            onChange={handleInputChange}
+                            style={S.select}
+                            required
+                          >
+                            {validReturnSlots.length > 0 ? (
+                              validReturnSlots.map((s) => (
+                                <option key={s.value} value={s.value}>
+                                  {s.label}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>
+                                No hours available
+                              </option>
+                            )}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 11,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selected date summary */}
+                    {(formData.pickupDate || formData.returnDate) && (
+                      <div
+                        style={{
+                          background: "#F5F5F3",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <FaCalendarAlt
+                            style={{ color: "#b50002", fontSize: 12 }}
+                          />
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#0E0E0E",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            {formData.pickupDate
+                              ? new Date(
+                                  formData.pickupDate + "T00:00:00",
+                                ).toLocaleDateString("en-PH", {
+                                  month: "short",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                            {" → "}
+                            {formData.returnDate
+                              ? new Date(
+                                  formData.returnDate + "T00:00:00",
+                                ).toLocaleDateString("en-PH", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "Select return"}
+                          </span>
+                        </div>
+                        {formData.returnDate && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: "#b50002",
+                              background: "rgba(181,0,2,0.08)",
+                              borderRadius: 999,
+                              padding: "3px 10px",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            {days} day{days !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <Field icon={FaMapMarkerAlt} label="Pickup Location">
+                      <input
+                        type="text"
+                        value={formData.pickupLocation}
+                        readOnly
+                        style={{ ...S.input, opacity: 0.55 }}
+                      />
+                    </Field>
+
+                    <div>
+                      {/* --- ADDED STATIC REGION BADGE --- */}
+                      {distanceTier?.label !==
+                        "Free Region (NCR / CALABARZON)" && (
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 10,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            background: "rgba(22,163,74,0.06)",
+                            color: "#16a34a",
+                            border: "1.5px solid rgba(22,163,74,0.2)",
+                            marginBottom: 12,
+                          }}
+                        >
+                          <FaMapMarkerAlt style={{ flexShrink: 0 }} />
+                          ~0 km — Free Region (NCR / CALABARZON) — Free
+                        </div>
+                      )}
+                      {/* --------------------------------- */}
+
+                      <p style={{ ...S.label, marginBottom: 8 }}>
+                        Primary Destination
+                      </p>
+                      <div
+                        style={
+                          errors.destination
+                            ? {
+                                borderRadius: 12,
+                                boxShadow: "0 0 0 1.5px #b50002",
+                                background: "#FDF0F0",
+                              }
+                            : undefined
+                        }
+                      >
+                        <DestinationSelect
+                          value={formData.destination}
+                          onChange={handleDestinationChange}
+                        />
+                      </div>
+                      {errors.destination && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#b50002",
+                            marginTop: 6,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {errors.destination}
+                        </p>
+                      )}
+                      {formData.destinationCity && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            padding: "8px 12px",
+                            borderRadius: 10,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            background:
+                              distanceFee === 0
+                                ? "rgba(22,163,74,0.06)"
+                                : "rgba(251,146,60,0.07)",
+                            color: distanceFee === 0 ? "#16a34a" : "#ea580c",
+                            border: `1.5px solid ${distanceFee === 0 ? "rgba(22,163,74,0.2)" : "rgba(251,146,60,0.2)"}`,
+                          }}
+                        >
+                          <FaMapMarkerAlt style={{ flexShrink: 0 }} />~
+                          {distanceKm} km — {distanceTier?.label}
+                          {distanceFee === 0
+                            ? " — Free"
+                            : `  — +₱${distanceFee}`}
+                          {isEstimate && " (est.)"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Helmet */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        background: "#F5F5F3",
+                        border: "1.5px solid rgba(0,0,0,0.07)",
+                        borderRadius: 14,
+                        padding: 16,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        id="wantsHelmet"
+                        name="wantsHelmet"
+                        checked={formData.wantsHelmet}
+                        onChange={handleInputChange}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          accentColor: "#b50002",
+                          cursor: "pointer",
+                          marginTop: 2,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <label
+                        htmlFor="wantsHelmet"
+                        style={{ flex: 1, cursor: "pointer" }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 3,
+                          }}
+                        >
+                          <GiFullMotorcycleHelmet
+                            style={{ color: "#b50002", fontSize: 15 }}
+                          />
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: "#0E0E0E",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            Additional Helmet
+                          </span>
+                          <span
+                            style={{
+                              marginLeft: "auto",
+                              color: "#b50002",
+                              fontWeight: 800,
+                              fontSize: 13,
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            +₱{HELMET_FEE}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "rgba(0,0,0,0.4)",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          Add an extra helmet for your passenger.
+                        </p>
+                      </label>
+                    </div>
+
+                    {/* Promo / loyalty code entry */}
+                    <div style={{ marginBottom: 16 }} ref={codePickerRef}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <label style={S.label}>Promo Code</label>
+                        {myPromoCodes.length > 0 && !manualDiscount && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCodePicker((v) => !v)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#b50002",
+                              cursor: "pointer",
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            Choose from my codes ({myPromoCodes.length})
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ position: "relative" }}>
+                        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                          <input
+                            type="text"
+                            value={promoCodeInput}
+                            onChange={(e) => {
+                              setPromoCodeInput(e.target.value.toUpperCase());
+                              if (promoCodeStatus !== "idle") {
+                                setPromoCodeStatus("idle");
+                                setPromoCodeMessage("");
+                              }
+                            }}
+                            placeholder="Enter promo or reward code"
+                            disabled={Boolean(manualDiscount)}
+                            style={{
+                              ...S.input,
+                              padding: "10px 12px",
+                              flex: 1,
+                              fontFamily: "monospace",
+                              letterSpacing: "1px",
+                              opacity: manualDiscount ? 0.6 : 1,
+                            }}
+                          />
+
+                          {manualDiscount ? (
+                            <button
+                              type="button"
+                              onClick={handleClearPromoCode}
+                              style={{
+                                ...S.btnSecondary,
+                                padding: "10px 16px",
+                                border: "1.5px solid rgba(0,0,0,0.1)",
+                                borderRadius: 10,
+                              }}
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleApplyPromoCode}
+                              disabled={
+                                !promoCodeInput.trim() ||
+                                promoCodeStatus === "checking"
+                              }
+                              style={{
+                                ...S.btnPrimary,
+                                padding: "10px 18px",
+                                opacity:
+                                  !promoCodeInput.trim() ||
+                                  promoCodeStatus === "checking"
+                                    ? 0.6
+                                    : 1,
+                                cursor:
+                                  !promoCodeInput.trim() ||
+                                  promoCodeStatus === "checking"
+                                    ? "not-allowed"
+                                    : "pointer",
+                              }}
+                            >
+                              {promoCodeStatus === "checking"
+                                ? "Checking..."
+                                : "Apply"}
+                            </button>
+                          )}
+
+                          {showCodePicker && myPromoCodes.length > 0 && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "calc(100% + 6px)",
+                                left: 0,
+                                right: 0,
+                                zIndex: 20,
+                                background: "#fff",
+                                border: "1.5px solid rgba(0,0,0,0.1)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                maxHeight: 220,
+                                overflowY: "auto",
+                                padding: 6,
+                              }}
+                            >
+                              {myPromoCodes.map((c) => (
+                                <button
+                                  key={c._id || c.code}
+                                  type="button"
+                                  onClick={() => handleSelectMyPromoCode(c)}
+                                  style={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 8,
+                                    background: "none",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    cursor: "pointer",
+                                    textAlign: "left",
+                                    fontFamily: "'Space Grotesk',sans-serif",
+                                  }}
+                                  onMouseEnter={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "rgba(181,0,2,0.06)")
+                                  }
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background = "none")
+                                  }
+                                >
+                                  <span style={{ minWidth: 0 }}>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontFamily: "monospace",
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: "#0E0E0E",
+                                      }}
+                                    >
+                                      {c.code}
+                                    </span>
+                                    {c.description && (
+                                      <span
+                                        style={{
+                                          display: "block",
+                                          fontSize: 10,
+                                          color: "rgba(0,0,0,0.4)",
+                                          marginTop: 2,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {c.description}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span
+                                    style={{
+                                      flexShrink: 0,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "#16a34a",
+                                      background: "rgba(22,163,74,0.08)",
+                                      border: "1px solid rgba(22,163,74,0.25)",
+                                      borderRadius: 6,
+                                      padding: "2px 6px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {c.discountType === "percentage"
+                                      ? `${c.discountValue}% off`
+                                      : `₱${c.discountValue} off`}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {promoCodeMessage && (
+                        <p
+                          style={{
+                            fontSize: 12,
+                            marginTop: 6,
+                            fontWeight: 600,
+                            color:
+                              promoCodeStatus === "valid"
+                                ? "#16a34a"
+                                : "#b50002",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          {promoCodeStatus === "valid" ? "✓ " : "✕ "}
+                          {promoCodeMessage}
+                        </p>
+                      )}
+                    </div>
+
+                    {formData.returnDate && (
+                      <PriceSummary
+                        price={price}
+                        days={days}
+                        baseRental={baseRental}
+                        distanceFee={distanceFee}
+                        helmetFee={helmetFee}
+                        totalAmount={totalAmount}
+                        discount={effectiveDiscount}
+                      />
+                    )}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: 24,
+                      }}
+                    >
+                      <p
                         style={{
                           fontSize: 11,
                           color: "rgba(0,0,0,0.35)",
                           fontFamily: "'Space Grotesk',sans-serif",
                         }}
                       >
-                        {new Date(
-                          r.createdAt || r.created_at || Date.now(),
-                        ).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        color: "rgba(0,0,0,0.65)",
-                        lineHeight: 1.65,
-                        fontFamily: "'Space Grotesk',sans-serif",
-                      }}
-                    >
-                      {r.feedbackDescription || r.comment || ""}
-                    </p>
-                    {r.adminReplyMessage && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          background: "rgba(181,0,2,0.04)",
-                          border: "1px solid rgba(181,0,2,0.1)",
-                          borderRadius: 10,
-                          padding: "8px 12px",
-                        }}
-                      >
-                        <p
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#b50002",
-                            fontFamily: "'Space Grotesk',sans-serif",
-                            marginBottom: 4,
-                          }}
-                        >
-                          Admin Reply
-                        </p>
-                        <p
-                          style={{
-                            fontSize: 12,
-                            color: "#0E0E0E",
-                            fontFamily: "'Space Grotesk',sans-serif",
-                          }}
-                        >
-                          {r.adminReplyMessage}
-                        </p>
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                        All hours in Philippine Standard Time
+                      </p>
                       <button
-                        className="md-vote-btn"
-                        disabled={votingReviewId === (r._id || r.id)}
-                        onClick={() => voteOnReview(r._id || r.id, "like")}
+                        type="submit"
+                        disabled={noSlotsAvailable}
                         style={{
-                          borderColor: "rgba(22,163,74,0.25)",
-                          background: "rgba(22,163,74,0.06)",
-                          color: "#16a34a",
+                          ...S.btnDark,
+                          opacity: noSlotsAvailable ? 0.5 : 1,
                         }}
                       >
-                        <FaThumbsUp size={10} /> Helpful (
-                        {r.helpfulLikeCount ?? 0})
-                      </button>
-                      <button
-                        className="md-vote-btn"
-                        disabled={votingReviewId === (r._id || r.id)}
-                        onClick={() => voteOnReview(r._id || r.id, "dislike")}
-                        style={{
-                          borderColor: "rgba(181,0,2,0.2)",
-                          background: "rgba(181,0,2,0.05)",
-                          color: "#b50002",
-                        }}
-                      >
-                        <FaThumbsDown size={10} /> Not Helpful (
-                        {r.helpfulDislikeCount ?? 0})
+                        Next <FaArrowRight size={10} />
                       </button>
                     </div>
-                  </div>
-                ))}
-            </div>
-          </div>
+                  </form>
+                )}
 
-          {/* ── RIGHT COLUMN — Booking Form ── */}
-          <div className="md-form-card">
-            <div className="md-form-header">
-              <div>
-                <h1
-                  style={{
-                    color: "#fff",
-                    fontWeight: 800,
-                    fontSize: 16,
-                    fontFamily: "'Space Grotesk',sans-serif",
-                    marginBottom: 2,
-                  }}
-                >
-                  Reserve Your Ride
-                </h1>
-                <p
-                  style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: 12,
-                    fontFamily: "'Space Grotesk',sans-serif",
-                  }}
-                >
-                  Pay ₱{DOWNPAYMENT} downpayment to secure your booking
-                </p>
-              </div>
-              <div
-                style={{
-                  background: "#b50002",
-                  color: "#fff",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  padding: "6px 12px",
-                  borderRadius: 10,
-                  fontFamily: "'Space Grotesk',sans-serif",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Step {bookingStep} / 3
-              </div>
-            </div>
-
-            <div className="md-form-body">
-              <StepIndicator step={bookingStep} />
-
-              {/* ── STEP 1 ── */}
-              {bookingStep === 1 && (
-                <form
-                  onSubmit={handleStep1Next}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
-                >
-                  <p style={S.label}>Schedule</p>
-
-                  {noSlotsAvailable && formData.pickupDate === todayISO() && (
-                    <div
-                      style={{
-                        background: "#fef2f2",
-                        border: "1.5px solid rgba(181,0,2,0.2)",
-                        borderRadius: 12,
-                        padding: "10px 14px",
-                        display: "flex",
-                        gap: 8,
-                        fontSize: 12,
-                        color: "#b50002",
-                        fontFamily: "'Space Grotesk',sans-serif",
-                      }}
-                    >
-                      <FaExclamationTriangle
-                        style={{ flexShrink: 0, marginTop: 1 }}
-                      />
-                      No pickup hours available for today. Please select a
-                      future date.
-                    </div>
-                  )}
-
-                  {/* Pickup Date + Time */}
-                  <div className="md-grid-2">
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        height: "100%",
-                      }}
-                    >
-                      <label style={S.label}>Pickup Date</label>
-                      <p
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(0,0,0,0.35)",
-                          marginBottom: 6,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        Select available dates
-                      </p>
-                      <div style={{ marginTop: "auto" }}>
-                        <InlineDatePicker
-                          value={formData.pickupDate}
-                          onChange={handlePickupDateChange}
-                          minDate={todayISO()}
-                          maxDate={null}
-                          label="Pickup Date"
-                          mode="pickup"
-                          maintenanceRanges={currentMaintenanceRanges}
-                          bookingRanges={bookingRanges}
-                        />
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        height: "100%",
-                      }}
-                    >
-                      <label style={S.label}>Pickup Time</label>
-                      <div
-                        style={{
-                          marginTop: "auto",
-                          position: "relative",
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <FaClock
-                          style={{
-                            position: "absolute",
-                            left: 12,
-                            color: "#b50002",
-                            fontSize: 13,
-                            pointerEvents: "none",
-                            zIndex: 1,
-                          }}
-                        />
-                        <select
-                          name="pickupTime"
-                          value={formData.pickupTime}
-                          onChange={handleInputChange}
-                          style={S.select}
-                          required
-                          disabled={noSlotsAvailable}
-                        >
-                          {noSlotsAvailable ? (
-                            <option value="">No hours available</option>
-                          ) : (
-                            availablePickupSlots.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                        <FaChevronDown
-                          style={{
-                            position: "absolute",
-                            right: 10,
-                            color: "rgba(0,0,0,0.3)",
-                            fontSize: 11,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Return Date + Time */}
-                  <div className="md-grid-2">
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        height: "100%",
-                      }}
-                    >
-                      <label style={S.label}>Return Date</label>
-                      <p
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(0,0,0,0.35)",
-                          marginBottom: 6,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        Must be after pickup
-                      </p>
-                      <div style={{ marginTop: "auto" }}>
-                        <InlineDatePicker
-                          value={formData.returnDate}
-                          onChange={handleReturnDateChange}
-                          minDate={addDaysToISODate(formData.pickupDate, 1)}
-                          maxDate={getNextUnavailableDate(formData.pickupDate)}
-                          label="Return Date"
-                          mode="return"
-                          pickupDateISO={formData.pickupDate}
-                          maintenanceRanges={currentMaintenanceRanges}
-                          bookingRanges={bookingRanges}
-                        />
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        height: "100%",
-                      }}
-                    >
-                      <label style={S.label}>Return Time</label>
-                      <div
-                        style={{
-                          marginTop: "auto",
-                          position: "relative",
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <FaClock
-                          style={{
-                            position: "absolute",
-                            left: 12,
-                            color: "#b50002",
-                            fontSize: 13,
-                            pointerEvents: "none",
-                            zIndex: 1,
-                          }}
-                        />
-                        <select
-                          name="returnTime"
-                          value={formData.returnTime}
-                          onChange={handleInputChange}
-                          style={S.select}
-                          required
-                        >
-                          {validReturnSlots.length > 0 ? (
-                            validReturnSlots.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))
-                          ) : (
-                            <option value="" disabled>
-                              No hours available
-                            </option>
-                          )}
-                        </select>
-                        <FaChevronDown
-                          style={{
-                            position: "absolute",
-                            right: 10,
-                            color: "rgba(0,0,0,0.3)",
-                            fontSize: 11,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Selected date summary */}
-                  {(formData.pickupDate || formData.returnDate) && (
-                    <div
-                      style={{
-                        background: "#F5F5F3",
-                        borderRadius: 12,
-                        padding: "10px 14px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <FaCalendarAlt
-                          style={{ color: "#b50002", fontSize: 12 }}
-                        />
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#0E0E0E",
-                            fontFamily: "'Space Grotesk',sans-serif",
-                          }}
-                        >
-                          {formData.pickupDate
-                            ? new Date(
-                                formData.pickupDate + "T00:00:00",
-                              ).toLocaleDateString("en-PH", {
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
-                          {" → "}
-                          {formData.returnDate
-                            ? new Date(
-                                formData.returnDate + "T00:00:00",
-                              ).toLocaleDateString("en-PH", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : "Select return"}
-                        </span>
-                      </div>
-                      {formData.returnDate && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 800,
-                            color: "#b50002",
-                            background: "rgba(181,0,2,0.08)",
-                            borderRadius: 999,
-                            padding: "3px 10px",
-                            fontFamily: "'Space Grotesk',sans-serif",
-                          }}
-                        >
-                          {days} day{days !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <Field icon={FaMapMarkerAlt} label="Pickup Location">
-                    <input
-                      type="text"
-                      value={formData.pickupLocation}
-                      readOnly
-                      style={{ ...S.input, opacity: 0.55 }}
-                    />
-                  </Field>
-
-                  <div>
-                    <p style={{ ...S.label, marginBottom: 8 }}>
-                      Primary Destination
-                    </p>
-                    <DestinationSelect
-                      value={formData.destination}
-                      onChange={handleDestinationChange}
-                    />
-                    {formData.destinationCity && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          padding: "8px 12px",
-                          borderRadius: 10,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          background:
-                            distanceFee === 0
-                              ? "rgba(22,163,74,0.06)"
-                              : "rgba(251,146,60,0.07)",
-                          color: distanceFee === 0 ? "#16a34a" : "#ea580c",
-                          border: `1.5px solid ${distanceFee === 0 ? "rgba(22,163,74,0.2)" : "rgba(251,146,60,0.2)"}`,
-                        }}
-                      >
-                        <FaMapMarkerAlt style={{ flexShrink: 0 }} />~
-                        {distanceKm} km — {distanceTier?.label}
-                        {distanceFee === 0 ? " — Free" : `  — +₱${distanceFee}`}
-                        {isEstimate && " (est.)"}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Helmet */}
-                  <div
+                {/* ── STEP 2 ── */}
+                {bookingStep === 2 && (
+                  <form
+                    onSubmit={handleStep2Next}
+                    noValidate
                     style={{
                       display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      background: "#F5F5F3",
-                      border: "1.5px solid rgba(0,0,0,0.07)",
-                      borderRadius: 14,
-                      padding: 16,
+                      flexDirection: "column",
+                      gap: 16,
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      id="wantsHelmet"
-                      name="wantsHelmet"
-                      checked={formData.wantsHelmet}
-                      onChange={handleInputChange}
-                      style={{
-                        width: 18,
-                        height: 18,
-                        accentColor: "#b50002",
-                        cursor: "pointer",
-                        marginTop: 2,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <label
-                      htmlFor="wantsHelmet"
-                      style={{ flex: 1, cursor: "pointer" }}
-                    >
-                      <div
+                    <div>
+                      <p style={S.label}>Renter Information</p>
+                      <p
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 3,
+                          fontSize: 12,
+                          color: "rgba(0,0,0,0.38)",
+                          fontFamily: "'Space Grotesk',sans-serif",
+                          marginTop: 2,
                         }}
                       >
-                        <GiFullMotorcycleHelmet
-                          style={{ color: "#b50002", fontSize: 15 }}
+                        Update your profile to change these details.
+                      </p>
+                    </div>
+                    <Field icon={FaUser} label="Full Name">
+                      <input
+                        type="text"
+                        value={formData.name}
+                        readOnly
+                        placeholder={
+                          loadingUserProfile ? "Loading…" : "Your full name"
+                        }
+                        style={{ ...S.input, opacity: 0.6 }}
+                      />
+                    </Field>
+                    <div className="md-grid-2">
+                      <Field icon={FaEnvelope} label="Email Address">
+                        <input
+                          type="email"
+                          value={formData.email}
+                          readOnly
+                          placeholder={
+                            loadingUserProfile ? "Loading…" : "Your email"
+                          }
+                          style={{ ...S.input, opacity: 0.6 }}
                         />
-                        <span
+                      </Field>
+                      <Field icon={FaPhone} label="Phone Number">
+                        <input
+                          type="tel"
+                          value={formData.phone}
+                          readOnly
+                          placeholder={
+                            loadingUserProfile ? "Loading…" : "Your phone"
+                          }
+                          style={{ ...S.input, opacity: 0.6 }}
+                        />
+                      </Field>
+                    </div>
+                    <div>
+                      <Field icon={FaMapMarkerAlt} label="Renter's Address">
+                        <input
+                          type="text"
+                          value={formData.fullAddress}
+                          readOnly
+                          placeholder={
+                            loadingUserProfile
+                              ? "Loading address…"
+                              : "Address from your profile"
+                          }
+                          style={{ ...S.input, opacity: 0.6 }}
+                        />
+                      </Field>
+                      {!formData.fullAddress && !loadingUserProfile && (
+                        <p
                           style={{
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: "#0E0E0E",
-                            fontFamily: "'Space Grotesk',sans-serif",
-                          }}
-                        >
-                          Additional Helmet
-                        </span>
-                        <span
-                          style={{
-                            marginLeft: "auto",
+                            fontSize: 12,
                             color: "#b50002",
-                            fontWeight: 800,
-                            fontSize: 13,
+                            marginTop: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
                             fontFamily: "'Space Grotesk',sans-serif",
                           }}
                         >
-                          +₱{HELMET_FEE}
+                          <FaInfoCircle /> No address found.{" "}
+                          <a
+                            href="/profile"
+                            style={{
+                              textDecoration: "underline",
+                              fontWeight: 600,
+                              color: "#b50002",
+                            }}
+                          >
+                            Update your profile
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: 24,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setBookingStep(1)}
+                        style={S.btnSecondary}
+                      >
+                        <FaArrowLeft size={10} /> Back
+                      </button>
+                      <button type="submit" style={S.btnDark}>
+                        Next <FaArrowRight size={10} />
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* ── STEP 3 ── */}
+                {bookingStep === 3 && (
+                  <form
+                    onSubmit={handleSubmit}
+                    noValidate
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                    }}
+                  >
+                    <p style={S.label}>Review Your Booking</p>
+
+                    {lockSecondsLeft !== null && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1.5px solid rgba(181,0,2,0.2)",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: "#b50002",
+                            fontWeight: 600,
+                            fontFamily: "'Space Grotesk',sans-serif",
+                          }}
+                        >
+                          Motorcycle held for checkout
                         </span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 800,
+                            color: "#b50002",
+                            fontFamily: "'Space Grotesk',sans-serif",
+                            letterSpacing: "1px",
+                          }}
+                        >
+                          {formatLockCountdown(lockSecondsLeft)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Schedule summary */}
+                    <div
+                      style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                    >
+                      <div
+                        onClick={() =>
+                          setIsScheduleCollapsed(!isScheduleCollapsed)
+                        }
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <p style={{ ...S.label, marginBottom: 0 }}>Schedule</p>
+                        <button
+                          type="button"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            transition: "transform 0.3s ease",
+                            transform: isScheduleCollapsed
+                              ? "rotate(0deg)"
+                              : "rotate(180deg)",
+                          }}
+                        >
+                          <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateRows: isScheduleCollapsed ? "0fr" : "1fr",
+                          opacity: isScheduleCollapsed ? 0 : 1,
+                          transition:
+                            "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                        }}
+                      >
+                        <div style={{ overflow: "hidden" }}>
+                          <div style={{ paddingTop: 10 }}>
+                            <ReviewRow
+                              label="Pickup"
+                              value={`${formData.pickupDate} at ${slotLabel(formData.pickupTime)}`}
+                            />
+                            <ReviewRow
+                              label="Return"
+                              value={`${formData.returnDate} at ${slotLabel(formData.returnTime)}`}
+                            />
+                            <ReviewRow
+                              label="Duration"
+                              value={`${days} day${days > 1 ? "s" : ""}`}
+                            />
+                            <ReviewRow
+                              label="Destination"
+                              value={formData.destination}
+                            />
+                            <ReviewRow
+                              label="Pickup Location"
+                              value={formData.pickupLocation}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Renter summary */}
+                    <div
+                      style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                    >
+                      <div
+                        onClick={() => setIsRenterCollapsed(!isRenterCollapsed)}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <p style={{ ...S.label, marginBottom: 0 }}>Renter</p>
+                        <button
+                          type="button"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            transition: "transform 0.3s ease",
+                            transform: isRenterCollapsed
+                              ? "rotate(0deg)"
+                              : "rotate(180deg)",
+                          }}
+                        >
+                          <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateRows: isRenterCollapsed ? "0fr" : "1fr",
+                          opacity: isRenterCollapsed ? 0 : 1,
+                          transition:
+                            "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                        }}
+                      >
+                        <div style={{ overflow: "hidden" }}>
+                          <div style={{ paddingTop: 10 }}>
+                            <ReviewRow label="Name" value={formData.name} />
+                            <ReviewRow label="Email" value={formData.email} />
+                            <ReviewRow label="Phone" value={formData.phone} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pricing summary */}
+                    <div
+                      style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
+                    >
+                      <div
+                        onClick={() =>
+                          setIsPricingCollapsed(!isPricingCollapsed)
+                        }
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <p style={{ ...S.label, marginBottom: 0 }}>Pricing</p>
+                        <button
+                          type="button"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            transition: "transform 0.3s ease",
+                            transform: isPricingCollapsed
+                              ? "rotate(0deg)"
+                              : "rotate(180deg)",
+                          }}
+                        >
+                          <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateRows: isPricingCollapsed ? "0fr" : "1fr",
+                          opacity: isPricingCollapsed ? 0 : 1,
+                          transition:
+                            "grid-template-rows 0.3s ease, opacity 0.3s ease",
+                        }}
+                      >
+                        <div style={{ overflow: "hidden" }}>
+                          <div style={{ paddingTop: 10 }}>
+                            <ReviewRow
+                              label={`₱${price} × ${days} day${days > 1 ? "s" : ""}`}
+                              value={`₱${baseRental}`}
+                            />
+                            {discountAmount > 0 && (
+                              <ReviewRow
+                                label={`Discount${effectiveDiscount?.code ? ` (${effectiveDiscount.code})` : ""}`}
+                                value={`−₱${Math.round(discountAmount)}`}
+                                deduct
+                              />
+                            )}
+                            {distanceFee > 0 && (
+                              <ReviewRow
+                                label={`Distance (${distanceTier?.label})`}
+                                value={`+₱${distanceFee}`}
+                                accent
+                              />
+                            )}
+                            {formData.wantsHelmet && (
+                              <ReviewRow
+                                label="Extra Helmet"
+                                value={`+₱${HELMET_FEE}`}
+                                accent
+                              />
+                            )}
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginTop: 10,
+                                paddingTop: 10,
+                                borderTop: "1.5px solid rgba(0,0,0,0.08)",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "1px",
+                                  color: "#0E0E0E",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                Total
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 800,
+                                  color: "#0E0E0E",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                ₱{totalAmount}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginTop: 4,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "rgba(0,0,0,0.4)",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                Downpayment (paid now)
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: "#16a34a",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                −₱{DOWNPAYMENT}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginTop: 4,
+                                paddingTop: 8,
+                                borderTop: "1.5px solid rgba(0,0,0,0.08)",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "1px",
+                                  color: "#0E0E0E",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                Due at Pickup
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 800,
+                                  color: "#b50002",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                ₱{dueAtPickup}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payment section */}
+                    <div style={{ ...S.card, padding: 18 }}>
+                      <p style={{ ...S.label, marginBottom: 14 }}>
+                        Downpayment — ₱{DOWNPAYMENT}
+                      </p>
+                      <div style={{ marginBottom: 12 }}>
+                        <Field icon={FaCreditCard} label="Payment Method">
+                          <select
+                            name="reservationPaymentMethod"
+                            value={formData.reservationPaymentMethod}
+                            onChange={handleInputChange}
+                            style={S.select}
+                            required
+                          >
+                            {activePaymentMethods.map((m) => (
+                              <option key={m._id || m.name} value={m.name}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                          <FaChevronDown
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              color: "rgba(0,0,0,0.3)",
+                              fontSize: 11,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </Field>
                       </div>
                       <p
                         style={{
                           fontSize: 12,
                           color: "rgba(0,0,0,0.4)",
+                          marginBottom: 12,
                           fontFamily: "'Space Grotesk',sans-serif",
                         }}
                       >
-                        Add an extra helmet for your passenger.
+                        Send ₱{DOWNPAYMENT} via{" "}
+                        {formData.reservationPaymentMethod}, then upload proof
+                        below.
                       </p>
-                    </label>
-                  </div>
-
-                  {formData.returnDate && (
-                    <PriceSummary
-                      price={price}
-                      days={days}
-                      baseRental={baseRental}
-                      distanceFee={distanceFee}
-                      helmetFee={helmetFee}
-                      totalAmount={totalAmount}
-                      discount={applicableDiscount}
-                    />
-                  )}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginTop: 24,
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: "rgba(0,0,0,0.35)",
-                        fontFamily: "'Space Grotesk',sans-serif",
-                      }}
-                    >
-                      All times in Philippine Standard Time
-                    </p>
-                    <button
-                      type="submit"
-                      disabled={noSlotsAvailable}
-                      style={{
-                        ...S.btnDark,
-                        opacity: noSlotsAvailable ? 0.5 : 1,
-                      }}
-                    >
-                      Next <FaArrowRight size={10} />
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* ── STEP 2 ── */}
-              {bookingStep === 2 && (
-                <form
-                  onSubmit={handleStep2Next}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
-                >
-                  <div>
-                    <p style={S.label}>Renter Information</p>
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(0,0,0,0.38)",
-                        fontFamily: "'Space Grotesk',sans-serif",
-                        marginTop: 2,
-                      }}
-                    >
-                      Update your profile to change these details.
-                    </p>
-                  </div>
-                  <Field icon={FaUser} label="Full Name">
-                    <input
-                      type="text"
-                      value={formData.name}
-                      readOnly
-                      placeholder={
-                        loadingUserProfile ? "Loading…" : "Your full name"
-                      }
-                      style={{ ...S.input, opacity: 0.6 }}
-                    />
-                  </Field>
-                  <div className="md-grid-2">
-                    <Field icon={FaEnvelope} label="Email Address">
-                      <input
-                        type="email"
-                        value={formData.email}
-                        readOnly
-                        placeholder={
-                          loadingUserProfile ? "Loading…" : "Your email"
-                        }
-                        style={{ ...S.input, opacity: 0.6 }}
-                      />
-                    </Field>
-                    <Field icon={FaPhone} label="Phone Number">
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        readOnly
-                        placeholder={
-                          loadingUserProfile ? "Loading…" : "Your phone"
-                        }
-                        style={{ ...S.input, opacity: 0.6 }}
-                      />
-                    </Field>
-                  </div>
-                  <div>
-                    <Field icon={FaMapMarkerAlt} label="Renter's Address">
-                      <input
-                        type="text"
-                        value={formData.fullAddress}
-                        readOnly
-                        placeholder={
-                          loadingUserProfile
-                            ? "Loading address…"
-                            : "Address from your profile"
-                        }
-                        style={{ ...S.input, opacity: 0.6 }}
-                      />
-                    </Field>
-                    {!formData.fullAddress && !loadingUserProfile && (
-                      <p
-                        style={{
-                          fontSize: 12,
-                          color: "#b50002",
-                          marginTop: 4,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        <FaInfoCircle /> No address found.{" "}
-                        <a
-                          href="/profile"
-                          style={{
-                            textDecoration: "underline",
-                            fontWeight: 600,
-                            color: "#b50002",
-                          }}
-                        >
-                          Update your profile
-                        </a>
-                      </p>
-                    )}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginTop: 24,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setBookingStep(1)}
-                      style={S.btnSecondary}
-                    >
-                      <FaArrowLeft size={10} /> Back
-                    </button>
-                    <button type="submit" style={S.btnDark}>
-                      Next <FaArrowRight size={10} />
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* ── STEP 3 ── */}
-              {bookingStep === 3 && (
-                <form
-                  onSubmit={handleSubmit}
-                  style={{ display: "flex", flexDirection: "column", gap: 14 }}
-                >
-                  <p style={S.label}>Review Your Booking</p>
-
-                  {lockSecondsLeft !== null && (
-                    <div
-                      style={{
-                        background: "#fef2f2",
-                        border: "1.5px solid rgba(181,0,2,0.2)",
-                        borderRadius: 12,
-                        padding: "10px 14px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "#b50002",
-                          fontWeight: 600,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        Motorcycle held for checkout
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 800,
-                          color: "#b50002",
-                          fontFamily: "'Space Grotesk',sans-serif",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {formatLockCountdown(lockSecondsLeft)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Schedule summary */}
-                  <div
-                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
-                  >
-                    <div
-                      onClick={() =>
-                        setIsScheduleCollapsed(!isScheduleCollapsed)
-                      }
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <p style={{ ...S.label, marginBottom: 0 }}>Schedule</p>
-                      <button
-                        type="button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "transform 0.3s ease",
-                          transform: isScheduleCollapsed
-                            ? "rotate(0deg)"
-                            : "rotate(180deg)",
-                        }}
-                      >
-                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateRows: isScheduleCollapsed ? "0fr" : "1fr",
-                        opacity: isScheduleCollapsed ? 0 : 1,
-                        transition:
-                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
-                      }}
-                    >
-                      <div style={{ overflow: "hidden" }}>
-                        <div style={{ paddingTop: 10 }}>
-                          <ReviewRow
-                            label="Pickup"
-                            value={`${formData.pickupDate} at ${slotLabel(formData.pickupTime)}`}
-                          />
-                          <ReviewRow
-                            label="Return"
-                            value={`${formData.returnDate} at ${slotLabel(formData.returnTime)}`}
-                          />
-                          <ReviewRow
-                            label="Duration"
-                            value={`${days} day${days > 1 ? "s" : ""}`}
-                          />
-                          <ReviewRow
-                            label="Destination"
-                            value={formData.destination}
-                          />
-                          <ReviewRow
-                            label="Pickup Location"
-                            value={formData.pickupLocation}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Renter summary */}
-                  <div
-                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
-                  >
-                    <div
-                      onClick={() => setIsRenterCollapsed(!isRenterCollapsed)}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <p style={{ ...S.label, marginBottom: 0 }}>Renter</p>
-                      <button
-                        type="button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "transform 0.3s ease",
-                          transform: isRenterCollapsed
-                            ? "rotate(0deg)"
-                            : "rotate(180deg)",
-                        }}
-                      >
-                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateRows: isRenterCollapsed ? "0fr" : "1fr",
-                        opacity: isRenterCollapsed ? 0 : 1,
-                        transition:
-                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
-                      }}
-                    >
-                      <div style={{ overflow: "hidden" }}>
-                        <div style={{ paddingTop: 10 }}>
-                          <ReviewRow label="Name" value={formData.name} />
-                          <ReviewRow label="Email" value={formData.email} />
-                          <ReviewRow label="Phone" value={formData.phone} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pricing summary */}
-                  <div
-                    style={{ ...S.card, background: "#F5F5F3", padding: 16 }}
-                  >
-                    <div
-                      onClick={() => setIsPricingCollapsed(!isPricingCollapsed)}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <p style={{ ...S.label, marginBottom: 0 }}>Pricing</p>
-                      <button
-                        type="button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: 0,
-                          transition: "transform 0.3s ease",
-                          transform: isPricingCollapsed
-                            ? "rotate(0deg)"
-                            : "rotate(180deg)",
-                        }}
-                      >
-                        <FaChevronDown color="rgba(0,0,0,0.4)" size={12} />
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateRows: isPricingCollapsed ? "0fr" : "1fr",
-                        opacity: isPricingCollapsed ? 0 : 1,
-                        transition:
-                          "grid-template-rows 0.3s ease, opacity 0.3s ease",
-                      }}
-                    >
-                      <div style={{ overflow: "hidden" }}>
-                        <div style={{ paddingTop: 10 }}>
-                          <ReviewRow
-                            label={`₱${price} × ${days} day${days > 1 ? "s" : ""}`}
-                            value={`₱${baseRental}`}
-                          />
-                          {distanceFee > 0 && (
-                            <ReviewRow
-                              label={`Distance (${distanceTier?.label})`}
-                              value={`+₱${distanceFee}`}
-                              accent
-                            />
-                          )}
-                          {formData.wantsHelmet && (
-                            <ReviewRow
-                              label="Extra Helmet"
-                              value={`+₱${HELMET_FEE}`}
-                              accent
-                            />
-                          )}
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginTop: 10,
-                              paddingTop: 10,
-                              borderTop: "1.5px solid rgba(0,0,0,0.08)",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 800,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                color: "#0E0E0E",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              Total
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 800,
-                                color: "#0E0E0E",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              ₱{totalAmount}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginTop: 4,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "rgba(0,0,0,0.4)",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              Downpayment (paid now)
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: "#16a34a",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              −₱{DOWNPAYMENT}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginTop: 4,
-                              paddingTop: 8,
-                              borderTop: "1.5px solid rgba(0,0,0,0.08)",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 800,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                color: "#0E0E0E",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              Due at Pickup
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 800,
-                                color: "#b50002",
-                                fontFamily: "'Space Grotesk',sans-serif",
-                              }}
-                            >
-                              ₱{dueAtPickup}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment section */}
-                  <div style={{ ...S.card, padding: 18 }}>
-                    <p style={{ ...S.label, marginBottom: 14 }}>
-                      Downpayment — ₱{DOWNPAYMENT}
-                    </p>
-                    <div style={{ marginBottom: 12 }}>
-                      <Field icon={FaCreditCard} label="Payment Method">
-                        <select
-                          name="reservationPaymentMethod"
-                          value={formData.reservationPaymentMethod}
-                          onChange={handleInputChange}
-                          style={S.select}
-                          required
-                        >
-                          <option value="GCash">GCash</option>
-                          <option value="PayMaya">PayMaya</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                        </select>
-                        <FaChevronDown
-                          style={{
-                            position: "absolute",
-                            right: 10,
-                            color: "rgba(0,0,0,0.3)",
-                            fontSize: 11,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      </Field>
-                    </div>
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(0,0,0,0.4)",
-                        marginBottom: 12,
-                        fontFamily: "'Space Grotesk',sans-serif",
-                      }}
-                    >
-                      Send ₱{DOWNPAYMENT} via{" "}
-                      {formData.reservationPaymentMethod}, then upload proof
-                      below.
-                    </p>
-                    <div
-                      style={{
-                        background: "#F5F5F3",
-                        border: "1.5px solid rgba(0,0,0,0.07)",
-                        borderRadius: 14,
-                        padding: 16,
-                        marginBottom: 14,
-                        textAlign: "center",
-                      }}
-                    >
-                      <p
-                        style={{
-                          ...S.label,
-                          marginBottom: 10,
-                          textAlign: "left",
-                        }}
-                      >
-                        Scan QR to Pay
-                      </p>
-                      <img
-                        src={selectedQrPath}
-                        alt={`${formData.reservationPaymentMethod} QR`}
-                        style={{
-                          width: 180,
-                          maxWidth: "100%",
-                          borderRadius: 12,
-                          border: "1.5px solid rgba(0,0,0,0.08)",
-                          display: "block",
-                          margin: "0 auto",
-                        }}
-                      />
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "rgba(0,0,0,0.35)",
-                          marginTop: 8,
-                          fontFamily: "'Space Grotesk',sans-serif",
-                        }}
-                      >
-                        QR shown is for {formData.reservationPaymentMethod}
-                      </p>
-                    </div>
-                    <div className="md-grid-2" style={{ marginBottom: 12 }}>
-                      <Field icon={FaReceipt} label="Reference ID">
-                        <input
-                          type="text"
-                          name="paymentReferenceId"
-                          value={formData.paymentReferenceId}
-                          onChange={handleInputChange}
-                          style={S.input}
-                          placeholder="e.g. GCash12345678"
-                          required
-                        />
-                      </Field>
-                      <Field icon={FaClock} label="Payment Sent Time">
-                        <input
-                          type="datetime-local"
-                          name="paymentSentAt"
-                          value={formData.paymentSentAt}
-                          onChange={handleInputChange}
-                          style={S.input}
-                          required
-                        />
-                      </Field>
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <Field icon={FaCreditCard} label="Amount Sent">
-                        <input
-                          type="number"
-                          name="paymentSentAmount"
-                          min={DOWNPAYMENT}
-                          max={DOWNPAYMENT}
-                          value={formData.paymentSentAmount}
-                          onChange={handleInputChange}
-                          style={{ ...S.input, opacity: 0.7 }}
-                          readOnly
-                          required
-                        />
-                      </Field>
-                    </div>
-                    <div>
-                      <p style={S.label}>Payment Proof (Image)</p>
                       <div
                         style={{
                           background: "#F5F5F3",
-                          border: "1.5px solid rgba(0,0,0,0.09)",
-                          borderRadius: 10,
-                          padding: "10px 14px",
+                          border: "1.5px solid rgba(0,0,0,0.07)",
+                          borderRadius: 14,
+                          padding: 16,
+                          marginBottom: 14,
+                          textAlign: "center",
                         }}
                       >
-                        <input
-                          type="file"
-                          name="paymentProofImage"
-                          accept="image/*"
-                          onChange={handleInputChange}
+                        <p
                           style={{
-                            fontSize: 13,
-                            fontFamily: "'Space Grotesk',sans-serif",
-                            width: "100%",
+                            ...S.label,
+                            marginBottom: 10,
+                            textAlign: "left",
                           }}
-                          required
+                        >
+                          Scan QR to Pay
+                        </p>
+                        <img
+                          src={selectedQrPath}
+                          alt={`${formData.reservationPaymentMethod} QR`}
+                          style={{
+                            width: 180,
+                            maxWidth: "100%",
+                            borderRadius: 12,
+                            border: "1.5px solid rgba(0,0,0,0.08)",
+                            display: "block",
+                            margin: "0 auto",
+                          }}
                         />
                         <p
                           style={{
                             fontSize: 11,
                             color: "rgba(0,0,0,0.35)",
-                            marginTop: 6,
+                            marginTop: 8,
                             fontFamily: "'Space Grotesk',sans-serif",
                           }}
                         >
-                          Upload a screenshot showing the reference ID, amount,
-                          and time.
+                          QR shown is for {formData.reservationPaymentMethod}
                         </p>
                       </div>
+                      <div className="md-grid-2" style={{ marginBottom: 12 }}>
+                        <Field
+                          icon={FaReceipt}
+                          label="Reference ID"
+                          error={errors.paymentReferenceId}
+                        >
+                          <input
+                            type="text"
+                            name="paymentReferenceId"
+                            value={formData.paymentReferenceId}
+                            onChange={handleInputChange}
+                            style={
+                              errors.paymentReferenceId ? S.inputError : S.input
+                            }
+                            placeholder="e.g. GCash12345678"
+                            required
+                          />
+                        </Field>
+                        <Field
+                          icon={FaClock}
+                          label="Payment Sent Time"
+                          error={errors.paymentSentAt}
+                        >
+                          <input
+                            type="datetime-local"
+                            name="paymentSentAt"
+                            value={formData.paymentSentAt}
+                            onChange={handleInputChange}
+                            style={
+                              errors.paymentSentAt ? S.inputError : S.input
+                            }
+                            required
+                          />
+                        </Field>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <Field icon={FaCreditCard} label="Amount Sent">
+                          <input
+                            type="number"
+                            name="paymentSentAmount"
+                            min={DOWNPAYMENT}
+                            max={DOWNPAYMENT}
+                            value={formData.paymentSentAmount}
+                            onChange={handleInputChange}
+                            style={{ ...S.input, opacity: 0.7 }}
+                            readOnly
+                            required
+                          />
+                        </Field>
+                      </div>
+                      <div>
+                        <p style={S.label}>Payment Proof (Image)</p>
+                        <div
+                          style={{
+                            background: errors.paymentProofImage
+                              ? "#FDF0F0"
+                              : "#F5F5F3",
+                            border: errors.paymentProofImage
+                              ? "1.5px solid #b50002"
+                              : "1.5px solid rgba(0,0,0,0.09)",
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                          }}
+                        >
+                          <input
+                            type="file"
+                            name="paymentProofImage"
+                            accept={ALLOWED_PROOF_IMAGE_TYPES.join(",")}
+                            onChange={handleInputChange}
+                            style={{
+                              fontSize: 13,
+                              fontFamily: "'Space Grotesk',sans-serif",
+                              width: "100%",
+                            }}
+                            required
+                          />
+                          <p
+                            style={{
+                              fontSize: 11,
+                              color: "rgba(0,0,0,0.35)",
+                              marginTop: 6,
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            Upload a screenshot showing the reference ID,
+                            amount, and time. JPG, PNG, WEBP, or HEIC, up to 5
+                            MB.
+                          </p>
+                          {paymentProofPreviewUrl && (
+                            <div
+                              style={{
+                                marginTop: 10,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setIsPaymentProofZoomed(true)}
+                                title="Click to zoom in"
+                                style={{
+                                  padding: 0,
+                                  border: "1.5px solid rgba(0,0,0,0.1)",
+                                  borderRadius: 8,
+                                  overflow: "hidden",
+                                  background: "#fff",
+                                  cursor: "zoom-in",
+                                  width: 64,
+                                  height: 64,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <img
+                                  src={paymentProofPreviewUrl}
+                                  alt="Payment proof preview"
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    display: "block",
+                                  }}
+                                />
+                              </button>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "rgba(0,0,0,0.4)",
+                                  fontFamily: "'Space Grotesk',sans-serif",
+                                }}
+                              >
+                                {formData.paymentProofImage?.name ||
+                                  "Image selected"}{" "}
+                                — click to preview
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {errors.paymentProofImage && (
+                          <p
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: "#b50002",
+                              marginTop: 6,
+                              fontFamily: "'Space Grotesk',sans-serif",
+                            }}
+                          >
+                            {errors.paymentProofImage}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div
-                    style={{
-                      background: "#fffbeb",
-                      border: "1.5px solid #fde68a",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      display: "flex",
-                      gap: 8,
-                      fontSize: 12,
-                      color: "#92400e",
-                      fontFamily: "'Space Grotesk',sans-serif",
-                    }}
-                  >
-                    <FaInfoCircle style={{ marginTop: 2, flexShrink: 0 }} />
-                    <span>
-                      Your booking will be marked as Pending Reservation while
-                      admin verifies your payment proof.
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginTop: 24,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      style={S.btnSecondary}
-                      onClick={async () => {
-                        clearLockTimer();
-                        await releaseCheckoutLock(true);
-                        setCheckoutLock({
-                          expiresAt: "",
-                          lockMinutes: CHECKOUT_LOCK_FALLBACK_MINUTES,
-                        });
-                        setBookingStep(2);
-                      }}
-                    >
-                      <FaArrowLeft size={10} /> Back
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={
-                        submitting ||
-                        loadingUserProfile ||
-                        hasSubmittedRef.current
-                      }
+                    <div
                       style={{
-                        ...S.btnDark,
-                        opacity: submitting ? 0.6 : 1,
+                        background: "#fffbeb",
+                        border: "1.5px solid #fde68a",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                        display: "flex",
                         gap: 8,
+                        fontSize: 12,
+                        color: "#92400e",
+                        fontFamily: "'Space Grotesk',sans-serif",
                       }}
                     >
-                      <FaCheckCircle size={11} />
-                      {submitting ? "Submitting…" : "Submit Proof & Confirm"}
-                    </button>
-                  </div>
-                </form>
-              )}
+                      <FaInfoCircle style={{ marginTop: 2, flexShrink: 0 }} />
+                      <span>
+                        Your booking will be marked as Pending Reservation while
+                        admin verifies your payment proof.
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: 24,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        style={S.btnSecondary}
+                        onClick={async () => {
+                          clearLockTimer();
+                          await releaseCheckoutLock(true);
+                          setCheckoutLock({
+                            expiresAt: "",
+                            lockMinutes: CHECKOUT_LOCK_FALLBACK_MINUTES,
+                          });
+                          setBookingStep(2);
+                        }}
+                      >
+                        <FaArrowLeft size={10} /> Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={
+                          submitting ||
+                          loadingUserProfile ||
+                          hasSubmittedRef.current
+                        }
+                        style={{
+                          ...S.btnDark,
+                          opacity: submitting ? 0.6 : 1,
+                          gap: 8,
+                        }}
+                      >
+                        <FaCheckCircle size={11} />
+                        {submitting ? "Submitting…" : "Submit Proof & Confirm"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </>

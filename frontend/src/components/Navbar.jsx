@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FaBars, FaTimes, FaUser, FaSignOutAlt } from "react-icons/fa";
+import {
+  FaBars,
+  FaTimes,
+  FaUser,
+  FaSignOutAlt,
+  FaBell,
+  FaHeart,
+} from "react-icons/fa";
 import logo from "../assets/logo.png";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
+import {
+  getFavoritesCount,
+  refreshFavorites,
+  FAVORITES_CHANGED_EVENT,
+} from "../utils/favorites";
 
 const LOGOUT_ENDPOINT = "/api/auth/logout";
 const ME_ENDPOINT = "/api/auth/me";
 const MY_BOOKINGS_ENDPOINT = "/api/motorcycle-bookings/mybooking";
+const NOTIFICATIONS_ENDPOINT = "/api/notifications";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -15,6 +28,11 @@ const navLinks = [
   { to: "/contact", label: "Contact" },
   { to: "/bookings", label: "Bookings" },
 ];
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { Accept: "application/json" },
+});
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,17 +52,21 @@ const Navbar = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [reuploadBadgeCount, setReuploadBadgeCount] = useState(0);
 
+  // Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Favorites State
+  const [favoritesCount, setFavoritesCount] = useState(0);
+
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
   const userMenuRef = useRef(null);
+  const notifMenuRef = useRef(null);
   const abortRef = useRef(null);
-
-  const api = axios.create({
-    baseURL: API_BASE_URL,
-    headers: { Accept: "application/json" },
-  });
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -52,38 +74,50 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const validateToken = useCallback(
-    async (signal) => {
-      const token = localStorage.getItem("token");
-      if (!token) {
+  // Keep the Favorites badge count in sync — both across tabs (native
+  // "storage" event) and within the same tab (custom event dispatched
+  // whenever a heart icon is toggled anywhere in the app).
+  useEffect(() => {
+    const syncFavorites = () => setFavoritesCount(getFavoritesCount());
+    syncFavorites();
+    window.addEventListener("storage", syncFavorites);
+    window.addEventListener(FAVORITES_CHANGED_EVENT, syncFavorites);
+    return () => {
+      window.removeEventListener("storage", syncFavorites);
+      window.removeEventListener(FAVORITES_CHANGED_EVENT, syncFavorites);
+    };
+  }, []);
+
+  const validateToken = useCallback(async (signal) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsLoggedIn(false);
+      setUser(null);
+      return;
+    }
+    try {
+      const res = await api.get(ME_ENDPOINT, {
+        signal,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const profile = res?.data?.user ?? res?.data ?? null;
+      setIsLoggedIn(true);
+      setUser(profile);
+      if (profile) {
+        try {
+          localStorage.setItem("user", JSON.stringify(profile));
+        } catch {}
+        refreshFavorites();
+      }
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         setIsLoggedIn(false);
         setUser(null);
-        return;
       }
-      try {
-        const res = await api.get(ME_ENDPOINT, {
-          signal,
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const profile = res?.data?.user ?? res?.data ?? null;
-        setIsLoggedIn(true);
-        setUser(profile);
-        if (profile) {
-          try {
-            localStorage.setItem("user", JSON.stringify(profile));
-          } catch {}
-        }
-      } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setIsLoggedIn(false);
-          setUser(null);
-        }
-      }
-    },
-    [api],
-  );
+    }
+  }, []);
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -112,6 +146,7 @@ const Navbar = () => {
   const handleLogout = useCallback(async () => {
     setShowLogoutConfirm(false);
     setShowUserMenu(false);
+    setShowNotifications(false);
     const token = localStorage.getItem("token");
     if (token) {
       try {
@@ -130,12 +165,16 @@ const Navbar = () => {
     setIsLoggedIn(false);
     setUser(null);
     setIsOpen(false);
+
+    refreshFavorites(); // no token now -> clears the favorites cache/badge
+
     navigate("/", { replace: true });
   }, [navigate, api]);
 
   useEffect(() => {
     setIsOpen(false);
     setShowUserMenu(false);
+    setShowNotifications(false);
     setShowLogoutConfirm(false);
     setIsLoggedIn(!!localStorage.getItem("token"));
     try {
@@ -146,6 +185,7 @@ const Navbar = () => {
     }
   }, [location]);
 
+  // Handle clicking outside of menus/dropdowns
   useEffect(() => {
     const handler = (e) => {
       if (
@@ -154,30 +194,41 @@ const Navbar = () => {
         buttonRef.current &&
         !menuRef.current.contains(e.target) &&
         !buttonRef.current.contains(e.target)
-      )
+      ) {
         setIsOpen(false);
+      }
       if (
         showUserMenu &&
         userMenuRef.current &&
         !userMenuRef.current.contains(e.target)
-      )
+      ) {
         setShowUserMenu(false);
+      }
+      if (
+        showNotifications &&
+        notifMenuRef.current &&
+        !notifMenuRef.current.contains(e.target)
+      ) {
+        setShowNotifications(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen, showUserMenu]);
+  }, [isOpen, showUserMenu, showNotifications]);
 
+  // Handle escape key
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "Escape") {
         if (isOpen) setIsOpen(false);
         if (showUserMenu) setShowUserMenu(false);
         if (showLogoutConfirm) setShowLogoutConfirm(false);
+        if (showNotifications) setShowNotifications(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, showUserMenu, showLogoutConfirm]);
+  }, [isOpen, showUserMenu, showLogoutConfirm, showNotifications]);
 
   useEffect(() => {
     const handler = () => {
@@ -187,13 +238,17 @@ const Navbar = () => {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  const fetchBadge = useCallback(async () => {
+  // Fetch Booking Data (for the re-upload badge) and Notifications
+  const fetchUserData = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setReuploadBadgeCount(0);
+      setNotifications([]);
+      setUnreadCount(0);
       return;
     }
-    if (location.pathname.startsWith("/bookings")) return;
+
+    // 1. Re-upload badge count is still derived from the bookings list.
     try {
       const res = await api.get(MY_BOOKINGS_ENDPOINT, {
         headers: { Authorization: `Bearer ${token}` },
@@ -202,20 +257,80 @@ const Navbar = () => {
       const raw = Array.isArray(res.data)
         ? res.data
         : res.data?.data || res.data?.bookings || [];
-      const count = raw.filter(
+
+      const uploadCount = raw.filter(
         (b) =>
           !b?.isDeleted &&
           (b?.requiresProofReupload || b?.paymentStatus === "rejected"),
       ).length;
-      setReuploadBadgeCount(count);
+      setReuploadBadgeCount(uploadCount);
     } catch {
       setReuploadBadgeCount(0);
     }
-  }, [location.pathname, api]);
+
+    // 2. Notifications are now persisted server-side (see
+    // notificationService.js + /api/notifications) instead of being
+    // re-derived from bookings and filtered through localStorage on every
+    // load. This means read/unread + cleared state is the same no matter
+    // which browser, tab, or device you're on.
+    try {
+      const res = await api.get(NOTIFICATIONS_ENDPOINT, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 8000,
+      });
+      const list = res.data?.data || [];
+      const normalized = list.map((n) => ({
+        id: n._id,
+        bookingId: n.booking,
+        title: n.title,
+        message: n.message,
+        date: n.createdAt,
+        step: n.step,
+        read: n.read,
+      }));
+      setNotifications(normalized);
+      setUnreadCount(normalized.filter((n) => !n.read).length);
+    } catch (err) {
+      console.error("[Notifications] fetch error:", err.message);
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchBadge();
-  }, [fetchBadge]);
+    fetchUserData();
+  }, [fetchUserData, location.pathname]);
+
+  const handleMarkAllRead = async () => {
+    // Optimistic UI update, then persist so it's consistent everywhere.
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      await api.patch(
+        `${NOTIFICATIONS_ENDPOINT}/read-all`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+    } catch (err) {
+      console.error("[Notifications] markAllRead error:", err.message);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setNotifications([]);
+    setUnreadCount(0);
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      await api.delete(NOTIFICATIONS_ENDPOINT, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error("[Notifications] clearAll error:", err.message);
+    }
+  };
 
   const isActive = (path) =>
     path === "/"
@@ -293,6 +408,137 @@ const Navbar = () => {
           box-shadow: 0 2px 6px rgba(181,0,2,0.35);
         }
 
+        /* ── Right Cluster (Groups Bell, User Menu, and Hamburger) ── */
+        .nav-right-cluster {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        /* ── Notification Bell Container ── */
+        .nav-bell-container {
+          position: relative;
+        }
+        .nav-icon-btn {
+          background: transparent;
+          border: none;
+          color: rgba(17,17,17,0.6);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px;
+          border-radius: 50%;
+          transition: background 0.18s, color 0.18s;
+          position: relative;
+        }
+        .nav-icon-btn:hover {
+          background: rgba(0,0,0,0.05);
+          color: #111;
+        }
+        .nav-root.top .nav-icon-btn {
+          color: rgba(17,17,17,0.6);
+        }
+        .nav-root.top .nav-icon-btn:hover {
+          color: #111;
+          background: rgba(255,255,255,0.4);
+        }
+
+        /* ── Notifications Dropdown Panel ── */
+        .notifications-dropdown {
+          position: absolute;
+          top: calc(100% + 12px);
+          right: -20px;
+          width: 340px;
+          background: #fff;
+          border-radius: 16px;
+          border: 1px solid rgba(0,0,0,0.08);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
+          z-index: 150;
+          animation: dropIn 0.15s ease;
+          display: flex;
+          flex-direction: column;
+        }
+        @media (max-width: 600px) {
+          .notifications-dropdown {
+            position: fixed;
+            top: 76px;
+            left: 16px;
+            right: 16px;
+            width: auto;
+          }
+        }
+        .notif-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 18px;
+          border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .notif-title {
+          font-weight: 800;
+          font-size: 14px;
+          color: #111;
+          font-family: 'Space Grotesk', sans-serif;
+        }
+        .notif-mark-read {
+          background: none;
+          border: none;
+          color: #b50002;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: 'Space Grotesk', sans-serif;
+          transition: color 0.2s;
+        }
+        .notif-mark-read:hover {
+          text-decoration: underline;
+          color: #a00001;
+        }
+        .notif-body {
+          max-height: 380px;
+          overflow-y: auto;
+        }
+        .notif-item {
+          padding: 14px 18px;
+          border-bottom: 1px solid rgba(0,0,0,0.04);
+          transition: background 0.2s;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .notif-item:last-child {
+          border-bottom: none;
+        }
+        .notif-item.unread {
+          background: rgba(181,0,2,0.03);
+        }
+        .notif-item:hover {
+          background: rgba(0,0,0,0.02);
+        }
+        .notif-item-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111;
+        }
+        .notif-item-msg {
+          font-size: 12px;
+          color: rgba(17,17,17,0.65);
+          line-height: 1.45;
+        }
+        .notif-item-time {
+          font-size: 10px;
+          color: rgba(17,17,17,0.4);
+          font-weight: 600;
+        }
+        .notif-empty {
+          padding: 40px 20px;
+          text-align: center;
+          color: rgba(17,17,17,0.5);
+          font-size: 13px;
+          font-weight: 500;
+        }
+
         /* ── User actions ── */
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         @media(max-width:900px){ .nav-actions { display: none; } }
@@ -328,7 +574,7 @@ const Navbar = () => {
 
         /* ── Dropdown ── */
         .user-dropdown {
-          position: absolute; top: calc(100% + 8px); right: 0;
+          position: absolute; top: calc(100% + 12px); right: 0;
           min-width: 175px;
           background: #fff; border-radius: 14px;
           border: 1px solid rgba(0,0,0,0.08);
@@ -474,94 +720,194 @@ const Navbar = () => {
                 className={`nav-link ${isActive(link.to) ? "active" : ""}`}
               >
                 {link.label}
-                {link.to === "/bookings" && reuploadBadgeCount > 0 && (
+                {/* {link.to === "/bookings" && reuploadBadgeCount > 0 && (
                   <span className="nav-badge">
                     {reuploadBadgeCount > 99 ? "99+" : reuploadBadgeCount}
                   </span>
-                )}
+                )} */}
               </Link>
             ))}
           </div>
 
-          {/* Desktop user actions */}
-          <div className="nav-actions">
-            {isLoggedIn ? (
-              <div style={{ position: "relative" }} ref={userMenuRef}>
+          {/* Right Layout Cluster (Bell, Actions, Hamburger) */}
+          <div className="nav-right-cluster">
+            {/* Favorites */}
+            <Link
+              to="/favorites"
+              className="nav-icon-btn"
+              aria-label="Favorites"
+              style={{ textDecoration: "none" }}
+              onClick={() => {
+                setShowNotifications(false);
+                setShowUserMenu(false);
+              }}
+            >
+              <FaHeart style={{ fontSize: 16 }} />
+              {favoritesCount > 0 && (
+                <span className="nav-badge">
+                  {favoritesCount > 99 ? "99+" : favoritesCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Notification Bell */}
+            {isLoggedIn && (
+              <div className="nav-bell-container" ref={notifMenuRef}>
                 <button
-                  onClick={() => setShowUserMenu((p) => !p)}
-                  className="nav-profile-btn"
-                  aria-label="User menu"
+                  onClick={() => {
+                    setShowNotifications((p) => !p);
+                    if (showUserMenu) setShowUserMenu(false);
+                  }}
+                  className="nav-icon-btn"
+                  aria-label="Notifications"
                 >
-                  {user?.profilePicture ? (
-                    <img
-                      src={user.profilePicture}
-                      alt="Profile"
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  ) : (
-                    <FaUser style={{ fontSize: 12, opacity: 0.6 }} />
+                  <FaBell style={{ fontSize: 16 }} />
+                  {unreadCount > 0 && (
+                    <span className="nav-badge">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   )}
-                  <span>{user?.name?.split(" ")[0] || "Profile"}</span>
                 </button>
 
-                {showUserMenu && (
-                  <div className="user-dropdown">
-                    <Link
-                      to="/profile"
-                      onClick={() => setIsOpen(false)}
-                      className="mobile-auth"
-                    >
-                      {user?.profilePicture ? (
-                        <img
-                          src={user.profilePicture}
-                          alt="Profile"
-                          style={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            objectFit: "cover",
-                          }}
-                        />
+                {showNotifications && (
+                  <div className="notifications-dropdown">
+                    <div className="notif-header">
+                      <span className="notif-title">Notifications</span>
+                      <div style={{ display: "flex", gap: "12px" }}>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={handleMarkAllRead}
+                            className="notif-mark-read"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={handleClearAll}
+                            className="notif-mark-read" // Reusing your existing CSS class
+                            style={{ color: "rgba(17,17,17,0.5)" }} // Making it look slightly different
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="notif-body">
+                      {notifications.length === 0 ? (
+                        <div className="notif-empty">No notifications</div>
                       ) : (
-                        <FaUser style={{ fontSize: 14 }} />
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className={`notif-item ${
+                              n.read ? "read" : "unread"
+                            }`}
+                          >
+                            <div className="notif-item-title">{n.title}</div>
+                            <div className="notif-item-msg">{n.message}</div>
+                            <div className="notif-item-time">
+                              {n.date
+                                ? new Date(n.date).toLocaleString([], {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "Recently"}
+                            </div>
+                          </div>
+                        ))
                       )}
-                      My Profile
-                    </Link>
-                    <div className="dropdown-sep" />
-                    <button
-                      onClick={() => setShowLogoutConfirm(true)}
-                      className="dropdown-item"
-                    >
-                      <FaSignOutAlt style={{ fontSize: 12, opacity: 0.5 }} />{" "}
-                      Logout
-                    </button>
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
-              <Link to="/login" className="nav-login-btn">
-                <FaUser style={{ fontSize: 12 }} />
-                <span>Login</span>
-              </Link>
             )}
-          </div>
 
-          {/* Hamburger */}
-          <button
-            ref={buttonRef}
-            onClick={() => setIsOpen((p) => !p)}
-            className="nav-hamburger"
-            aria-expanded={isOpen}
-            aria-controls="mobile-menu"
-            aria-label={isOpen ? "Close menu" : "Open menu"}
-          >
-            {isOpen ? <FaTimes size={17} /> : <FaBars size={17} />}
-          </button>
+            {/* Desktop user actions */}
+            <div className="nav-actions">
+              {isLoggedIn ? (
+                <div style={{ position: "relative" }} ref={userMenuRef}>
+                  <button
+                    onClick={() => {
+                      setShowUserMenu((p) => !p);
+                      if (showNotifications) setShowNotifications(false);
+                    }}
+                    className="nav-profile-btn"
+                    aria-label="User menu"
+                  >
+                    {user?.profilePicture ? (
+                      <img
+                        src={user.profilePicture}
+                        alt="Profile"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <FaUser style={{ fontSize: 12, opacity: 0.6 }} />
+                    )}
+                    <span>{user?.name?.split(" ")[0] || "Profile"}</span>
+                  </button>
+
+                  {showUserMenu && (
+                    <div className="user-dropdown">
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsOpen(false)}
+                        className="mobile-auth"
+                      >
+                        {user?.profilePicture ? (
+                          <img
+                            src={user.profilePicture}
+                            alt="Profile"
+                            style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <FaUser style={{ fontSize: 14 }} />
+                        )}
+                        My Profile
+                      </Link>
+                      <div className="dropdown-sep" />
+                      <button
+                        onClick={() => setShowLogoutConfirm(true)}
+                        className="dropdown-item"
+                      >
+                        <FaSignOutAlt style={{ fontSize: 12, opacity: 0.5 }} />{" "}
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link to="/login" className="nav-login-btn">
+                  <FaUser style={{ fontSize: 12 }} />
+                  <span>Login</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Hamburger */}
+            <button
+              ref={buttonRef}
+              onClick={() => setIsOpen((p) => !p)}
+              className="nav-hamburger"
+              aria-expanded={isOpen}
+              aria-controls="mobile-menu"
+              aria-label={isOpen ? "Close menu" : "Open menu"}
+            >
+              {isOpen ? <FaTimes size={17} /> : <FaBars size={17} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile drawer */}
@@ -581,16 +927,33 @@ const Navbar = () => {
                 style={{ position: "relative" }}
               >
                 {link.label}
-                {link.to === "/bookings" && reuploadBadgeCount > 0 && (
+                {/* {link.to === "/bookings" && reuploadBadgeCount > 0 && (
                   <span
                     className="nav-badge"
                     style={{ position: "absolute", top: 8, right: 10 }}
                   >
                     {reuploadBadgeCount > 99 ? "99+" : reuploadBadgeCount}
                   </span>
-                )}
+                )} */}
               </Link>
             ))}
+
+            <Link
+              to="/favorites"
+              onClick={() => setIsOpen(false)}
+              className={`mobile-link ${isActive("/favorites") ? "active" : ""}`}
+              style={{ position: "relative" }}
+            >
+              Favorites
+              {favoritesCount > 0 && (
+                <span
+                  className="nav-badge"
+                  style={{ position: "absolute", top: 8, right: 10 }}
+                >
+                  {favoritesCount > 99 ? "99+" : favoritesCount}
+                </span>
+              )}
+            </Link>
 
             <div className="mobile-divider" />
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import io from "socket.io-client";
 import logo from "../assets/logo.png";
 import {
   BarChart3,
@@ -18,6 +19,7 @@ import {
   Wrench,
   User,
   QrCode,
+  MessageCircle,
 } from "lucide-react";
 import { FaMotorcycle } from "react-icons/fa";
 import axios from "axios";
@@ -33,7 +35,20 @@ const navLinks = [
   { path: "/manage-motorcycles", icon: FaMotorcycle, label: "Manage Fleet" },
   { path: "/analytics", icon: BarChart3, label: "Analytics" },
   { path: "/walk-in-rentals", icon: Store, label: "Walk-In" },
-  { path: "/return-inspection", icon: ClipboardCheck, label: "Inspection" },
+  {
+    path: "/return-inspection",
+    icon: ClipboardCheck,
+    label: "Inspection",
+    showBadge: true,
+    badgeKey: "inspections",
+  },
+  {
+    path: "/live-chat",
+    icon: MessageCircle,
+    label: "Live Chat",
+    showBadge: true,
+    badgeKey: "liveChat",
+  },
   {
     path: "/reviews",
     icon: MessageSquare,
@@ -243,8 +258,38 @@ const Sidebar = ({
   const [pendingCounts, setPendingCounts] = useState({
     bookings: 0,
     reviews: 0,
+    inspections: 0,
+    liveChat: 0,
   });
   const intervalRef = useRef(null);
+  const chatSocketRef = useRef(null);
+
+  // Sync Live Chat Unread counts via Socket
+  useEffect(() => {
+    const socket = io(API_BASE_URL);
+    chatSocketRef.current = socket;
+
+    socket.emit("get_admin_chats");
+
+    socket.on("sync_admin_chats", (sessions) => {
+      let unread = 0;
+      Object.values(sessions || {}).forEach((chat) => {
+        if (chat.messages) {
+          unread += chat.messages.filter(
+            (msg) => msg.sender === "user" && msg.status !== "Seen",
+          ).length;
+        }
+      });
+      setPendingCounts((prev) => ({ ...prev, liveChat: unread }));
+    });
+
+    socket.on("receive_user_message", () => {
+      // Re-fetch chats to compute an accurate total unread count
+      socket.emit("get_admin_chats");
+    });
+
+    return () => socket.disconnect();
+  }, []);
 
   const fetchPending = useCallback(async () => {
     try {
@@ -266,6 +311,14 @@ const Sidebar = ({
         (b) => !b.isDeleted && b.status === "pending_reservation",
       ).length;
 
+      const pendingInspections = rawBookings.filter(
+        (b) =>
+          !b.isDeleted &&
+          b.status === "inspection" &&
+          (!b.returnInspection?.clearanceStatus ||
+            b.returnInspection?.clearanceStatus === "pending_inspection"),
+      ).length;
+
       // Calculate reviews (status === "pending" or missing status)
       const rawReviews = Array.isArray(resReviews.data)
         ? resReviews.data
@@ -274,10 +327,12 @@ const Sidebar = ({
         (r) => r.status === "pending" || !r.status,
       ).length;
 
-      setPendingCounts({
+      setPendingCounts((prev) => ({
+        ...prev,
         bookings: pendingBookings,
         reviews: pendingReviews,
-      });
+        inspections: pendingInspections,
+      }));
     } catch {
       /* silent */
     }
@@ -285,7 +340,11 @@ const Sidebar = ({
 
   useEffect(() => {
     fetchPending();
-    intervalRef.current = setInterval(fetchPending, 30_000);
+    intervalRef.current = setInterval(() => {
+      fetchPending();
+      // Keep chat badge synced in case messages are read in another component
+      chatSocketRef.current?.emit("get_admin_chats");
+    }, 30_000);
     return () => clearInterval(intervalRef.current);
   }, [fetchPending]);
 
@@ -300,7 +359,11 @@ const Sidebar = ({
     navigate("/login", { replace: true });
   }, [navigate, onLogout]);
 
-  const totalPending = pendingCounts.bookings + pendingCounts.reviews;
+  const totalPending =
+    pendingCounts.bookings +
+    pendingCounts.reviews +
+    pendingCounts.inspections +
+    pendingCounts.liveChat;
 
   return (
     <>

@@ -37,19 +37,87 @@ function useScrollReveal(options = {}) {
   return [ref, visible];
 }
 
-const Stars = ({ rating, size = 13 }) => (
-  <div style={{ display: "flex", gap: 2 }}>
-    {[1, 2, 3, 4, 5].map((i) => (
-      <FaStar
-        key={i}
-        size={size}
-        style={{ color: i <= rating ? "#f59e0b" : "#e5e7eb" }}
-      />
-    ))}
-  </div>
-);
+// Accurate fractional star rating: a gray background row of stars with an
+// amber foreground row clipped to a width proportional to the exact rating
+// (e.g. 2.8/5 fills 56% of the row), rather than rounding to the nearest
+// whole or half star. The numeric value is always shown next to the stars.
+// Each star is its own self-contained fill unit: a gray star underneath and
+// an amber star clipped to that star's own fraction filled (0-100%). This
+// avoids clipping the whole row at X%, whose percentage math doesn't line up
+// cleanly with individual star boundaries once a flex `gap` is involved.
+const Stars = ({ rating, size = 13, showValue = true }) => {
+  const numericRating = Math.max(0, Math.min(5, Number(rating) || 0));
 
-const Avatar = ({ name, size = 44 }) => (
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", gap: 2 }}>
+        {[1, 2, 3, 4, 5].map((i) => {
+          const starFill = Math.max(0, Math.min(1, numericRating - (i - 1)));
+          return (
+            <span
+              key={i}
+              style={{
+                position: "relative",
+                display: "inline-block",
+                width: size,
+                height: size,
+                lineHeight: 0,
+              }}
+            >
+              <FaStar
+                size={size}
+                style={{ display: "block", color: "#e5e7eb" }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  overflow: "hidden",
+                  width: `${starFill * 100}%`,
+                  height: "100%",
+                }}
+              >
+                <FaStar
+                  size={size}
+                  style={{ display: "block", color: "#f59e0b" }}
+                />
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      {showValue && (
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: "rgba(14,14,14,0.4)",
+          }}
+        >
+          {numericRating > 0 ? numericRating.toFixed(1) : "0.0"}/5.0
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Resolve a profile picture reference (relative path, Cloudinary path, or
+// full URL) into a usable <img> src — mirrors the convention used elsewhere
+// in the admin dashboard (see UserManagement.jsx).
+const makeImageUrl = (filename) => {
+  if (!filename) return "";
+  const s = String(filename).trim();
+  if (!s) return "";
+  if (/^data:image\//i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/dxta0nmdy/") || s.startsWith("dxta0nmdy/"))
+    return `https://res.cloudinary.com/${s.replace(/^\/+/, "")}`;
+  const cleanPath = s.replace(/^\/+/, "").replace(/^uploads\//, "");
+  return `${API_BASE_URL}/uploads/${cleanPath}`;
+};
+
+const Avatar = ({ name, photo, size = 44 }) => (
   <div
     style={{
       width: size,
@@ -64,9 +132,21 @@ const Avatar = ({ name, size = 44 }) => (
       fontWeight: 800,
       color: "#b50002",
       flexShrink: 0,
+      overflow: "hidden",
     }}
   >
-    {(name || "R").charAt(0).toUpperCase()}
+    {photo ? (
+      <img
+        src={photo}
+        alt={name || "Reviewer"}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+    ) : (
+      (name || "R").charAt(0).toUpperCase()
+    )}
   </div>
 );
 
@@ -112,6 +192,10 @@ const Testimonial = () => {
         Array.isArray(t.reviewImages) && t.reviewImages.length
           ? t.reviewImages[0]
           : t.reviewImages || null,
+      // GET /api/reviews/testimonials (getFeaturedTestimonials) returns
+      // `profilePicture` directly on each testimonial — already resolved
+      // server-side from the renter's linked user account.
+      avatar: makeImageUrl(t.profilePicture || ""),
     }));
   }, [raw]);
 
@@ -359,7 +443,11 @@ const Testimonial = () => {
           <div className="tm-featured">
             <div className="tm-slide-content" style={slideStyle}>
               <div className="tm-feat-top">
-                <Avatar name={featured.name} size={48} />
+                <Avatar
+                  name={featured.name}
+                  photo={featured.avatar}
+                  size={48}
+                />
                 <div>
                   <div className="tm-feat-name">{featured.name}</div>
                   <div className="tm-feat-role">{featured.role}</div>

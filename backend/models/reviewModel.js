@@ -71,6 +71,12 @@ const reviewSchema = new Schema(
       max: 5,
       default: null,
     },
+    valueForMoney: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null,
+    },
     // Status tracking
     status: {
       type: String,
@@ -117,7 +123,6 @@ const reviewSchema = new Schema(
       ],
       default: [],
     },
-    // Whether the renter allows their name to be shown publicly (testimonials)
     isRenterPublic: {
       type: Boolean,
       default: true,
@@ -139,11 +144,9 @@ const reviewSchema = new Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// Index for faster queries
-// Note: bookingId index is automatically created by unique: true constraint
 reviewSchema.index({ userId: 1 });
 reviewSchema.index({ motorcycleId: 1 });
 reviewSchema.index({ createdAt: -1 });

@@ -21,10 +21,17 @@ import {
   FaStar,
   FaStarHalfAlt,
   FaRegStar,
+  FaHeart,
 } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
 import { getBestDiscount, PromoBanner, PriceBadge } from "./DiscountBadge";
+import {
+  getFavorites,
+  toggleFavorite,
+  FAVORITES_CHANGED_EVENT,
+} from "../utils/favorites";
+import Toast from "./Toast";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const ITEMS_PER_PAGE = 10;
@@ -415,28 +422,40 @@ const SidebarContent = ({
   </>
 );
 
-const renderStars = (rating) => {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) {
-      // Full star
-      stars.push(<FaStar key={i} style={{ color: "#f59e0b", fontSize: 13 }} />);
-    } else if (rating >= i - 0.5) {
-      // Half star for decimals like 4.5
-      stars.push(
-        <FaStarHalfAlt key={i} style={{ color: "#f59e0b", fontSize: 13 }} />,
-      );
-    } else {
-      // Empty star
-      stars.push(
-        <FaRegStar
-          key={i}
-          style={{ color: "rgba(0,0,0,0.15)", fontSize: 13 }}
-        />,
-      );
-    }
-  }
-  return stars;
+const renderStars = (rating, size = 13) => {
+  const numericRating = Math.max(0, Math.min(5, Number(rating) || 0));
+  return [1, 2, 3, 4, 5].map((i) => {
+    const starFill = Math.max(0, Math.min(1, numericRating - (i - 1)));
+    return (
+      <span
+        key={i}
+        style={{
+          position: "relative",
+          display: "inline-block",
+          width: size,
+          height: size,
+          lineHeight: 0,
+        }}
+      >
+        <FaStar
+          size={size}
+          style={{ display: "block", color: "rgba(0,0,0,0.15)" }}
+        />
+        <span
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            overflow: "hidden",
+            width: `${starFill * 100}%`,
+            height: "100%",
+          }}
+        >
+          <FaStar size={size} style={{ display: "block", color: "#f59e0b" }} />
+        </span>
+      </span>
+    );
+  });
 };
 
 /* ── Main ───────────────────────────────────────────────────────── */
@@ -456,15 +475,62 @@ const Motorcycles = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [activePromos, setActivePromos] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
 
   // Price slider state — will be set once motorcycles load
   const [priceSliderMax, setPriceSliderMax] = useState(2000);
   const [priceSliderRange, setPriceSliderRange] = useState([0, 2000]);
+  const [toastMsg, setToastMsg] = useState("");
 
   const abortControllerRef = useRef(null);
+  const toastTimeoutRef = useRef(null);
   const topRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToastMsg(""), 2200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
   // const base = "https://anaias-motorcycle-rental.onrender.com";
   const fallbackImage = `${API_BASE_URL}/uploads/default-motorcycle.png`;
+
+  useEffect(() => {
+    const syncFavorites = () => {
+      const ids = getFavorites().map((m) => m._id ?? m.id);
+      setFavoriteIds(new Set(ids));
+    };
+    syncFavorites();
+    window.addEventListener("storage", syncFavorites);
+    window.addEventListener(FAVORITES_CHANGED_EVENT, syncFavorites);
+    return () => {
+      window.removeEventListener("storage", syncFavorites);
+      window.removeEventListener(FAVORITES_CHANGED_EVENT, syncFavorites);
+    };
+  }, []);
+
+  const handleToggleFavorite = (e, motorcycle) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const isLoggedIn = !!localStorage.getItem("token");
+
+    if (!isLoggedIn) {
+      // 2. Redirect to the login page if they are not authenticated
+      navigate("/login");
+      return;
+    }
+
+    const id = motorcycle._id ?? motorcycle.id;
+    const wasFavorite = favoriteIds.has(id);
+    toggleFavorite(motorcycle);
+    showToast(wasFavorite ? "Removed from favorites" : "Added to favorites");
+  };
 
   const fetchMotorcycles = useCallback(async () => {
     setLoading(true);
@@ -772,8 +838,8 @@ const Motorcycles = () => {
     if (!eff || eff.state === "fully_available")
       // return <span style={badgeStyle("green")}>Available</span>;
       return;
-    if (eff.state === "booked")
-      return <span style={badgeStyle("red")}>Booked</span>;
+    if (eff.state === "booked") return;
+    // return <span style={badgeStyle("red")}>Booked</span>;
     // return <span style={badgeStyle("green")}>Available</span>;
   };
 
@@ -794,8 +860,13 @@ const Motorcycles = () => {
     return eff?.state === "booked";
   };
   const handleBook = (motorcycle, id) => {
-    // if (isBookDisabled(motorcycle)) return;
-    navigate(`/motorcycles/${id}`, { state: { motorcycle } });
+    const disabled = isBookDisabled(motorcycle);
+    navigate(`/motorcycles/${id}`, {
+      state: {
+        motorcycle,
+        showCalendar: disabled, // Pass this flag to the detail page
+      },
+    });
   };
 
   const uniqueCategories = [
@@ -839,6 +910,7 @@ const Motorcycles = () => {
 
   return (
     <>
+      <Toast message={toastMsg} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
 
@@ -929,6 +1001,16 @@ const Motorcycles = () => {
         @media(max-width: 640px) { .mc-card-img { height: 200px; } }
         .mc-card-img img { width: 100%; height: 100%; object-fit: cover; object-position: center; transition: transform 0.4s ease; }
         .mc-card:hover .mc-card-img img { transform: scale(1.04); }
+
+        .mc-fav-btn {
+          position: absolute; top: 10px; left: 10px; z-index: 2;
+          width: 32px; height: 32px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(17,17,17,0.35); border: none; cursor: pointer;
+          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+          transition: transform 0.15s, background 0.18s;
+        }
+        .mc-fav-btn:hover { transform: scale(1.08); background: rgba(17,17,17,0.5); }
 
         .mc-card-body { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
         .mc-card-name { font-size: 16px; font-weight: 800; color: #0E0E0E; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1071,14 +1153,14 @@ const Motorcycles = () => {
               )}
               {!loading && !error && filteredMotorcycles.length === 0 && (
                 <div className="mc-empty">
-                  <FaMotorcycle
+                  {/* <FaMotorcycle
                     size={32}
                     style={{ color: "rgba(0,0,0,0.15)", marginBottom: 12 }}
-                  />
+                  /> */}
                   <p>
                     {motorcycles.length === 0
-                      ? "No motorcycles available."
-                      : "No motorcycles match your filters."}
+                      ? "No vehicles available."
+                      : "No vehicles match your filters."}
                   </p>
                 </div>
               )}
@@ -1111,14 +1193,25 @@ const Motorcycles = () => {
                           alt={name}
                           onError={handleImageError}
                         />
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 10,
-                            left: 10,
-                            zIndex: 2,
-                          }}
-                        ></div>
+                        <button
+                          className="mc-fav-btn"
+                          onClick={(e) => handleToggleFavorite(e, motorcycle)}
+                          aria-label={
+                            favoriteIds.has(id)
+                              ? "Remove from favorites"
+                              : "Add to favorites"
+                          }
+                          aria-pressed={favoriteIds.has(id)}
+                        >
+                          <FaHeart
+                            size={14}
+                            style={{
+                              color: favoriteIds.has(id)
+                                ? "#b50002"
+                                : "rgba(255,255,255,0.85)",
+                            }}
+                          />
+                        </button>
                         <div
                           style={{
                             position: "absolute",
@@ -1244,7 +1337,7 @@ const Motorcycles = () => {
                           className="mc-rent-btn"
                           onClick={() => handleBook(motorcycle, id)}
                         >
-                          {disabled ? "Check Availability" : "Rent Now"}
+                          {disabled ? "View Availability" : "Rent Now"}
                           <FaArrowRight size={10} />
                         </button>
                       </div>

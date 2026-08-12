@@ -20,11 +20,21 @@ import {
   FaChevronDown,
 } from "react-icons/fa";
 import { AlertTriangle, CheckCircle2, Mail, MessageSquare } from "lucide-react";
+import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { Accept: "application/json" },
 });
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 const ITEMS_PER_PAGE = 10;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,13 +104,28 @@ const alertModal = (message, { isError = false } = {}) =>
     );
   });
 
+const MIN_REPLY_WORDS = 10;
+const countWords = (str) => str.trim().split(/\s+/).filter(Boolean).length;
+
 // ── Reply Drawer ──────────────────────────────────────────────────────────────
 const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyError, setReplyError] = useState("");
 
   const handleSend = async () => {
-    if (!replyText.trim()) return;
+    const wordCount = countWords(replyText);
+    if (!replyText.trim()) {
+      setReplyError("Please enter a reply message.");
+      return;
+    }
+    if (wordCount < MIN_REPLY_WORDS) {
+      setReplyError(
+        `Please enter at least ${MIN_REPLY_WORDS} words (currently ${wordCount}).`,
+      );
+      return;
+    }
+    setReplyError("");
     setSending(true);
     try {
       await api.patch(`/api/contact-messages/${msg._id}/reply`, {
@@ -123,14 +148,16 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[9990] flex" onClick={onClose}>
-      <div className="flex-1 bg-black/30 backdrop-blur-sm" />
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg bg-[#f7f8fa] h-full overflow-y-auto shadow-2xl"
+        className="w-full max-w-xl bg-[#f7f8fa] max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm rounded-t-2xl">
           <div>
             <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
               Contact Message
@@ -231,17 +258,30 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
             </p>
             <textarea
               value={replyText}
-              onChange={(e) => setReplyText(e.target.value.slice(0, 2000))}
+              onChange={(e) => {
+                setReplyText(e.target.value.slice(0, 2000));
+                if (replyError) setReplyError("");
+              }}
               rows={6}
-              placeholder="Type your reply here…"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 resize-none mb-2"
+              placeholder={`Type your reply here…`}
+              className={`w-full px-3 py-2.5 rounded-xl border text-[#171717] text-sm placeholder-slate-300 focus:outline-none resize-none mb-2 ${
+                replyError
+                  ? "border-[#b50002] bg-[#FDF0F0] focus:border-[#b50002]"
+                  : "border-slate-200 bg-white focus:border-[#b50002]/30"
+              }`}
             />
+            {replyError && (
+              <p className="text-xs font-semibold text-[#b50002] mb-2">
+                {replyError}
+              </p>
+            )}
             <p className="text-xs text-slate-300 text-right mb-3">
-              {replyText.length}/2000
+              {countWords(replyText)}/{MIN_REPLY_WORDS} words min ·{" "}
+              {replyText.length}/2000 characters
             </p>
             <button
               onClick={handleSend}
-              disabled={sending || !replyText.trim()}
+              disabled={sending}
               className="w-full flex items-center justify-center gap-2 py-3 bg-[#171717] text-white font-bold text-sm rounded-xl shadow-lg shadow-black/20 hover:brightness-110 hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
             >
               <FaPaperPlane className="text-sm" />

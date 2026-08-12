@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ManageMotorcycle from "./components/ManageMotorcycle";
@@ -9,6 +9,7 @@ import AdminAnalytics from "./components/AdminAnalytics";
 import WalkInRentals from "./components/WalkInRentals";
 import SystemLog from "./components/SystemLog";
 import AdminLogin from "./components/AdminLogin";
+import AdminForgotPassword from "./components/AdminForgotPassword";
 import ReturnInspection from "./components/ReturnInspection";
 import ReviewManagement from "./components/ReviewManagement";
 import Dashboard from "./components/Dashboard";
@@ -18,45 +19,83 @@ import CalendarView from "./components/CalendarView";
 import AdminContact from "./components/AdminContact";
 import UserManagement from "./components/UserManagement";
 import QRChanger from "./components/QRChanger";
-import {
-  ADMIN_AUTH_STORAGE_KEY,
-  ADMIN_DEFAULT_EMAIL,
-  ADMIN_DEFAULT_PASSWORD,
-  validateStrongPassword,
-} from "./constants/adminAuth";
+import AdminLiveChat from "./components/AdminLiveChat";
+import { ADMIN_TOKEN_STORAGE_KEY } from "./constants/adminAuth";
+
+// Same API base other parts of the app use to reach the backend.
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
 
 const ProtectedRoute = ({ isAuthenticated, children }) =>
   isAuthenticated ? children : <Navigate to="/login" replace />;
 
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === "true",
-  );
+  // isAuthenticated is only ever set to true after the backend confirms the
+  // token is valid — never just because *something* is sitting in
+  // localStorage. checkingAuth guards the brief window on load/refresh
+  // while that confirmation is in flight, so we don't flash the login page
+  // (or a protected page) before we actually know.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
   // Sidebar state lifted so content margin stays in sync
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogin = (emailOrUsername, password) => {
-    const isStrongPassword = validateStrongPassword(password).isValid;
-    const normalizedInput = emailOrUsername.trim().toLowerCase();
-    const normalizedAdminEmail = ADMIN_DEFAULT_EMAIL.trim().toLowerCase();
-    const isAllowedIdentifier =
-      normalizedInput === normalizedAdminEmail || normalizedInput === "admin";
-
-    if (
-      isAllowedIdentifier &&
-      password === ADMIN_DEFAULT_PASSWORD &&
-      isStrongPassword
-    ) {
-      localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, "true");
-      setIsAuthenticated(true);
-      return true;
+  useEffect(() => {
+    const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+    if (!token) {
+      setCheckingAuth(false);
+      return;
     }
-    return false;
+
+    fetch(`${API_BASE}/api/admin/verify`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        if (data?.success) {
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+        }
+      })
+      .catch(() => {
+        // Token missing, expired, or server unreachable — treat as logged out.
+        localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+      })
+      .finally(() => setCheckingAuth(false));
+  }, []);
+
+  const handleLogin = async (email, password) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success && data.token) {
+        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, data.token);
+        setIsAuthenticated(true);
+        return { ok: true };
+      }
+
+      return {
+        ok: false,
+        message: data.message || "Invalid admin email or password.",
+        lockedUntil: data.lockedUntil,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        message: "Unable to reach the server. Please try again.",
+      };
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setIsAuthenticated(false);
@@ -64,6 +103,14 @@ const App = () => {
 
   // Sidebar offsets (must match Sidebar.jsx widths)
   const desktopOffset = sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[230px]";
+
+  if (checkingAuth) {
+    // Avoid rendering routes until we know the real auth state, so a
+    // logged-out visitor never briefly sees a protected page (and a
+    // logged-in admin never gets bounced to /login) while the token is
+    // still being verified.
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
@@ -93,6 +140,16 @@ const App = () => {
             }
           />
           <Route
+            path="/forgot-password"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/" replace />
+              ) : (
+                <AdminForgotPassword />
+              )
+            }
+          />
+          <Route
             path="/"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated}>
@@ -100,14 +157,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          {/* <Route
-            path="/"
-            element={
-              <ProtectedRoute isAuthenticated={isAuthenticated}>
-                <AddMotorcycle />
-              </ProtectedRoute>
-            }
-          /> */}
           <Route
             path="/manage-motorcycles"
             element={
@@ -227,7 +276,14 @@ const App = () => {
                 <QRChanger />
               </ProtectedRoute>
             }
-            
+          />
+          <Route
+            path="/live-chat"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <AdminLiveChat />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="*"

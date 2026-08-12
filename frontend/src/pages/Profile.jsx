@@ -17,6 +17,7 @@ import {
   FaKey,
   FaCalendarAlt,
   FaTrash,
+  FaTrophy,
 } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";
@@ -25,9 +26,22 @@ import Footer from "../components/Footer";
 import PasswordStrengthMeter from "../components/PasswordStrengthMeter";
 import API_BASE_URL from "../apiBase";
 import useResendCooldown, { formatCooldown } from "../hooks/useResendCooldown";
+import {
+  fetchLoyaltyStatus,
+  LoyaltyTierBadge,
+  LoyaltyProgressBar,
+  LoyaltyCodeList,
+  LoyaltyHowItWorksModal,
+} from "../components/DiscountBadge";
 
 const BASE = API_BASE_URL;
 const PH_API = "https://psgc.gitlab.io/api";
+const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PROFILE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PROFILE_IMAGE_TOO_LARGE_MESSAGE =
+  "That image is too large. Please upload a photo up to 5 MB.";
+const PROFILE_IMAGE_UNSUPPORTED_TYPE_MESSAGE =
+  "Unsupported file type. Please upload a JPG, PNG, or WEBP image.";
 
 /* ── PH Address hook ─────────────────────────────────────────────── */
 const usePHAddress = () => {
@@ -201,17 +215,33 @@ const iconStyle = {
   pointerEvents: "none",
 };
 
-const Field = ({ icon: Icon, label, children }) => (
+const errorTextStyle = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#b50002",
+  marginTop: 5,
+  fontFamily: "'Space Grotesk', sans-serif",
+};
+
+const Field = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label style={labelStyle}>{label}</label>}
     <div
-      style={inputWrapStyle}
+      style={{
+        ...inputWrapStyle,
+        ...(error ? { borderColor: "#b50002", background: "#FDF0F0" } : null),
+      }}
       onFocus={(e) => (e.currentTarget.style.borderColor = "#b50002")}
-      onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(0,0,0,0.09)")}
+      onBlur={(e) =>
+        (e.currentTarget.style.borderColor = error
+          ? "#b50002"
+          : "rgba(0,0,0,0.09)")
+      }
     >
       {Icon && <Icon style={iconStyle} />}
       {children}
     </div>
+    {error && <p style={errorTextStyle}>{error}</p>}
   </div>
 );
 
@@ -319,9 +349,9 @@ const SectionLabel = ({ children }) => (
   <div
     style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}
   >
-    <div
+    {/* <div
       style={{ width: 20, height: 1.5, background: "#b50002", borderRadius: 2 }}
-    />
+    /> */}
     <span
       style={{
         fontSize: 10,
@@ -342,6 +372,9 @@ const Profile = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loyalty, setLoyalty] = useState(null);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(true);
+  const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingImage, setDeletingImage] = useState(false);
@@ -377,12 +410,20 @@ const Profile = () => {
   });
   const [changingPassword, setChangingPassword] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [otpError, setOtpError] = useState("");
   const [emailChanged, setEmailChanged] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [showEmailOTP, setShowEmailOTP] = useState(false);
   const [emailOTP, setEmailOTP] = useState("");
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [resendingEmailOtp, setResendingEmailOtp] = useState(false);
+  // Set once the backend reports the 3-resend cap has been hit for this
+  // pending email-change OTP; disables further resend attempts until the
+  // OTP naturally expires (or the flow restarts with a new target email).
+  const [emailOtpResendLimitReached, setEmailOtpResendLimitReached] =
+    useState(false);
 
   const emailChangeOtpCooldown = useResendCooldown({
     storageKey: pendingEmail ? `otpCooldown:emailChange:${pendingEmail}` : null,
@@ -454,12 +495,37 @@ const Profile = () => {
     }
   }, [navigate]);
 
+  const fetchLoyalty = useCallback(async (userId) => {
+    if (!userId) {
+      setLoyaltyLoading(false);
+      return;
+    }
+    try {
+      const data = await fetchLoyaltyStatus(userId);
+      setLoyalty(data);
+    } catch (err) {
+      // Non-critical — silently skip if the loyalty endpoint is unavailable
+    } finally {
+      setLoyaltyLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
 
+  useEffect(() => {
+    if (user?.id) fetchLoyalty(user.id);
+  }, [user?.id, fetchLoyalty]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     if (name === "email" && value !== user?.email) {
       setEmailChanged(true);
       setPendingEmail(value);
@@ -519,7 +585,12 @@ const Profile = () => {
   };
 
   const handleResendEmailChangeOTP = async () => {
-    if (!emailChangeOtpCooldown.canResend || resendingEmailOtp || updating)
+    if (
+      !emailChangeOtpCooldown.canResend ||
+      resendingEmailOtp ||
+      updating ||
+      emailOtpResendLimitReached
+    )
       return;
     if (!pendingEmail) {
       toast.error("New email is missing");
@@ -528,15 +599,25 @@ const Profile = () => {
     setResendingEmailOtp(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.post(
+      const res = await axios.post(
         `${BASE}/api/auth/request-email-change-otp`,
         { newEmail: pendingEmail },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success("OTP resent!");
+      toast.success(res.data?.message || "OTP resent!");
       emailChangeOtpCooldown.startCooldown();
-    } catch {
-      toast.error("Failed to resend OTP");
+    } catch (err) {
+      const data = err.response?.data;
+      if (err.response?.status === 429) {
+        setEmailOtpResendLimitReached(true);
+        toast.error(
+          data?.message ||
+            "OTP resend limit reached. Please wait for the current code to expire and try again.",
+          { autoClose: 6000 },
+        );
+      } else {
+        toast.error(data?.message || "Failed to resend OTP");
+      }
     } finally {
       setResendingEmailOtp(false);
     }
@@ -544,6 +625,25 @@ const Profile = () => {
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const next = {};
+    if (!formData.firstName.trim()) next.firstName = "First name is required";
+    if (!formData.lastName.trim()) next.lastName = "Last name is required";
+    if (!formData.email.trim()) {
+      next.email = "Email is required";
+    } else if (!EMAIL_RE.test(formData.email.trim())) {
+      next.email = "Enter a valid email address";
+    }
+    if (!formData.phone) {
+      next.phone = "Phone number is required";
+    } else if (!/^09\d{9}$/.test(formData.phone)) {
+      next.phone = "Enter 11 digits starting with 09";
+    }
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
     if (emailChanged) {
       setUpdating(true);
       try {
@@ -561,6 +661,7 @@ const Profile = () => {
         if (res.data.success) {
           toast.success("OTP sent to your new email address!");
           emailChangeOtpCooldown.startCooldown();
+          setEmailOtpResendLimitReached(false);
           setShowEmailOTP(true);
         }
       } catch (err) {
@@ -614,6 +715,11 @@ const Profile = () => {
 
   const handleVerifyEmailOTP = async (e) => {
     e.preventDefault();
+    if (!emailOTP || emailOTP.length < 6) {
+      setOtpError("Please enter the 6-digit code");
+      return;
+    }
+    setOtpError("");
     setVerifyingEmail(true);
     try {
       const token = localStorage.getItem("token");
@@ -646,20 +752,24 @@ const Profile = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!passwordData.currentPassword) {
-      toast.error("Please enter your current password");
-      return;
+    const next = {};
+    if (!passwordData.currentPassword)
+      next.currentPassword = "Please enter your current password";
+    if (!passwordData.newPassword) {
+      next.newPassword = "New password is required";
+    } else if (getPasswordStrength(passwordData.newPassword) < 4) {
+      next.newPassword = "Password must be Strong (meet all criteria)";
+    } else if (passwordData.currentPassword === passwordData.newPassword) {
+      next.newPassword = "New password must be different";
     }
-    if (passwordData.currentPassword === passwordData.newPassword) {
-      toast.error("New password must be different");
-      return;
+    if (!passwordData.confirmPassword) {
+      next.confirmPassword = "Please confirm your new password";
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      next.confirmPassword = "New passwords do not match";
     }
-    if (getPasswordStrength(passwordData.newPassword) < 4) {
-      toast.error("Password must be Strong (meet all criteria)");
-      return;
-    }
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error("New passwords do not match");
+    setPasswordErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
       return;
     }
     setUpdating(true);
@@ -685,6 +795,7 @@ const Profile = () => {
           newPassword: "",
           confirmPassword: "",
         });
+        setPasswordErrors({});
         setChangingPassword(false);
       }
     } catch (err) {
@@ -696,6 +807,7 @@ const Profile = () => {
 
   const handleCancelEdit = () => {
     setEditMode(false);
+    setErrors({});
     setShowEmailOTP(false);
     setEmailOTP("");
     setEmailChanged(false);
@@ -837,6 +949,18 @@ const Profile = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (!ALLOWED_PROFILE_IMAGE_TYPES.includes(file.type)) {
+      toast.error(PROFILE_IMAGE_UNSUPPORTED_TYPE_MESSAGE);
+      e.target.value = null;
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      toast.error(PROFILE_IMAGE_TOO_LARGE_MESSAGE);
+      e.target.value = null;
+      return;
+    }
+
     const formData = new FormData();
     formData.append("image", file);
 
@@ -863,7 +987,21 @@ const Profile = () => {
         window.dispatchEvent(new Event("storage"));
       }
     } catch (err) {
-      toast.error("Failed to upload profile picture");
+      const isTooLarge =
+        err.response?.status === 413 ||
+        /too large|file size|exceeds/i.test(err.response?.data?.message || "");
+      const isUnsupportedType =
+        err.response?.status === 415 ||
+        /unsupported|invalid file type|invalid.*type/i.test(
+          err.response?.data?.message || "",
+        );
+      toast.error(
+        isTooLarge
+          ? PROFILE_IMAGE_TOO_LARGE_MESSAGE
+          : isUnsupportedType
+            ? PROFILE_IMAGE_UNSUPPORTED_TYPE_MESSAGE
+            : err.response?.data?.message || "Failed to upload profile picture",
+      );
     } finally {
       setUploadingImage(false);
       e.target.value = null; // Clear the input
@@ -1078,7 +1216,7 @@ const Profile = () => {
                   type="file"
                   ref={fileInputRef}
                   style={{ display: "none" }}
-                  accept="image/*"
+                  accept={ALLOWED_PROFILE_IMAGE_TYPES.join(",")}
                   onChange={handleImageUpload}
                 />
                 {user?.profilePicture && (
@@ -1118,44 +1256,112 @@ const Profile = () => {
                 )}
                 <div className="pf-avatar-name">{fullName}</div>
                 <div className="pf-avatar-email">{user?.email}</div>
-                <span
-                  className={`pf-badge ${user?.isVerified ? "pf-badge-green" : "pf-badge-amber"}`}
-                >
-                  {user?.isVerified ? (
-                    <FaCheckCircle style={{ fontSize: 9 }} />
-                  ) : (
-                    <FaShieldAlt style={{ fontSize: 9 }} />
-                  )}
-                  {user?.isVerified ? "Verified Account" : "Unverified"}
-                </span>
               </div>
 
-              {/* Quick info */}
-              <div className="pf-info-card">
-                <SectionLabel>Quick Info</SectionLabel>
-                <InfoRow
-                  icon={FaPhone}
-                  label="Phone"
-                  value={user?.phone || "—"}
-                />
-                <InfoRow
-                  icon={FaMapMarkerAlt}
-                  label="Location"
-                  value={
-                    addr.city && addr.province
-                      ? `${addr.city}, ${addr.province}`
-                      : "Not set"
-                  }
-                />
-                <InfoRow
-                  icon={FaCalendarAlt}
-                  label="Member Since"
-                  value={new Date(user?.createdAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                  })}
-                />
-              </div>
+              {/* Loyalty rewards */}
+              {!loyaltyLoading && loyalty && (
+                <div className="pf-info-card">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      rowGap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {/* <SectionLabel>Loyalty Rewards</SectionLabel> */}
+                    {loyalty.tier !== "None" && (
+                      <LoyaltyTierBadge tier={loyalty.tier} />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLoyaltyInfo(true)}
+                    style={{
+                      display: "block",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#b50002",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      marginBottom: 12,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    See how it works
+                  </button>
+
+                  {loyalty.tier === "None" ? (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(0,0,0,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginBottom: 10,
+                      }}
+                    >
+                      Complete rentals to start earning Silver, Gold, and
+                      Platinum member perks.
+                    </p>
+                  ) : (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(0,0,0,0.45)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        marginBottom: 10,
+                      }}
+                    >
+                      {loyalty.tierBenefits?.description}
+                    </p>
+                  )}
+
+                  <div style={{ marginBottom: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#0E0E0E",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {loyalty.completedRentalsCount} completed rental
+                      {loyalty.completedRentalsCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  <LoyaltyProgressBar
+                    completedRentalsCount={loyalty.completedRentalsCount}
+                    nextTier={loyalty.nextTier}
+                    rentalsUntilNextTier={loyalty.rentalsUntilNextTier}
+                    tierThresholds={loyalty.tierThresholds}
+                    className="mb-3"
+                  />
+
+                  {loyalty.activeCodes?.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "1.5px",
+                          textTransform: "uppercase",
+                          color: "rgba(0,0,0,0.35)",
+                          margin: "12px 0 8px",
+                        }}
+                      >
+                        Your Reward Codes
+                      </div>
+                      <LoyaltyCodeList codes={loyalty.activeCodes} />
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Action buttons — view mode only */}
               {!editMode && !changingPassword && (
@@ -1195,6 +1401,7 @@ const Profile = () => {
                           newPassword: "",
                           confirmPassword: "",
                         });
+                        setPasswordErrors({});
                       } else handleCancelEdit();
                     }}
                   >
@@ -1271,11 +1478,15 @@ const Profile = () => {
 
                 {/* ── EDIT MODE ── */}
                 {activePanel === "edit" && (
-                  <form onSubmit={handleUpdateProfile}>
+                  <form onSubmit={handleUpdateProfile} noValidate>
                     <div className="pf-form-section">
                       <SectionLabel>Full Name</SectionLabel>
                       <div className="pf-form-grid-3">
-                        <Field icon={FaUser} label="First Name *">
+                        <Field
+                          icon={FaUser}
+                          label="First Name *"
+                          error={errors.firstName}
+                        >
                           <input
                             type="text"
                             name="firstName"
@@ -1298,7 +1509,11 @@ const Profile = () => {
                             maxLength={50}
                           />
                         </Field>
-                        <Field icon={FaUser} label="Last Name *">
+                        <Field
+                          icon={FaUser}
+                          label="Last Name *"
+                          error={errors.lastName}
+                        >
                           <input
                             type="text"
                             name="lastName"
@@ -1318,7 +1533,11 @@ const Profile = () => {
                       <SectionLabel>Contact</SectionLabel>
                       <div className="pf-form-grid-2">
                         <div>
-                          <Field icon={FaEnvelope} label="Email Address">
+                          <Field
+                            icon={FaEnvelope}
+                            label="Email Address"
+                            error={errors.email}
+                          >
                             <input
                               type="email"
                               name="email"
@@ -1329,7 +1548,7 @@ const Profile = () => {
                               maxLength={254}
                             />
                           </Field>
-                          {emailChanged && (
+                          {emailChanged && !errors.email && (
                             <p
                               style={{
                                 fontSize: 11,
@@ -1343,7 +1562,11 @@ const Profile = () => {
                             </p>
                           )}
                         </div>
-                        <Field icon={FaPhone} label="Phone Number">
+                        <Field
+                          icon={FaPhone}
+                          label="Phone Number"
+                          error={errors.phone}
+                        >
                           <input
                             type="tel"
                             name="phone"
@@ -1477,7 +1700,7 @@ const Profile = () => {
 
                 {/* ── EMAIL OTP ── */}
                 {activePanel === "otp" && (
-                  <form onSubmit={handleVerifyEmailOTP}>
+                  <form onSubmit={handleVerifyEmailOTP} noValidate>
                     <div className="pf-info-notice">
                       <FaEnvelope
                         style={{
@@ -1497,14 +1720,23 @@ const Profile = () => {
 
                     <div style={{ marginBottom: 16 }}>
                       <label style={labelStyle}>Verification Code</label>
-                      <div style={{ ...inputWrapStyle, borderRadius: 14 }}>
+                      <div
+                        style={{
+                          ...inputWrapStyle,
+                          borderRadius: 14,
+                          ...(otpError
+                            ? { borderColor: "#b50002", background: "#FDF0F0" }
+                            : null),
+                        }}
+                      >
                         <FaLock style={iconStyle} />
                         <input
                           type="tel"
                           value={emailOTP}
-                          onChange={(e) =>
-                            setEmailOTP(e.target.value.replace(/\D/g, ""))
-                          }
+                          onChange={(e) => {
+                            setEmailOTP(e.target.value.replace(/\D/g, ""));
+                            if (otpError) setOtpError("");
+                          }}
                           className="pf-otp-input"
                           placeholder="— — — — — —"
                           required
@@ -1512,6 +1744,7 @@ const Profile = () => {
                           inputMode="numeric"
                         />
                       </div>
+                      {otpError && <p style={errorTextStyle}>{otpError}</p>}
                     </div>
 
                     <button
@@ -1520,24 +1753,45 @@ const Profile = () => {
                       disabled={
                         !emailChangeOtpCooldown.canResend ||
                         resendingEmailOtp ||
-                        updating
+                        updating ||
+                        emailOtpResendLimitReached
                       }
                       className="pf-resend-btn"
                       style={{
                         color:
-                          !emailChangeOtpCooldown.canResend || resendingEmailOtp
+                          !emailChangeOtpCooldown.canResend ||
+                          resendingEmailOtp ||
+                          emailOtpResendLimitReached
                             ? "rgba(0,0,0,0.3)"
                             : "#b50002",
                         cursor:
-                          !emailChangeOtpCooldown.canResend || resendingEmailOtp
+                          !emailChangeOtpCooldown.canResend ||
+                          resendingEmailOtp ||
+                          emailOtpResendLimitReached
                             ? "not-allowed"
                             : "pointer",
                       }}
                     >
-                      {!emailChangeOtpCooldown.canResend
-                        ? `Resend OTP in ${formatCooldown(emailChangeOtpCooldown.remainingSeconds)}`
-                        : "Didn't receive it? Resend OTP"}
+                      {emailOtpResendLimitReached
+                        ? "Resend limit reached"
+                        : !emailChangeOtpCooldown.canResend
+                          ? `Resend OTP in ${formatCooldown(emailChangeOtpCooldown.remainingSeconds)}`
+                          : "Didn't receive it? Resend OTP"}
                     </button>
+
+                    {emailOtpResendLimitReached && (
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "#b50002",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          marginTop: 4,
+                        }}
+                      >
+                        You've reached the resend limit. Please wait for the
+                        current code to expire and try again.
+                      </p>
+                    )}
 
                     <button
                       type="submit"
@@ -1553,7 +1807,7 @@ const Profile = () => {
 
                 {/* ── CHANGE PASSWORD ── */}
                 {activePanel === "password" && (
-                  <form onSubmit={handleChangePassword}>
+                  <form onSubmit={handleChangePassword} noValidate>
                     <SectionLabel>Update Password</SectionLabel>
 
                     {[
@@ -1575,18 +1829,34 @@ const Profile = () => {
                     ].map(({ label, field, name }) => (
                       <div key={name} style={{ marginBottom: 16 }}>
                         <label style={labelStyle}>{label}</label>
-                        <div style={{ ...inputWrapStyle }}>
+                        <div
+                          style={{
+                            ...inputWrapStyle,
+                            ...(passwordErrors[name]
+                              ? {
+                                  borderColor: "#b50002",
+                                  background: "#FDF0F0",
+                                }
+                              : null),
+                          }}
+                        >
                           <FaLock style={iconStyle} />
                           <input
                             type={showPasswords[field] ? "text" : "password"}
                             name={name}
                             value={passwordData[name]}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              setPasswordErrors((prev) => {
+                                if (!(e.target.name in prev)) return prev;
+                                const next = { ...prev };
+                                delete next[e.target.name];
+                                return next;
+                              });
                               setPasswordData((p) => ({
                                 ...p,
                                 [e.target.name]: e.target.value,
-                              }))
-                            }
+                              }));
+                            }}
                             style={{ ...inputStyle, paddingRight: 40 }}
                             placeholder={label}
                             required
@@ -1615,33 +1885,39 @@ const Profile = () => {
                             {showPasswords[field] ? <FaEyeSlash /> : <FaEye />}
                           </button>
                         </div>
-                        {name === "newPassword" &&
-                          passwordData.newPassword.length > 0 && (
-                            <PasswordStrengthMeter
-                              password={passwordData.newPassword}
-                            />
-                          )}
-                        {name === "confirmPassword" &&
-                          passwordData.confirmPassword && (
-                            <p
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                marginTop: 5,
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                color:
-                                  passwordData.newPassword ===
+                        {passwordErrors[name] ? (
+                          <p style={errorTextStyle}>{passwordErrors[name]}</p>
+                        ) : (
+                          <>
+                            {name === "newPassword" &&
+                              passwordData.newPassword.length > 0 && (
+                                <PasswordStrengthMeter
+                                  password={passwordData.newPassword}
+                                />
+                              )}
+                            {name === "confirmPassword" &&
+                              passwordData.confirmPassword && (
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    marginTop: 5,
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    color:
+                                      passwordData.newPassword ===
+                                      passwordData.confirmPassword
+                                        ? "#16a34a"
+                                        : "#b50002",
+                                  }}
+                                >
+                                  {passwordData.newPassword ===
                                   passwordData.confirmPassword
-                                    ? "#16a34a"
-                                    : "#b50002",
-                              }}
-                            >
-                              {passwordData.newPassword ===
-                              passwordData.confirmPassword
-                                ? "✓ Passwords match"
-                                : "✗ Passwords do not match"}
-                            </p>
-                          )}
+                                    ? "✓ Passwords match"
+                                    : "✗ Passwords do not match"}
+                                </p>
+                              )}
+                          </>
+                        )}
                       </div>
                     ))}
 
@@ -1696,6 +1972,12 @@ const Profile = () => {
       )}
 
       <Footer />
+      {showLoyaltyInfo && (
+        <LoyaltyHowItWorksModal
+          currentTier={loyalty?.tier}
+          onClose={() => setShowLoyaltyInfo(false)}
+        />
+      )}
       <ToastContainer
         position="top-right"
         autoClose={3000}

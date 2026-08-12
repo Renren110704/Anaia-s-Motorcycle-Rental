@@ -41,16 +41,28 @@ import {
   Trash2,
   RotateCcw,
   AlertTriangle,
+  History,
+  Mail,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
+import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
   baseURL: BASE,
   headers: { Accept: "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 const ITEMS_PER_PAGE = 10;
 
@@ -99,11 +111,16 @@ const labelCls =
   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
 const fieldCls =
   "w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30";
+const fieldClsError =
+  "w-full px-3 py-2.5 rounded-xl border border-[#b50002] bg-[#FDF0F0] text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]";
 const fieldClsIcon =
   "w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 appearance-none";
+const fieldClsIconError =
+  "w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#b50002] bg-[#FDF0F0] text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002] appearance-none";
+const fieldErrorTextCls = "text-[11px] font-semibold text-[#b50002] mt-1.5";
 
 // Icon-wrapped input container
-const IconField = ({ icon: Icon, label, children }) => (
+const IconField = ({ icon: Icon, label, error, children }) => (
   <div>
     {label && <label className={labelCls}>{label}</label>}
     <div className="relative flex items-center">
@@ -112,6 +129,7 @@ const IconField = ({ icon: Icon, label, children }) => (
       )}
       {children}
     </div>
+    {error && <p className={fieldErrorTextCls}>{error}</p>}
   </div>
 );
 
@@ -123,6 +141,16 @@ const STATUS_STYLE = {
   pending: "bg-violet-50 text-violet-600 border-violet-200",
   deleted: "bg-red-50 text-[#b50002] border-red-200",
 };
+// ── GPS Tracker indicator (icon-only) ─────────────────────────────────────────
+const GpsIndicator = ({ hasGps }) => (
+  <FaSatelliteDish
+    title={hasGps ? "GPS Tracker Assigned" : "No GPS Tracker"}
+    className={`text-[11px] flex-shrink-0 ${
+      hasGps ? "text-blue-500" : "text-slate-300"
+    }`}
+  />
+);
+
 const StatusBadge = ({ status, isDeleted }) => {
   const key = isDeleted ? "deleted" : status;
   const cls =
@@ -194,6 +222,386 @@ const confirmModal = (message, isPermanent = false) =>
       />,
     );
   });
+
+// ── Booking history helpers ──────────────────────────────────────────────────
+const BOOKING_STATUS_STYLE = {
+  pending_reservation: "bg-amber-50 text-amber-600 border-amber-200",
+  pending_full_payment: "bg-orange-50 text-orange-600 border-orange-200",
+  pending: "bg-amber-50 text-amber-600 border-amber-200",
+  active: "bg-blue-50 text-blue-600 border-blue-200",
+  inspection: "bg-violet-50 text-violet-600 border-violet-200",
+  completed: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  cancelled: "bg-slate-50 text-slate-500 border-slate-200",
+  rejected: "bg-red-50 text-[#b50002] border-red-200",
+};
+const BOOKING_STATUS_LABEL = {
+  pending_reservation: "Pending Reservation",
+  pending_full_payment: "Pending Full Payment",
+  active: "Active",
+  inspection: "Inspection",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  rejected: "Rejected",
+};
+// Statuses considered "current" (ongoing/unresolved) vs. "past" (closed out)
+const CURRENT_BOOKING_STATUSES = new Set([
+  "pending_reservation",
+  "pending_full_payment",
+  "pending",
+  "active",
+  "inspection",
+]);
+
+// ── Inspection clearance helpers (mirrors ReturnInspection) ──────────────────
+const CLEARANCE_STYLE = {
+  cleared: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  damage_found: "bg-amber-50 text-amber-600 border-amber-200",
+  penalty_required: "bg-red-50 text-[#b50002] border-red-200",
+  pending_inspection: "bg-violet-50 text-violet-600 border-violet-200",
+};
+const clearanceLabel = (val) =>
+  val
+    ? val
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    : "Pending Inspection";
+const ClearanceBadge = ({ status }) => {
+  const cls =
+    CLEARANCE_STYLE[status] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}
+    >
+      {clearanceLabel(status)}
+    </span>
+  );
+};
+
+const BookingStatusBadge = ({ status, isDeleted }) => {
+  const key = isDeleted ? "rejected" : status;
+  const cls =
+    BOOKING_STATUS_STYLE[key] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  const label = isDeleted
+    ? "Rejected"
+    : (BOOKING_STATUS_LABEL[status] ??
+      String(status || "")
+        .charAt(0)
+        .toUpperCase() + String(status || "").slice(1));
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cls}`}
+    >
+      {label}
+    </span>
+  );
+};
+
+const formatBookingDate = (s) => {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (isNaN(d)) return "—";
+  return d.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatBookingTime = (timeStr) => {
+  if (!timeStr) return "";
+  const [hourStr, minStr] = String(timeStr).split(":");
+  const hour = parseInt(hourStr, 10);
+  const min = minStr || "00";
+  if (isNaN(hour)) return timeStr;
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${min} ${period}`;
+};
+
+// Pulls the referenced motorcycle's identity off a raw booking record,
+// regardless of whether it was stored as a snapshot, populated object, or string.
+const extractBookingMotorcycleRef = (b = {}) => {
+  const snap =
+    b.motorcycleSnapshot &&
+    typeof b.motorcycleSnapshot === "object" &&
+    Object.keys(b.motorcycleSnapshot).length
+      ? b.motorcycleSnapshot
+      : null;
+  const moto =
+    snap ||
+    (b.motorcycle && typeof b.motorcycle === "object" ? b.motorcycle : null);
+  if (moto) {
+    return {
+      id: moto._id || moto.id || "",
+      unitId: moto.unitId || "",
+      title:
+        `${moto.make || ""} ${moto.model || ""}`.trim() ||
+        moto.make ||
+        moto.model ||
+        "",
+    };
+  }
+  return {
+    id: b.motorcycleId || "",
+    unitId: "",
+    title:
+      typeof b.motorcycle === "string"
+        ? b.motorcycle
+        : b.motorcycleName || b.vehicle || "",
+  };
+};
+
+// Bookings are matched to a physical unit by its database id first, then by
+// its Unit ID (e.g. "UNIT-01"). We deliberately do NOT fall back to matching
+// on make/model — several units can share the same make & model, so a
+// name-based match would leak one unit's bookings into another unit's
+// history. If neither the id nor the Unit ID matches, the booking is not
+// considered to belong to this unit.
+const bookingBelongsToMotorcycle = (booking, motorcycle) => {
+  const ref = extractBookingMotorcycleRef(booking);
+  const mId = motorcycle._id || motorcycle.id;
+  if (ref.id && mId && String(ref.id) === String(mId)) return true;
+  if (ref.unitId && motorcycle.unitId && ref.unitId === motorcycle.unitId)
+    return true;
+  return false;
+};
+
+const BookingHistoryRow = ({ booking: b }) => {
+  const isCurrent = !b.isDeleted && CURRENT_BOOKING_STATUSES.has(b.status);
+  return (
+    <div className="bg-white rounded-xl border border-slate-100 p-4 hover:border-slate-200 transition-colors">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <p className="font-black text-[13px] text-[#171717] leading-tight truncate">
+            {b.customer || "Unknown customer"}
+          </p>
+          {b.email && (
+            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+              <Mail className="w-3 h-3 flex-shrink-0" /> {b.email}
+            </p>
+          )}
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-1.5">
+          {isCurrent && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-[#b50002]/10 text-[#b50002] uppercase tracking-wide">
+              Current
+            </span>
+          )}
+          <BookingStatusBadge status={b.status} isDeleted={b.isDeleted} />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <FaCalendarAlt className="text-[#b50002] text-[10px]" />
+          {formatBookingDate(b.pickupDate)}
+          {b.pickupTime ? ` · ${formatBookingTime(b.pickupTime)}` : ""}
+          <ArrowRight className="w-3 h-3 text-slate-300 mx-0.5" />
+          {formatBookingDate(b.returnDate)}
+          {b.returnTime ? ` · ${formatBookingTime(b.returnTime)}` : ""}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
+        <span className="text-[11px] text-slate-400">
+          Booked {formatBookingDate(b.bookingDate)}
+        </span>
+        <span className="font-black text-[13px] text-[#171717]">
+          ₱{Number(b.amount || 0).toLocaleString()}
+        </span>
+      </div>
+
+      {/* Inspection history */}
+      {b.returnInspection &&
+        (b.returnInspection.clearanceStatus ||
+          b.returnInspection.inspectionDate) && (
+          <div className="mt-2 pt-2 border-t border-slate-50">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-slate-300 uppercase">
+                <Wrench className="w-3 h-3 text-[#b50002]" />
+                Inspection
+              </span>
+              <ClearanceBadge status={b.returnInspection.clearanceStatus} />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+              {b.returnInspection.inspectionDate && (
+                <span className="flex items-center gap-1.5">
+                  <FaCalendarAlt className="text-[#b50002] text-[10px]" />
+                  Inspected{" "}
+                  {formatBookingDate(b.returnInspection.inspectionDate)}
+                </span>
+              )}
+              {b.returnInspection.clearanceStatus === "damage_found" &&
+                Number(b.returnInspection.repairEstimateAmount) > 0 && (
+                  <span>
+                    Repair est. ₱
+                    {Number(
+                      b.returnInspection.repairEstimateAmount,
+                    ).toLocaleString()}
+                  </span>
+                )}
+              {b.returnInspection.clearanceStatus === "penalty_required" &&
+                Number(b.returnInspection.penaltyAmount) > 0 && (
+                  <span>
+                    Penalty ₱
+                    {Number(b.returnInspection.penaltyAmount).toLocaleString()}
+                  </span>
+                )}
+            </div>
+            {b.returnInspection.damageNotes && (
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug line-clamp-2">
+                {b.returnInspection.damageNotes}
+              </p>
+            )}
+          </div>
+        )}
+    </div>
+  );
+};
+
+const BookingHistoryModal = ({ motorcycle, onClose }) => {
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.get("/api/motorcycle-bookings", {
+          params: { limit: 500, includeDeleted: "true" },
+        });
+        const raw = Array.isArray(res.data)
+          ? res.data
+          : res.data.data || res.data.bookings || [];
+        const mapped = raw
+          .filter((b) => bookingBelongsToMotorcycle(b, motorcycle))
+          .map((b, i) => ({
+            id: b._id || b.id || `local-${i + 1}`,
+            customer: b.customer || b.customerName || "",
+            email: b.email || "",
+            pickupDate: b.pickupDate || b.pickup || b.startDate || "",
+            pickupTime: b.pickupTime || "",
+            returnDate: b.returnDate || b.return || b.endDate || "",
+            returnTime: b.returnTime || "",
+            bookingDate: b.bookingDate || b.createdAt || "",
+            status:
+              (b.status || "pending_reservation") === "pending"
+                ? "pending_reservation"
+                : b.status || "pending_reservation",
+            amount: b.amount ?? b.total ?? 0,
+            isDeleted: !!b.isDeleted,
+            returnInspection: b.returnInspection || null,
+          }))
+          .sort(
+            (a, b2) =>
+              new Date(b2.bookingDate || b2.pickupDate || 0) -
+              new Date(a.bookingDate || a.pickupDate || 0),
+          );
+        if (!cancelled) setBookings(mapped);
+      } catch (err) {
+        if (!cancelled)
+          setError(
+            err.response?.data?.message ||
+              err.message ||
+              "Failed to load booking history",
+          );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [motorcycle]);
+
+  const currentCount = bookings.filter(
+    (b) => !b.isDeleted && CURRENT_BOOKING_STATUSES.has(b.status),
+  ).length;
+  const pastCount = bookings.length - currentCount;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-50 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+              <History className="w-5 h-5 text-[#b50002]" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-black text-[#171717] truncate">
+                Booking History
+              </h3>
+              <p className="text-[11px] text-slate-400 truncate">
+                {motorcycle.unitId ? `${motorcycle.unitId} · ` : ""}
+                {motorcycle.make} {motorcycle.model}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Summary */}
+        {!loading && !error && bookings.length > 0 && (
+          <div className="px-6 py-3 bg-slate-50/60 border-b border-slate-50 flex-shrink-0">
+            <p className="text-[11px] text-slate-500 font-semibold">
+              <span className="text-[#171717] font-black">
+                {bookings.length}
+              </span>{" "}
+              total reservation{bookings.length !== 1 ? "s" : ""} ·{" "}
+              <span className="text-[#b50002] font-black">{currentCount}</span>{" "}
+              current ·{" "}
+              <span className="text-slate-400 font-black">{pastCount}</span>{" "}
+              past
+            </p>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="overflow-y-auto px-6 py-4 space-y-3">
+          {loading ? (
+            [...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="h-20 bg-slate-50 rounded-xl animate-pulse"
+              />
+            ))
+          ) : error ? (
+            <div className="text-center py-10">
+              <AlertTriangle className="w-8 h-8 text-[#b50002] mx-auto mb-2" />
+              <p className="text-sm text-slate-500">{error}</p>
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="text-center py-10">
+              <Clock className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+              <p className="text-sm text-slate-500 font-semibold">
+                No bookings yet
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                This unit hasn't been rented by anyone.
+              </p>
+            </div>
+          ) : (
+            bookings.map((b) => <BookingHistoryRow key={b.id} booking={b} />)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 const StatCard = ({
@@ -338,7 +746,13 @@ const QuickAction = ({ onClick, icon: Icon, title, desc, accent }) => (
 );
 
 // ── Motorcycle Card ───────────────────────────────────────────────────────────
-const MotorcycleCard = ({ motorcycle: m, onEdit, onDelete, onRestore }) => (
+const MotorcycleCard = ({
+  motorcycle: m,
+  onEdit,
+  onDelete,
+  onRestore,
+  onViewHistory,
+}) => (
   <div
     className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${m.isDeleted ? "opacity-60" : ""}`}
   >
@@ -364,8 +778,11 @@ const MotorcycleCard = ({ motorcycle: m, onEdit, onDelete, onRestore }) => (
               {m.unitId}
             </p>
           )}
-          <h3 className="font-black text-[#171717] text-[15px] leading-tight">
-            {m.make} {m.model}
+          <h3 className="font-black text-[#171717] text-[15px] leading-tight flex items-start justify-between gap-2">
+            <span>
+              {m.make} {m.model}
+            </span>
+            <GpsIndicator hasGps={!!m.traccarDeviceId} />
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             {m.year} · {m.category}
@@ -406,6 +823,12 @@ const MotorcycleCard = ({ motorcycle: m, onEdit, onDelete, onRestore }) => (
           })}
         </p>
       )}
+      <button
+        onClick={() => onViewHistory(m)}
+        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors mb-2"
+      >
+        <History className="w-3.5 h-3.5" /> View Booking History
+      </button>
       <div className="flex gap-2 pt-3 border-t border-slate-50">
         {m.isDeleted ? (
           <>
@@ -453,6 +876,7 @@ const MotorcycleTable = ({
   onEdit,
   onDelete,
   onRestore,
+  onViewHistory,
   colSort,
   onColSort,
 }) => {
@@ -519,8 +943,11 @@ const MotorcycleTable = ({
                       />
                     </div>
                     <div>
-                      <p className="font-black text-[13px] text-[#171717] leading-tight">
-                        {m.make} {m.model}
+                      <p className="font-black text-[13px] text-[#171717] leading-tight flex items-start justify-between gap-2">
+                        <span>
+                          {m.make} {m.model}
+                        </span>
+                        <GpsIndicator hasGps={!!m.traccarDeviceId} />
                       </p>
                       <p className="text-[11px] text-slate-400">{m.category}</p>
                       {m.isDeleted && m.deletedAt && (
@@ -549,6 +976,13 @@ const MotorcycleTable = ({
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => onViewHistory(m)}
+                      title="Booking History"
+                      className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </button>
                     {m.isDeleted ? (
                       <>
                         <button
@@ -600,6 +1034,28 @@ const MotorcycleTable = ({
 };
 
 // ── ADD MOTORCYCLE MODAL ──────────────────────────────────────────────────────
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const IMAGE_TOO_LARGE_MESSAGE =
+  "That image is too large. Please upload a photo up to 5MB.";
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const UNSUPPORTED_IMAGE_TYPE_MESSAGE =
+  "Unsupported file type. Please upload a JPG, PNG, or WEBP image.";
+
+// Turns a failed unit save (esp. image upload issues) into a friendly
+// message instead of leaking raw axios/HTTP text like
+// "Request failed with status code 500".
+const getFriendlySaveErrorMessage = (err, fallback) => {
+  const serverMessage = err?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+
+  const status = err?.response?.status;
+  if (status === 413 || status === 500) {
+    return IMAGE_TOO_LARGE_MESSAGE;
+  }
+
+  return fallback;
+};
+
 const initialAddForm = {
   unitId: "",
   brandName: "Honda",
@@ -621,16 +1077,33 @@ const initialAddForm = {
 const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
   const [data, setData] = useState(initialAddForm);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
   const fileRef = useRef(null);
 
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     setData((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   }, []);
 
   const handleImageChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error(UNSUPPORTED_IMAGE_TYPE_MESSAGE);
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error(IMAGE_TOO_LARGE_MESSAGE);
+      e.target.value = "";
+      return;
+    }
     setData((p) => ({ ...p, image: file }));
     const reader = new FileReader();
     reader.onload = (evt) =>
@@ -644,6 +1117,17 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const next = {};
+    if (!data.unitId.trim()) next.unitId = "Unit ID is required";
+    if (!data.model.trim()) next.model = "Model is required";
+    if (!data.year) next.year = "Year is required";
+    if (!data.engineSize) next.engineSize = "Engine size is required";
+    if (!data.dailyPrice) next.dailyPrice = "Daily price is required";
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
     const trimmedId = data.traccarDeviceId?.trim();
     if (trimmedId) {
       const isDuplicate = motorcycles.some(
@@ -684,9 +1168,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || err.message || "Failed to add unit",
-      );
+      toast.error(getFriendlySaveErrorMessage(err, "Failed to add unit"));
     } finally {
       setSubmitting(false);
     }
@@ -708,19 +1190,22 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
           {/* Unit Identifiers */}
           <div>
             <p className={`${labelCls} mb-3`}>Unit Identifiers</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <IconField icon={FaIdCard} label="Unit ID *">
+              <IconField
+                icon={FaIdCard}
+                label="Unit ID *"
+                error={errors.unitId}
+              >
                 <input
-                  required
                   name="unitId"
                   value={data.unitId}
                   onChange={handleChange}
                   type="text"
-                  className={fieldClsIcon}
+                  className={errors.unitId ? fieldClsIconError : fieldClsIcon}
                   placeholder="e.g. UNIT-01"
                   maxLength={30}
                 />
@@ -806,15 +1291,18 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
                     ))}
                   </select>
                 </IconField>
-                <IconField icon={FaCalendarAlt} label="Year *">
+                <IconField
+                  icon={FaCalendarAlt}
+                  label="Year *"
+                  error={errors.year}
+                >
                   <input
-                    required
                     name="year"
                     value={data.year}
                     onChange={handleChange}
                     type="number"
                     onKeyDown={noScroll}
-                    className={fieldClsIcon}
+                    className={errors.year ? fieldClsIconError : fieldClsIcon}
                     placeholder="2020"
                     min="1990"
                     max={new Date().getFullYear()}
@@ -824,27 +1312,35 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
 
               {/* Model / Engine / Fuel */}
               <div className="grid grid-cols-3 gap-3">
-                <IconField icon={FaMotorcycle} label="Model *">
+                <IconField
+                  icon={FaMotorcycle}
+                  label="Model *"
+                  error={errors.model}
+                >
                   <input
-                    required
                     name="model"
                     value={data.model}
                     onChange={handleChange}
                     type="text"
-                    className={fieldClsIcon}
+                    className={errors.model ? fieldClsIconError : fieldClsIcon}
                     placeholder="e.g. Click"
                     maxLength={18}
                   />
                 </IconField>
-                <IconField icon={FaTachometerAlt} label="Engine (cc) *">
+                <IconField
+                  icon={FaTachometerAlt}
+                  label="Engine (cc) *"
+                  error={errors.engineSize}
+                >
                   <input
-                    required
                     name="engineSize"
                     value={data.engineSize}
                     onChange={handleChange}
                     type="number"
                     onKeyDown={noScroll}
-                    className={fieldClsIcon}
+                    className={
+                      errors.engineSize ? fieldClsIconError : fieldClsIcon
+                    }
                     placeholder="150"
                     min="50"
                   />
@@ -875,17 +1371,23 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
                       ₱
                     </span>
                     <input
-                      required
                       name="dailyPrice"
                       value={data.dailyPrice}
                       onChange={handleChange}
                       type="number"
                       onKeyDown={noScroll}
-                      className={fieldClsIcon}
+                      className={
+                        errors.dailyPrice ? fieldClsIconError : fieldClsIcon
+                      }
                       placeholder="200"
                       min="1"
                     />
                   </div>
+                  {errors.dailyPrice && (
+                    <p className="text-[11px] font-semibold text-[#b50002] mt-1.5">
+                      {errors.dailyPrice}
+                    </p>
+                  )}
                 </div>
                 <IconField icon={FaCog} label="Transmission *">
                   <select
@@ -977,7 +1479,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
                         <p className="text-xs font-semibold">
                           Click to upload image
                         </p>
-                        <p className="text-[10px]">PNG, JPG up to 5MB</p>
+                        <p className="text-[10px]">PNG, JPG, WEBP up to 5MB</p>
                       </div>
                     )}
                   </div>
@@ -987,7 +1489,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
                     name="image"
                     onChange={handleImageChange}
                     className="hidden"
-                    accept="image/*"
+                    accept={ALLOWED_IMAGE_TYPES.join(",")}
                   />
                 </label>
               </div>
@@ -1036,7 +1538,15 @@ const noScroll = (e) => {
   if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
 };
 
-const EditTF = ({ label, name, type = "text", value, onChange, opts = {} }) => (
+const EditTF = ({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  opts = {},
+  error,
+}) => (
   <div>
     <label className={labelCls}>{label}</label>
     <input
@@ -1045,25 +1555,27 @@ const EditTF = ({ label, name, type = "text", value, onChange, opts = {} }) => (
       value={value || ""}
       onChange={onChange}
       onKeyDown={type === "number" ? noScroll : undefined}
-      required={opts.required}
       min={opts.min}
       max={opts.max}
       step={opts.step}
       maxLength={opts.maxLength}
       placeholder={opts.placeholder}
-      className={fieldCls}
+      className={error ? fieldClsError : fieldCls}
     />
+    {error && (
+      <p className="text-[11px] font-semibold text-[#b50002] mt-1.5">{error}</p>
+    )}
   </div>
 );
 
-const EditSF = ({ label, name, value, onChange, options }) => (
+const EditSF = ({ label, name, value, onChange, options, error }) => (
   <div>
     <label className={labelCls}>{label}</label>
     <select
       name={name}
       value={value ?? ""}
       onChange={onChange}
-      className={fieldCls}
+      className={error ? fieldClsError : fieldCls}
     >
       {options.map((o) => (
         <option key={o.value ?? o} value={o.value ?? o}>
@@ -1071,14 +1583,24 @@ const EditSF = ({ label, name, value, onChange, options }) => (
         </option>
       ))}
     </select>
+    {error && (
+      <p className="text-[11px] font-semibold text-[#b50002] mt-1.5">{error}</p>
+    )}
   </div>
 );
 
 // ── EDIT MOTORCYCLE MODAL ─────────────────────────────────────────────────────
-const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => {
+const EditModal = ({
+  motorcycle,
+  onClose,
+  onSubmit,
+  onChange,
+  motorcycles,
+}) => {
   const fileRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     const cur = motorcycle?.image || motorcycle?._rawImage || "";
@@ -1112,6 +1634,16 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error(UNSUPPORTED_IMAGE_TYPE_MESSAGE);
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error(IMAGE_TOO_LARGE_MESSAGE);
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (evt) => {
       setSelectedImage(file);
@@ -1122,6 +1654,12 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     onChange({
       ...motorcycle,
       [name]:
@@ -1137,9 +1675,17 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!motorcycle?.unitId) return toast.error("Unit ID is required.");
-    if (!motorcycle?.make || !motorcycle?.model)
-      return toast.error("Make and Model are required.");
+    const next = {};
+    if (!motorcycle?.unitId?.trim()) next.unitId = "Unit ID is required";
+    if (!motorcycle?.model?.trim()) next.model = "Model is required";
+    if (!motorcycle?.year) next.year = "Year is required";
+    if (!motorcycle?.engineSize) next.engineSize = "Engine size is required";
+    if (!motorcycle?.dailyRate) next.dailyRate = "Daily rate is required";
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
 
     const trimmedId = motorcycle.traccarDeviceId?.trim();
     if (trimmedId) {
@@ -1176,7 +1722,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
             <FaTimes className="text-sm" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <EditTF
@@ -1184,7 +1730,8 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                 name="unitId"
                 value={motorcycle.unitId}
                 onChange={handleInputChange}
-                opts={{ required: true, placeholder: "e.g. UNIT-01", maxLength: 30 }}
+                opts={{ placeholder: "e.g. UNIT-01", maxLength: 30 }}
+                error={errors.unitId}
               />
             </div>
             <div className="sm:col-span-2">
@@ -1196,25 +1743,36 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                 opts={{ placeholder: "e.g. 9210010703", maxLength: 50 }}
               />
             </div>
-            
+
             {/* Make field is now a Select dropdown */}
-            <EditSF 
-              label="Make *" 
-              name="make" 
+            <EditSF
+              label="Make *"
+              name="make"
               value={motorcycle.make}
               onChange={handleInputChange}
               options={[
-                "Honda", "Yamaha", "Suzuki", "Kawasaki", "Toyota", "Nissan", 
-                "Geely", "Mitsubishi", "BYD", "Ford", "Isuzu", "Mazda"
-              ]} 
+                "Honda",
+                "Yamaha",
+                "Suzuki",
+                "Kawasaki",
+                "Toyota",
+                "Nissan",
+                "Geely",
+                "Mitsubishi",
+                "BYD",
+                "Ford",
+                "Isuzu",
+                "Mazda",
+              ]}
             />
-            
-            <EditTF 
-              label="Model *" 
-              name="model" 
+
+            <EditTF
+              label="Model *"
+              name="model"
               value={motorcycle.model}
               onChange={handleInputChange}
-              opts={{ required: true }} 
+              opts={{}}
+              error={errors.model}
             />
             <EditTF
               label="Year *"
@@ -1222,7 +1780,8 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
               type="number"
               value={motorcycle.year}
               onChange={handleInputChange}
-              opts={{ required: true, min: 1900, max: 2099 }}
+              opts={{ min: 1900, max: 2099 }}
+              error={errors.year}
             />
             <EditTF
               label="Daily Rate (₱) *"
@@ -1230,7 +1789,8 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
               type="number"
               value={motorcycle.dailyRate}
               onChange={handleInputChange}
-              opts={{ required: true, min: 1, step: 0.01 }}
+              opts={{ min: 1, step: 0.01 }}
+              error={errors.dailyRate}
             />
             <div className="sm:col-span-2">
               <label className={labelCls}>Description</label>
@@ -1264,7 +1824,8 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
               type="number"
               value={motorcycle.engineSize}
               onChange={handleInputChange}
-              opts={{ required: true, min: 50 }}
+              opts={{ min: 50 }}
+              error={errors.engineSize}
             />
             <EditSF
               label="Transmission *"
@@ -1342,7 +1903,7 @@ const EditModal = ({ motorcycle, onClose, onSubmit, onChange, motorcycles }) => 
                 type="file"
                 ref={fileRef}
                 name="image"
-                accept="image/*"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
                 onChange={handleImageChange}
                 className="hidden"
               />
@@ -1404,6 +1965,7 @@ const ManageMotorcycle = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [historyMotorcycle, setHistoryMotorcycle] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [colSort, setColSort] = useState({ key: null, dir: null });
 
@@ -1578,6 +2140,38 @@ const ManageMotorcycle = () => {
       permanent,
     );
     if (!confirmed) return;
+
+    // Permanent deletes get a second confirmation if the unit has booking
+    // history attached, since the unit record itself can't be recovered
+    // afterward (the bookings remain, stored independently).
+    if (permanent && m._id) {
+      let bookingCount = 0;
+      try {
+        const res = await api.get("/api/motorcycle-bookings", {
+          params: { limit: 500, includeDeleted: "true" },
+        });
+        const raw = Array.isArray(res.data)
+          ? res.data
+          : res.data.data || res.data.bookings || [];
+        bookingCount = raw.filter((b) =>
+          bookingBelongsToMotorcycle(b, m),
+        ).length;
+      } catch {
+        // If the booking lookup fails, don't block the delete flow on it —
+        // just skip the extra warning and proceed to the normal confirm.
+      }
+
+      if (bookingCount > 0) {
+        const reconfirmed = await confirmModal(
+          `${m.make} ${m.model} has ${bookingCount} booking record${
+            bookingCount !== 1 ? "s" : ""
+          } in its history. The booking history will be preserved independently, but this unit's own record cannot be recovered once deleted. Delete anyway?`,
+          true,
+        );
+        if (!reconfirmed) return;
+      }
+    }
+
     try {
       if (!m._id) {
         setMotorcycles((prev) => prev.filter((p) => p.id !== m.id));
@@ -1589,7 +2183,7 @@ const ManageMotorcycle = () => {
           ? `/api/motorcycles/${m._id}/permanent`
           : `/api/motorcycles/${m._id}`,
       );
-      toast.success(permanent ? "Permanently deleted" : "Deleted");
+      toast.success(permanent ? "Permanently deleted" : "Deleted successfully");
       fetchMotorcycles();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete");
@@ -1618,6 +2212,10 @@ const ManageMotorcycle = () => {
     setShowEditModal(true);
   };
 
+  const openHistory = (m) => {
+    setHistoryMotorcycle(m);
+  };
+
   const handleEditSubmit = async (payload) => {
     try {
       await api.put(`/api/motorcycles/${editingMotorcycle._id}`, payload);
@@ -1626,7 +2224,7 @@ const ManageMotorcycle = () => {
       setEditingMotorcycle(null);
       fetchMotorcycles();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to update");
+      toast.error(getFriendlySaveErrorMessage(err, "Failed to update"));
     }
   };
 
@@ -1898,6 +2496,7 @@ const ManageMotorcycle = () => {
                     onEdit={openEdit}
                     onDelete={handleDelete}
                     onRestore={handleRestore}
+                    onViewHistory={openHistory}
                   />
                 ))}
               </div>
@@ -1907,6 +2506,7 @@ const ManageMotorcycle = () => {
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onRestore={handleRestore}
+                onViewHistory={openHistory}
                 colSort={colSort}
                 onColSort={handleColSort}
               />
@@ -2027,6 +2627,14 @@ const ManageMotorcycle = () => {
           }}
           onSubmit={handleEditSubmit}
           onChange={setEditingMotorcycle}
+        />
+      )}
+
+      {/* Booking History Modal */}
+      {historyMotorcycle && (
+        <BookingHistoryModal
+          motorcycle={historyMotorcycle}
+          onClose={() => setHistoryMotorcycle(null)}
         />
       )}
 

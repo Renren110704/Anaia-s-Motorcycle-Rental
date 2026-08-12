@@ -41,6 +41,10 @@ import {
   XCircle,
   ClipboardList,
   Upload,
+  Square,
+  CheckSquare,
+  MinusSquare,
+  ListChecks,
 } from "lucide-react";
 
 const baseURL = API_BASE_URL;
@@ -192,6 +196,53 @@ const getAllowedNextStatuses = (currentStatus) => {
   }
 };
 
+// ── Bulk actions available per status tab ──────────────────────────────────
+// Keyed by the `selectedStatus` tab (isDeleted rows use "rejected").
+const getBulkActionsForStatus = (statusTab) => {
+  switch (statusTab) {
+    case "pending_reservation":
+      return ["confirm", "cancel", "reject"];
+    case "pending_full_payment":
+      return ["cancel", "reject"];
+    case "active":
+      return ["inspection"];
+    case "cancelled":
+      return ["reject"];
+    case "rejected":
+      return ["restore", "cancel"];
+    default:
+      return [];
+  }
+};
+
+const BULK_ACTION_CONFIG = {
+  confirm: {
+    label: "Confirm Reservation",
+    icon: CheckCircle2,
+    cls: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-100",
+  },
+  cancel: {
+    label: "Cancel",
+    icon: FaBan,
+    cls: "bg-amber-50 text-amber-600 hover:bg-amber-100 border-amber-100",
+  },
+  reject: {
+    label: "Reject",
+    icon: Trash2,
+    cls: "bg-red-50 text-[#b50002] hover:bg-red-100 border-red-100",
+  },
+  inspection: {
+    label: "Move to Inspection",
+    icon: ClipboardList,
+    cls: "bg-violet-50 text-violet-600 hover:bg-violet-100 border-violet-100",
+  },
+  restore: {
+    label: "Restore",
+    icon: RotateCcw,
+    cls: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-100",
+  },
+};
+
 // ── Modals ────────────────────────────────────────────────────────────────────
 const ConfirmModal = ({
   message,
@@ -235,6 +286,8 @@ const ConfirmModal = ({
   </div>
 );
 
+const SECURITY_DEPOSIT_AMOUNT = 1000;
+
 const FullPaymentConfirmModal = ({
   customer,
   amount,
@@ -243,6 +296,8 @@ const FullPaymentConfirmModal = ({
   onCancel,
 }) => {
   const [method, setMethod] = useState("Cash");
+  const [depositMethod, setDepositMethod] = useState("Cash");
+  const [depositCollected, setDepositCollected] = useState(false);
   const due = Math.max(0, (amount || 0) - (reservationFee || 200));
 
   return (
@@ -285,6 +340,45 @@ const FullPaymentConfirmModal = ({
           </select>
         </div>
 
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={depositCollected}
+              onChange={(e) => setDepositCollected(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#b50002]"
+            />
+            <span className="text-sm text-[#171717]">
+              <span className="font-bold">
+                Collected ₱{SECURITY_DEPOSIT_AMOUNT.toLocaleString()} refundable
+                security deposit
+              </span>
+              <br />
+              <span className="text-slate-500 text-xs">
+                Required before releasing the motorcycle to the renter.
+              </span>
+            </span>
+          </label>
+
+          {depositCollected && (
+            <div className="mt-3">
+              <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2">
+                Deposit Collection Method
+              </label>
+              <select
+                value={depositMethod}
+                onChange={(e) => setDepositMethod(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+              >
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="PayMaya">PayMaya</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+          )}
+        </div>
+
         <div className="flex gap-3">
           <button
             onClick={onCancel}
@@ -293,8 +387,13 @@ const FullPaymentConfirmModal = ({
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(method)}
-            className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-sm shadow-md shadow-emerald-600/30 hover:brightness-110 transition-all"
+            disabled={!depositCollected}
+            onClick={() => onConfirm(method, depositMethod)}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
+              depositCollected
+                ? "bg-emerald-600 text-white shadow-emerald-600/30 hover:brightness-110"
+                : "bg-slate-200 text-slate-400 shadow-none cursor-not-allowed"
+            }`}
           >
             Confirm
           </button>
@@ -641,6 +740,17 @@ const DetailDrawer = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newStatus, setNewStatus] = useState(booking.status);
+
+  const [previewImage, setPreviewImage] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setPreviewImage(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const details = booking.details || {};
   // const latestExtension = Array.isArray(booking.extensions)
   //   ? booking.extensions[booking.extensions.length - 1]
@@ -663,6 +773,31 @@ const DetailDrawer = ({
         )
       : 1;
   const baseRental = dailyRate * days;
+
+  // True original return date BEFORE any extensions were made. The promo
+  // code applied at checkout must stay pinned to the amount it actually
+  // discounted at the time — `days`/`baseRental` above reflect the CURRENT
+  // (post-extension) duration and grow with every extension, so computing
+  // the original discount against them made it look like it was
+  // stacking/accumulating even though it was only ever applied once.
+  const firstExtensionRecord =
+    Array.isArray(booking.extensions) && booking.extensions.length > 0
+      ? booking.extensions[0]
+      : null;
+  const originalReturnDateForDiscount = firstExtensionRecord?.previousReturnDate
+    ? new Date(firstExtensionRecord.previousReturnDate)
+    : returnDate;
+  const originalBookingDays =
+    pickupDate && originalReturnDateForDiscount
+      ? Math.max(
+          1,
+          Math.ceil(
+            (originalReturnDateForDiscount - pickupDate) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : days;
+  const originalBookingBaseRental = dailyRate * originalBookingDays;
   const reservationFee = booking.reservationFee || 200;
   const storedDistanceFee = details.distanceFee;
   const storedHelmetFee = details.helmetFee;
@@ -715,14 +850,17 @@ const DetailDrawer = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[9990] flex" onClick={onClose}>
-      <div className="flex-1 bg-black/30 backdrop-blur-sm" />
+    <div
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-xl bg-[#f7f8fa] h-full overflow-y-auto shadow-2xl"
+        className="w-full max-w-2xl bg-[#f7f8fa] max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm rounded-t-2xl">
+          {/* ... existing header content ... */}
           <div>
             <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
               Booking Detail
@@ -736,80 +874,7 @@ const DetailDrawer = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {booking.isDeleted ? (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRestore(e, booking.id);
-                    onClose();
-                  }}
-                  className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                  title="Restore"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(e, booking.id, true);
-                    onClose();
-                  }}
-                  className="p-2 rounded-xl bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
-                  title="Reject Forever"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </>
-            ) : (
-              <>
-                {[
-                  "pending_reservation",
-                  "pending_full_payment",
-                  "pending",
-                ].includes(booking.status) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onConfirmPayment(e, booking.id);
-                    }}
-                    className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                    title={
-                      booking.status === "pending_reservation"
-                        ? "Confirm Reservation"
-                        : "Confirm Full Payment"
-                    }
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                  </button>
-                )}
-                {booking.status === "pending_reservation" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRequestReupload(e, booking.id);
-                    }}
-                    className="p-2 rounded-xl bg-orange-50 text-orange-500 hover:bg-orange-100 transition-colors"
-                    title="Request Re-upload"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </button>
-                )}
-                {!["active", "completed"].includes(booking.status) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(e, booking.id, false);
-                      onClose();
-                    }}
-                    className="p-2 rounded-xl bg-red-50 text-[#b50002] hover:bg-red-100 transition-colors"
-                    title="Reject"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </>
-            )}
+            {/* ... existing action buttons ... */}
             <button
               onClick={onClose}
               className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
@@ -921,11 +986,12 @@ const DetailDrawer = ({
                     -₱
                     {Math.round(
                       details.appliedDiscount.discountType === "percentage"
-                        ? (baseRental * details.appliedDiscount.discountValue) /
+                        ? (originalBookingBaseRental *
+                            details.appliedDiscount.discountValue) /
                             100
                         : Math.min(
                             details.appliedDiscount.discountValue,
-                            baseRental,
+                            originalBookingBaseRental,
                           ),
                     ).toLocaleString("en-US")}
                   </span>
@@ -983,6 +1049,29 @@ const DetailDrawer = ({
                   </span>
                 </div>
               )}
+
+              {/* Promo code(s) used specifically on an extension — kept
+                  separate from the original checkout promo shown above,
+                  since it isn't carried over/reapplied automatically. */}
+              {(booking.extensions || [])
+                .filter((ext) => ext.appliedDiscount?.code)
+                .map((ext, idx) => (
+                  <div
+                    key={ext._id || idx}
+                    className="flex items-center justify-between pl-4"
+                  >
+                    <span className="text-slate-400 text-[11px]">
+                      ↳ Promo ({ext.appliedDiscount.code}) on extension
+                    </span>
+                    <span className="font-semibold text-emerald-600 text-[11px]">
+                      {ext.appliedDiscount.discountType === "percentage"
+                        ? `${ext.appliedDiscount.discountValue}% off`
+                        : `-₱${Math.round(
+                            ext.appliedDiscount.discountValue,
+                          ).toLocaleString("en-US")}`}
+                    </span>
+                  </div>
+                ))}
 
               {/* Reschedule Fee */}
               {((booking.rescheduleFee || details.rescheduleFee) > 0 ||
@@ -1046,6 +1135,15 @@ const DetailDrawer = ({
                   ).toLocaleString("en-US")}
                 </span>
               </div>
+              {!["active", "inspection", "completed"].includes(
+                booking.status,
+              ) &&
+                !booking.securityDeposit?.collected && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Plus a ₱1,000 refundable security deposit collected at
+                    pickup.
+                  </p>
+                )}
             </div>
           </Section>
 
@@ -1217,7 +1315,10 @@ const DetailDrawer = ({
                   <img
                     src={makeImageUrl(booking.paymentProofImage)}
                     alt="Payment proof"
-                    className="max-h-64 w-full object-contain rounded-xl border border-slate-100 bg-slate-50"
+                    onClick={() =>
+                      setPreviewImage(makeImageUrl(booking.paymentProofImage))
+                    }
+                    className="max-h-64 w-full object-contain rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:opacity-80 transition-opacity"
                   />
                 </div>
               )}
@@ -1282,56 +1383,223 @@ const DetailDrawer = ({
             </div>
           </Section>
 
+          {/* Security Deposit */}
+          {booking.securityDeposit?.collected && (
+            <Section title="Security Deposit">
+              <div
+                className={`rounded-xl border p-4 ${
+                  !booking.securityDeposit.returned
+                    ? "bg-amber-50 border-amber-200"
+                    : booking.securityDeposit.deductions > 0
+                      ? "bg-orange-50 border-orange-200"
+                      : "bg-emerald-50 border-emerald-200"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FaShieldAlt
+                      className={
+                        !booking.securityDeposit.returned
+                          ? "text-amber-600"
+                          : booking.securityDeposit.deductions > 0
+                            ? "text-orange-600"
+                            : "text-emerald-600"
+                      }
+                    />
+                    <span
+                      className={`text-xs font-bold ${
+                        !booking.securityDeposit.returned
+                          ? "text-amber-800"
+                          : booking.securityDeposit.deductions > 0
+                            ? "text-orange-800"
+                            : "text-emerald-800"
+                      }`}
+                    >
+                      Security Deposit (₱
+                      {(
+                        booking.securityDeposit.amount || 1000
+                      ).toLocaleString()}
+                      )
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs font-black ${
+                      !booking.securityDeposit.returned
+                        ? "text-amber-700"
+                        : booking.securityDeposit.deductions > 0
+                          ? "text-orange-700"
+                          : "text-emerald-700"
+                    }`}
+                  >
+                    {!booking.securityDeposit.returned
+                      ? "Held (Refundable)"
+                      : booking.securityDeposit.deductions > 0
+                        ? "Partially Refunded"
+                        : "Fully Refunded"}
+                  </span>
+                </div>
+
+                {!booking.securityDeposit.returned && (
+                  <p className="text-[11px] text-slate-500 mt-2 pl-6">
+                    Collected via{" "}
+                    {booking.securityDeposit.collectionMethod || "Cash"}
+                  </p>
+                )}
+
+                {/* Breakdown once the return inspection has settled the deposit */}
+                {booking.securityDeposit.returned && (
+                  <div
+                    className={`mt-3 pt-3 border-t space-y-1.5 ${
+                      booking.securityDeposit.deductions > 0
+                        ? "border-orange-200"
+                        : "border-emerald-200"
+                    }`}
+                  >
+                    {booking.securityDeposit.deductions > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-orange-800">
+                          Deducted for violations
+                        </span>
+                        <span className="text-[11px] font-bold text-orange-700">
+                          −₱
+                          {Number(
+                            booking.securityDeposit.deductions,
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-500">
+                        Refunded to customer
+                      </span>
+                      <span
+                        className={`text-xs font-black ${
+                          booking.securityDeposit.deductions > 0
+                            ? "text-orange-700"
+                            : "text-emerald-700"
+                        }`}
+                      >
+                        ₱
+                        {Number(
+                          booking.securityDeposit.returnedAmount || 0,
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                    {booking.securityDeposit.balanceDue > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-[#b50002]">
+                          Balance still owed
+                        </span>
+                        <span className="text-xs font-black text-[#b50002]">
+                          ₱
+                          {Number(
+                            booking.securityDeposit.balanceDue,
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {booking.securityDeposit.refundReason && (
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        {booking.securityDeposit.refundReason}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
           {/* Tracking Summary */}
           <Section title="Trip Tracking Summary">
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaRoad className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">Total Distance</span>
+                  <span className="text-slate-400 text-xs font-medium">
+                    Total Distance
+                  </span>
                 </div>
                 <span className="text-[#171717] text-sm font-semibold pl-6">
-                  {booking.trackingSummary ? `${(booking.trackingSummary.totalDistanceKm ?? 0).toFixed(2)} km` : "—"}
+                  {booking.trackingSummary
+                    ? `${(booking.trackingSummary.totalDistanceKm ?? 0).toFixed(2)} km`
+                    : "—"}
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">Avg Speed</span>
+                  <span className="text-slate-400 text-xs font-medium">
+                    Avg Speed
+                  </span>
                 </div>
                 <span className="text-[#171717] text-sm font-semibold pl-6">
-                  {booking.trackingSummary ? `${(booking.trackingSummary.avgSpeedKmh ?? 0).toFixed(1)} km/h` : "—"}
+                  {booking.trackingSummary
+                    ? `${(booking.trackingSummary.avgSpeedKmh ?? 0).toFixed(1)} km/h`
+                    : "—"}
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">Max Speed</span>
+                  <span className="text-slate-400 text-xs font-medium">
+                    Max Speed
+                  </span>
                 </div>
                 <span className="text-[#171717] text-sm font-semibold pl-6">
-                  {booking.trackingSummary ? `${(booking.trackingSummary.maxSpeedKmh ?? 0).toFixed(1)} km/h` : "—"}
+                  {booking.trackingSummary
+                    ? `${(booking.trackingSummary.maxSpeedKmh ?? 0).toFixed(1)} km/h`
+                    : "—"}
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaMapMarkerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">Stops Made</span>
+                  <span className="text-slate-400 text-xs font-medium">
+                    Stops Made
+                  </span>
                 </div>
                 <span className="text-[#171717] text-sm font-semibold pl-6">
-                  {booking.trackingSummary ? (booking.trackingSummary.stopsMade ?? 0) : "—"}
+                  {booking.trackingSummary
+                    ? (booking.trackingSummary.stopsMade ?? 0)
+                    : "—"}
                 </span>
               </div>
             </div>
             {booking.trackingSummary?.lastUpdatedAt && (
               <p className="text-[10px] text-slate-400 mt-3 text-right">
-                Last updated: {formatDateTime(booking.trackingSummary.lastUpdatedAt)}
+                Last updated:{" "}
+                {formatDateTime(booking.trackingSummary.lastUpdatedAt)}
               </p>
             )}
             {!booking.trackingSummary && (
-              <p className="text-[11px] text-slate-400 mt-1">No tracking data recorded for this booking.</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                No tracking data recorded for this booking.
+              </p>
             )}
           </Section>
         </div>
+        {previewImage && (
+          <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={(e) => {
+              e.stopPropagation(); // Prevents closing the DetailDrawer
+              setPreviewImage(null);
+            }}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-6 right-8 text-white hover:text-slate-300 transition-colors text-3xl"
+            >
+              <FaTimes />
+            </button>
+            <img
+              src={previewImage}
+              alt="Full screen preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1348,6 +1616,12 @@ const BookingTable = ({
   onRestore,
   onConfirmPayment,
   onRequestReupload,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelectRow,
+  onToggleSelectAll,
+  allVisibleSelected = false,
+  someVisibleSelected = false,
 }) => {
   const cols = [
     { label: "Customer", key: "customer", sortable: true },
@@ -1367,6 +1641,26 @@ const BookingTable = ({
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-50">
+              {selectionMode && (
+                <th className="px-5 py-3 w-10">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSelectAll?.();
+                    }}
+                    title="Select all on this page"
+                    className="flex items-center justify-center"
+                  >
+                    {allVisibleSelected ? (
+                      <CheckSquare className="w-4 h-4 text-[#b50002]" />
+                    ) : someVisibleSelected ? (
+                      <MinusSquare className="w-4 h-4 text-[#b50002]" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-300" />
+                    )}
+                  </button>
+                </th>
+              )}
               {cols.map((col) => (
                 <th
                   key={col.label}
@@ -1391,8 +1685,25 @@ const BookingTable = ({
               <tr
                 key={booking.id}
                 onClick={() => onRowClick(booking)}
-                className={`hover:bg-slate-50/60 transition-colors cursor-pointer ${booking.isDeleted ? "opacity-50" : ""}`}
+                className={`hover:bg-slate-50/60 transition-colors cursor-pointer ${booking.isDeleted ? "opacity-50" : ""} ${selectionMode && selectedIds?.has(booking.id) ? "bg-red-50/40" : ""}`}
               >
+                {selectionMode && (
+                  <td
+                    className="px-5 py-3.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => onToggleSelectRow?.(booking.id)}
+                      className="flex items-center justify-center"
+                    >
+                      {selectedIds?.has(booking.id) ? (
+                        <CheckSquare className="w-4 h-4 text-[#b50002]" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-300" />
+                      )}
+                    </button>
+                  </td>
+                )}
                 {/* Customer */}
                 <td className="px-5 py-3.5">
                   <p className="font-black text-[13px] text-[#171717] leading-tight">
@@ -1643,6 +1954,11 @@ const MotorcycleBooking = () => {
   // Custom Modal Data for Full Payment
   const [fullPaymentData, setFullPaymentData] = useState(null);
 
+  // ── Bulk selection state ──────────────────────────────────────────────────
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
   const fetchBookings = useCallback(async () => {
     try {
       const res = await api.get("/api/motorcycle-bookings", {
@@ -1683,6 +1999,7 @@ const MotorcycleBooking = () => {
           paymentStatus: b.paymentStatus || "pending_verification",
           reservationPaymentMethod: b.reservationPaymentMethod || "",
           fullPaymentMethod: b.fullPaymentMethod || "",
+          securityDeposit: b.securityDeposit || null,
           paymentProofImage: b.paymentProofImage || "",
           paymentReferenceId: b.paymentReferenceId || "",
           paymentSentAmount: Number(b.paymentSentAmount || 0),
@@ -1726,6 +2043,16 @@ const MotorcycleBooking = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedStatus, colSort]);
+
+  // Clear any bulk selection whenever the visible set of rows changes, so we
+  // never act on rows the admin can no longer see.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [searchTerm, selectedStatus, colSort, currentPage]);
+
+  useEffect(() => {
+    if (!selectionMode) setSelectedIds(new Set());
+  }, [selectionMode]);
 
   const counts = useMemo(
     () => ({
@@ -1905,13 +2232,18 @@ const MotorcycleBooking = () => {
     }
   };
 
-  // Submits the Full Payment with chosen payment method
-  const submitFullPayment = async (method) => {
+  // Submits the Full Payment with chosen payment method, plus the required
+  // security deposit collection details captured at pickup.
+  const submitFullPayment = async (method, depositMethod) => {
     const { id, bookingId } = fullPaymentData;
     try {
       const response = await api.patch(
         `/api/motorcycle-bookings/${id}/confirm-payment`,
-        { fullPaymentMethod: method },
+        {
+          fullPaymentMethod: method,
+          securityDepositCollected: true,
+          securityDepositMethod: depositMethod || method,
+        },
       );
       const updated = response?.data?.booking || {};
 
@@ -1925,6 +2257,7 @@ const MotorcycleBooking = () => {
                 reservationFeePaid:
                   updated.reservationFeePaid ?? b.reservationFeePaid,
                 fullPaymentMethod: updated.fullPaymentMethod || method,
+                securityDeposit: updated.securityDeposit || b.securityDeposit,
               }
             : b,
         ),
@@ -1938,6 +2271,7 @@ const MotorcycleBooking = () => {
           reservationFeePaid:
             updated.reservationFeePaid ?? prev.reservationFeePaid,
           fullPaymentMethod: updated.fullPaymentMethod || method,
+          securityDeposit: updated.securityDeposit || prev.securityDeposit,
         }));
       }
 
@@ -2020,6 +2354,96 @@ const MotorcycleBooking = () => {
         `Error: ${err.response?.data?.message || err.message || "Failed"}`,
         { isError: true },
       );
+    }
+  };
+
+  // ── Bulk selection helpers ───────────────────────────────────────────────
+  const toggleSelectRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      const allSelected =
+        paginated.length > 0 && paginated.every((b) => prev.has(b.id));
+      if (allSelected) return new Set();
+      return new Set(paginated.map((b) => b.id));
+    });
+  };
+
+  const allVisibleSelected =
+    paginated.length > 0 && paginated.every((b) => selectedIds.has(b.id));
+  const someVisibleSelected = paginated.some((b) => selectedIds.has(b.id));
+
+  const handleBulkAction = async (actionKey) => {
+    const config = BULK_ACTION_CONFIG[actionKey];
+    const targets = bookings.filter((b) => selectedIds.has(b.id));
+    if (!config || targets.length === 0) return;
+
+    const plural = targets.length > 1;
+    const confirmed = await confirmModal(
+      `${config.label} ${targets.length} selected booking${plural ? "s" : ""}? This action will be applied to all of them.`,
+      { confirmLabel: config.label },
+    );
+    if (!confirmed) return;
+
+    setBulkProcessing(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((booking) => {
+          if (!booking._id)
+            return Promise.reject(new Error("Missing booking id"));
+          switch (actionKey) {
+            case "confirm":
+              return api.patch(
+                `/api/motorcycle-bookings/${booking._id}/confirm-payment`,
+              );
+            case "cancel":
+              return api.patch(
+                `/api/motorcycle-bookings/${booking._id}/status`,
+                { status: "cancelled" },
+              );
+            case "inspection":
+              return api.patch(
+                `/api/motorcycle-bookings/${booking._id}/status`,
+                { status: "inspection" },
+              );
+            case "reject":
+              return api.delete(`/api/motorcycle-bookings/${booking._id}`);
+            case "restore":
+              return api.patch(
+                `/api/motorcycle-bookings/${booking._id}/restore`,
+              );
+            default:
+              return Promise.reject(new Error("Unknown action"));
+          }
+        }),
+      );
+
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const succeeded = results.length - failed;
+
+      await fetchBookings();
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+
+      if (failed === 0) {
+        await alertModal(
+          `${succeeded} booking${succeeded > 1 ? "s" : ""} updated successfully.`,
+        );
+      } else {
+        await alertModal(
+          `${succeeded} booking${succeeded === 1 ? "" : "s"} updated, ${failed} failed. Please retry the failed booking${failed === 1 ? "" : "s"} individually.`,
+          { isError: succeeded === 0 },
+        );
+      }
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -2201,24 +2625,80 @@ const MotorcycleBooking = () => {
 
         {/* Search + toolbar */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
-          <div className="relative">
-            <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
-            <input
-              type="text"
-              placeholder="Search by customer, unit name, unit ID, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
-              >
-                <FaTimes className="text-sm" />
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
+              <input
+                type="text"
+                placeholder="Search by customer, unit name, unit ID, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm text-[#171717] placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                >
+                  <FaTimes className="text-sm" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectionMode((prev) => !prev)}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-bold transition-colors ${
+                selectionMode
+                  ? "bg-[#b50002] border-[#b50002] text-white"
+                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              <ListChecks className="w-4 h-4" />
+              {selectionMode ? "Cancel Select" : "Select"}
+            </button>
           </div>
+
+          {selectionMode && (
+            <div className="mt-3 pt-3 border-t border-slate-50 flex flex-wrap items-center justify-between gap-3">
+              <button
+                onClick={toggleSelectAllVisible}
+                disabled={paginated.length === 0}
+                className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-[#171717] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {allVisibleSelected ? (
+                  <CheckSquare className="w-4 h-4 text-[#b50002]" />
+                ) : someVisibleSelected ? (
+                  <MinusSquare className="w-4 h-4 text-[#b50002]" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-300" />
+                )}
+                Select All on this page
+              </button>
+
+              {selectedIds.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400">
+                    {selectedIds.size} selected
+                  </span>
+                  {getBulkActionsForStatus(selectedStatus).map((actionKey) => {
+                    const cfg = BULK_ACTION_CONFIG[actionKey];
+                    if (!cfg) return null;
+                    const Icon = cfg.icon;
+                    return (
+                      <button
+                        key={actionKey}
+                        onClick={() => handleBulkAction(actionKey)}
+                        disabled={bulkProcessing}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cfg.cls}`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Result count */}
@@ -2265,6 +2745,12 @@ const MotorcycleBooking = () => {
             onRestore={handleRestore}
             onConfirmPayment={handleConfirmPayment}
             onRequestReupload={handleRequestReupload}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleSelectRow={toggleSelectRow}
+            onToggleSelectAll={toggleSelectAllVisible}
+            allVisibleSelected={allVisibleSelected}
+            someVisibleSelected={someVisibleSelected}
           />
         )}
 

@@ -9,7 +9,6 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
-// Import your background image here (Adjust the path if necessary)
 import mainBg from "../assets/MainBG.png";
 
 const api = axios.create({
@@ -67,6 +66,7 @@ export default function Contact() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [messageError, setMessageError] = useState("");
   const [user, setUser] = useState({ name: "", email: "", phone: "" });
   const [loadingUser, setLoadingUser] = useState(false);
 
@@ -99,17 +99,32 @@ export default function Contact() {
     })();
   }, []);
 
+  const MIN_MESSAGE_WORDS = 10;
+  const countWords = (str) => str.trim().split(/\s+/).filter(Boolean).length;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!message.trim()) {
-      setError("Please enter a message.");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Please log in to send a message.");
       return;
     }
+    const wordCount = countWords(message);
+    if (!message.trim()) {
+      setMessageError("Please enter a message.");
+      return;
+    }
+    if (wordCount < MIN_MESSAGE_WORDS) {
+      setMessageError(
+        `Please enter at least ${MIN_MESSAGE_WORDS} words (currently ${wordCount}).`,
+      );
+      return;
+    }
+    setMessageError("");
     setError("");
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = { Authorization: `Bearer ${token}` };
       await api.post(
         "/api/contact-messages",
         {
@@ -302,6 +317,15 @@ export default function Contact() {
           transition: border-color 0.18s, background 0.18s;
         }
         .ct-textarea-wrap:focus-within { border-color: #b50002; background: #fff; }
+        .ct-textarea-wrap-error {
+          border-color: #b50002 !important;
+          background: #FDF0F0 !important;
+        }
+        .ct-field-error {
+          font-size: 11px; font-weight: 600; color: #b50002;
+          margin-top: 6px;
+          font-family: 'Space Grotesk', sans-serif;
+        }
         .ct-textarea-icon {
           position: absolute; left: 12px; top: 13px;
           color: rgba(181,0,2,0.5); font-size: 13px; pointer-events: none;
@@ -339,6 +363,7 @@ export default function Contact() {
           border-radius: 8px; padding: 9px 12px;
           margin-bottom: 12px;
         }
+        .ct-error a { color: #b50002; text-decoration: underline; }
 
         /* submit */
         .ct-submit {
@@ -569,7 +594,11 @@ export default function Contact() {
                     </button>
                   </div>
                 ) : (
-                  <form className="ct-form-body" onSubmit={handleSubmit}>
+                  <form
+                    className="ct-form-body"
+                    onSubmit={handleSubmit}
+                    noValidate
+                  >
                     {/* Title + hint */}
                     <div className="ct-form-title">Send a Message</div>
                     <div className="ct-form-hint">
@@ -625,7 +654,7 @@ export default function Contact() {
                     {/* Not logged in hint */}
                     {!user.name && !loadingUser && (
                       <p className="ct-login-hint">
-                        Not logged in — details won't be pre-filled.{" "}
+                        You must be logged in to send a message.{" "}
                         <a href="/login">Log in</a> or{" "}
                         <a href="/profile">update your profile</a>.
                       </p>
@@ -636,7 +665,9 @@ export default function Contact() {
                     {/* Message */}
                     <div className="ct-section-label">Message</div>
                     <div className="ct-field">
-                      <div className="ct-textarea-wrap">
+                      <div
+                        className={`ct-textarea-wrap${messageError ? " ct-textarea-wrap-error" : ""}`}
+                      >
                         <svg
                           className="ct-textarea-icon"
                           width="13"
@@ -650,18 +681,35 @@ export default function Contact() {
                         <textarea
                           className="ct-textarea"
                           rows={5}
-                          placeholder="Tell us about your rental needs, questions, or concerns…"
+                          placeholder={`Tell us about your rental needs, questions, or concerns…`}
                           value={message}
-                          onChange={(e) =>
-                            setMessage(e.target.value.slice(0, 1000))
-                          }
+                          onChange={(e) => {
+                            setMessage(e.target.value.slice(0, 1000));
+                            if (messageError) setMessageError("");
+                          }}
                           required
                         />
                       </div>
-                      <div className="ct-char-count">{message.length}/1000</div>
+                      {messageError && (
+                        <p className="ct-field-error">{messageError}</p>
+                      )}
+                      <div className="ct-char-count">
+                        {countWords(message)}/{MIN_MESSAGE_WORDS} words min ·{" "}
+                        {message.length}/1000 characters
+                      </div>
                     </div>
 
-                    {error && <div className="ct-error">{error}</div>}
+                    {error && (
+                      <div className="ct-error">
+                        {error}
+                        {error === "Please log in to send a message." && (
+                          <>
+                            {" "}
+                            <a href="/login">Log in now</a>.
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     <button
                       className="ct-submit"

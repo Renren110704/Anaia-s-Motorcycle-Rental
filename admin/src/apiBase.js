@@ -1,3 +1,19 @@
-const API_BASE_URL = "https://anaias-motorcycle-rental.onrender.com";
+const getDefaultApiBaseUrl = () => {
+  if (typeof window === "undefined") {
+    return "http://localhost:5001";
+  }
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:5001";
+  }
+
+  // If this frontend is hosted on a static host like Hostinger,
+  // use the Render backend service for API requests.
+  return "https://anaias-motorcycle-rental.onrender.com";
+};
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || getDefaultApiBaseUrl();
 
 export default API_BASE_URL;

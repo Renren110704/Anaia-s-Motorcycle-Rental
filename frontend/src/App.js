@@ -12,7 +12,9 @@ import { FaArrowUp } from "react-icons/fa";
 import MyBooking from "./pages/MyBooking";
 import FAQPage from "./pages/FAQPage";
 import AboutPage from "./pages/AboutPage";
-import Chatbot from "./components/Chatbot";
+import Favorites from "./pages/Favorites";
+// import Chatbot from "./components/Chatbot";
+// import UserLiveChat from "./components/UserLiveChat";
 
 // PROTECTED ROUTE
 const ProtectedRoute = ({ children }) => {
@@ -130,10 +132,13 @@ const App = () => {
           }
         />
 
+        <Route path="/favorites" element={<Favorites />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      <Chatbot />
+      {/* <UserLiveChat/>
+      <Chatbot /> */}
 
       {showButton && (
         <button

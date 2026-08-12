@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
+import { FaMedal, FaCrown, FaGem } from "react-icons/fa";
 import API_BASE_URL from "../apiBase";
 
 // ── Hook: fetch active promos once, cache globally ─────────────────────────
@@ -540,6 +542,590 @@ export const PriceBadge = ({ originalPrice, discount, className = "" }) => {
   );
 };
 
+// ── Loyalty rewards program helpers ─────────────────────────────────────────
+
+export const TIER_COLORS = {
+  Silver: {
+    // flat tokens kept for any existing background/text/border usage
+    bg: "rgba(148,163,184,0.15)",
+    text: "#3f4a5c",
+    border: "rgba(100,116,139,0.35)",
+    // new: metallic gradient + glow + icon for premium badge rendering
+    gradient: "linear-gradient(135deg, #f8fafc 0%, #dbe2ea 45%, #a7b4c4 100%)",
+    glow: "rgba(148,163,184,0.45)",
+    shine: "rgba(255,255,255,0.8)",
+    icon: FaMedal,
+  },
+  Gold: {
+    bg: "rgba(234,179,8,0.15)",
+    text: "#7c4a03",
+    border: "rgba(217,119,6,0.4)",
+    gradient: "linear-gradient(135deg, #fff6d8 0%, #fcd34d 45%, #d97706 100%)",
+    glow: "rgba(251,191,36,0.5)",
+    shine: "rgba(255,251,235,0.9)",
+    icon: FaCrown,
+  },
+  Platinum: {
+    bg: "rgba(147,51,234,0.12)",
+    text: "#4c1d95",
+    border: "rgba(124,58,237,0.35)",
+    gradient: "linear-gradient(135deg, #f6f4ff 0%, #d9c9fb 45%, #8b5cf6 100%)",
+    glow: "rgba(167,139,250,0.5)",
+    shine: "rgba(255,255,255,0.85)",
+    icon: FaGem,
+  },
+  None: {
+    bg: "rgba(0,0,0,0.06)",
+    text: "rgba(0,0,0,0.45)",
+    border: "rgba(0,0,0,0.1)",
+    gradient: "linear-gradient(135deg, #f5f5f5 0%, #e5e5e5 100%)",
+    glow: "rgba(0,0,0,0.08)",
+    shine: "rgba(255,255,255,0.6)",
+    icon: null,
+  },
+};
+
+/**
+ * Validates a promo/loyalty code entered by the user at checkout.
+ * Checks global Discount codes first, then the user's personal loyalty codes.
+ * Returns a discount-shaped object (compatible with computeDiscountedPrice)
+ * or throws with a message describing why the code is invalid.
+ */
+export const validatePromoCode = async ({ code, userId, rentalDays = 1 }) => {
+  const res = await axios.post(`${API_BASE_URL}/api/discounts/validate-code`, {
+    code,
+    userId,
+    rentalDays,
+  });
+  return res.data;
+};
+
+/** Marks a personal loyalty code as used after a booking is created with it. */
+export const redeemLoyaltyCode = async ({ userId, code, bookingId }) => {
+  const res = await axios.patch(
+    `${API_BASE_URL}/api/discounts/loyalty/redeem`,
+    {
+      userId,
+      code,
+      bookingId,
+    },
+  );
+  return res.data;
+};
+
+/** Fetches the current user's loyalty tier, progress, and codes. */
+export const fetchLoyaltyStatus = async (userId) => {
+  const res = await axios.get(
+    `${API_BASE_URL}/api/discounts/loyalty/status/${userId}`,
+  );
+  return res.data;
+};
+
+/** Fetches the full, admin-configured loyalty program rules (all tiers + milestone). */
+export const fetchLoyaltyConfig = async () => {
+  const res = await axios.get(`${API_BASE_URL}/api/discounts/loyalty/config`);
+  return res.data;
+};
+
+/** Small pill showing a user's current loyalty tier, styled like a metallic medal. */
+export const LoyaltyTierBadge = ({ tier = "None", className = "" }) => {
+  const colors = TIER_COLORS[tier] || TIER_COLORS.None;
+  const Icon = colors.icon;
+  if (tier === "None") return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full text-xs font-extrabold tracking-wide whitespace-nowrap shrink-0 ${className}`}
+      style={{
+        background: colors.gradient,
+        color: colors.text,
+        border: `1px solid ${colors.border}`,
+        boxShadow: `0 1px 2px rgba(0,0,0,0.06), 0 0 0 3px ${colors.glow}22, inset 0 1px 0 ${colors.shine}`,
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      <span
+        className="inline-flex items-center justify-center rounded-full shrink-0"
+        style={{
+          width: 18,
+          height: 18,
+          background: `radial-gradient(circle at 30% 30%, ${colors.shine}, transparent 70%), ${colors.gradient}`,
+          border: `1px solid ${colors.border}`,
+          boxShadow: `0 0 6px ${colors.glow}`,
+        }}
+      >
+        {Icon && <Icon style={{ fontSize: 9, color: colors.text }} />}
+      </span>
+      {tier} Member
+    </span>
+  );
+};
+
+/** Progress bar toward the next loyalty tier. */
+export const LoyaltyProgressBar = ({
+  completedRentalsCount = 0,
+  nextTier,
+  rentalsUntilNextTier,
+  tierThresholds,
+  className = "",
+}) => {
+  if (!nextTier) {
+    return (
+      <p className={`text-xs font-semibold text-purple-700 ${className}`}>
+        You've reached the Platinum tier!
+      </p>
+    );
+  }
+  const prevThreshold =
+    nextTier === "Silver"
+      ? 0
+      : nextTier === "Gold"
+        ? (tierThresholds?.Silver ?? 0)
+        : (tierThresholds?.Gold ?? 0);
+  const target =
+    tierThresholds?.[nextTier] ?? completedRentalsCount + rentalsUntilNextTier;
+  const span = Math.max(1, target - prevThreshold);
+  const pct = Math.min(
+    100,
+    Math.max(0, ((completedRentalsCount - prevThreshold) / span) * 100),
+  );
+
+  return (
+    <div className={className}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-semibold text-[#171717]/60">
+          {rentalsUntilNextTier} rental{rentalsUntilNextTier === 1 ? "" : "s"}{" "}
+          to {nextTier}
+        </span>
+        <span className="text-[11px] font-semibold text-[#171717]/40">
+          {completedRentalsCount}/{target}
+        </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-black/5 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#b50002] to-[#ff3333] transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+/** Card listing a user's active (unused, unexpired) loyalty promo codes. */
+export const LoyaltyCodeList = ({ codes = [], className = "" }) => {
+  const [copied, setCopied] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  const handleCopy = (code) => {
+    navigator.clipboard?.writeText(code).catch(() => {});
+    setCopied(code);
+    setTimeout(() => setCopied(""), 1500);
+  };
+
+  if (!codes.length) {
+    return (
+      <p className={`text-xs text-[#171717]/40 ${className}`}>
+        No active reward codes yet. Complete more rentals to earn some!
+      </p>
+    );
+  }
+
+  const PREVIEW_COUNT = 3;
+  const visibleCodes = showAll ? codes : codes.slice(0, PREVIEW_COUNT);
+  const hiddenCount = codes.length - PREVIEW_COUNT;
+
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      {visibleCodes.map((c) => (
+        <div
+          key={c._id || c.code}
+          className="flex items-center justify-between gap-3 bg-white border border-black/8 rounded-lg px-3 py-2"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs font-bold text-[#0E0E0E] truncate">
+                {c.code}
+              </span>
+              <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-px">
+                {c.discountType === "percentage"
+                  ? `${c.discountValue}% off`
+                  : `₱${c.discountValue} off`}
+              </span>
+            </div>
+            {c.description && (
+              <p className="text-[10px] text-[#171717]/40 truncate mt-0.5">
+                {c.description}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleCopy(c.code)}
+            className="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-md bg-[#0E0E0E] text-white hover:bg-[#b50002] transition-colors"
+          >
+            {copied === c.code ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      ))}
+
+      {codes.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-1 text-[11px] font-bold text-[#b50002] hover:underline text-center"
+        >
+          {showAll ? "Show less" : `See All Promo Codes (${hiddenCount} more)`}
+        </button>
+      )}
+    </div>
+  );
+};
+
+/**
+ * "See how it works" modal — explains the loyalty program end-to-end using
+ * the live, admin-configured rules (thresholds, discounts, periodic rewards,
+ * expiry, and the milestone bonus), so it never drifts out of sync with
+ * what the Discount Management panel actually has set.
+ */
+export const LoyaltyHowItWorksModal = ({ onClose, currentTier }) => {
+  const [config, setConfig] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchLoyaltyConfig();
+        if (!cancelled) setConfig(data);
+      } catch {
+        if (!cancelled) setError("Couldn't load the current program details.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const tierOrder = ["Silver", "Gold", "Platinum"];
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        zIndex: 9990,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: 16,
+        overflowY: "auto",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 24,
+          boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
+          width: "100%",
+          maxWidth: 560,
+          margin: "32px 0",
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #0E0E0E, #2a2a2a)",
+            padding: "20px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                color: "#fff",
+                fontWeight: 900,
+                fontSize: 18,
+                fontFamily: "'Space Grotesk', sans-serif",
+                margin: 0,
+              }}
+            >
+              🏆 How Loyalty Rewards Work
+            </h2>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.5)",
+                fontSize: 12,
+                marginTop: 4,
+              }}
+            >
+              Earn perks automatically as you complete more rentals.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.1)",
+              border: "none",
+              color: "rgba(255,255,255,0.7)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "32px 0",
+              }}
+            >
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  border: "3px solid rgba(0,0,0,0.08)",
+                  borderTopColor: "#b50002",
+                  animation: "spin 0.8s linear infinite",
+                }}
+              />
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          ) : error ? (
+            <p
+              style={{
+                fontSize: 13,
+                color: "#b50002",
+                textAlign: "center",
+                padding: "16px 0",
+              }}
+            >
+              {error}
+            </p>
+          ) : (
+            <>
+              {/* <p
+                style={{
+                  fontSize: 13,
+                  color: "rgba(0,0,0,0.55)",
+                  lineHeight: 1.6,
+                  marginBottom: 20,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Every time a rental is completed, it counts toward your total.
+                Reach a tier's threshold and you're automatically upgraded — no
+                sign-up needed. Reward codes are single-use and can expire, so
+                it's worth using them before they do.
+              </p> */}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
+                {tierOrder.map((tierName) => {
+                  const t = config?.tiers?.[tierName];
+                  if (!t) return null;
+                  const colors = TIER_COLORS[tierName];
+                  const Icon = colors.icon;
+                  const isCurrent = currentTier === tierName;
+                  return (
+                    <div
+                      key={tierName}
+                      style={{
+                        border: `1.5px solid ${isCurrent ? colors.border : "rgba(0,0,0,0.08)"}`,
+                        background: isCurrent ? "#fff" : "#fafafa",
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        boxShadow: isCurrent
+                          ? `0 0 0 3px ${colors.glow}22`
+                          : "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontWeight: 800,
+                            fontSize: 14,
+                            color: colors.text,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 24,
+                              height: 24,
+                              borderRadius: "50%",
+                              flexShrink: 0,
+                              background: `radial-gradient(circle at 30% 30%, ${colors.shine}, transparent 70%), ${colors.gradient}`,
+                              border: `1px solid ${colors.border}`,
+                              boxShadow: `0 0 6px ${colors.glow}`,
+                            }}
+                          >
+                            {Icon && (
+                              <Icon
+                                style={{ fontSize: 11, color: colors.text }}
+                              />
+                            )}
+                          </span>
+                          {tierName}
+                          {isCurrent && (
+                            <span
+                              style={{
+                                marginLeft: 2,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: colors.text,
+                                background: colors.gradient,
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                              }}
+                            >
+                              Your tier
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "rgba(0,0,0,0.45)",
+                          }}
+                        >
+                          {t.threshold}+ rentals
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(0,0,0,0.6)",
+                          lineHeight: 1.5,
+                          margin: 0,
+                        }}
+                      >
+                        {t.description ||
+                          `${t.discountPercent}% off when you reach this tier.`}
+                      </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 14,
+                          marginTop: 8,
+                          fontSize: 11,
+                          color: "rgba(0,0,0,0.4)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>🎁 {t.discountPercent}% welcome code</span>
+                        {t.periodicEveryRentals ? (
+                          <span>
+                            🔁 bonus code every {t.periodicEveryRentals} rentals
+                          </span>
+                        ) : (
+                          <span>No recurring codes</span>
+                        )}
+                        <span>
+                          ⏳{" "}
+                          {t.codeExpiryDays
+                            ? `expires in ${t.codeExpiryDays} days`
+                            : "never expires"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {config?.milestone?.enabled && (
+                <div
+                  style={{
+                    border: "1.5px dashed rgba(181,0,2,0.3)",
+                    background: "rgba(181,0,2,0.04)",
+                    borderRadius: 14,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 13,
+                      color: "#b50002",
+                      marginBottom: 4,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Milestone Bonus
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "rgba(0,0,0,0.6)",
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
+                    {config.milestone.description ||
+                      `Complete ${config.milestone.rentals} rentals and get an extra ${config.milestone.discountPercent}% off code`}{" "}
+                    (expires in {config.milestone.codeExpiryDays || "∞"} days).
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+};
+
 const discountBadgeExports = {
   useApplicableDiscount,
   getBestDiscount,
@@ -549,6 +1135,14 @@ const discountBadgeExports = {
   PromoTag,
   PriceSummaryWithDiscount,
   ActivePromoBanner,
+  validatePromoCode,
+  redeemLoyaltyCode,
+  fetchLoyaltyStatus,
+  fetchLoyaltyConfig,
+  LoyaltyTierBadge,
+  LoyaltyProgressBar,
+  LoyaltyCodeList,
+  LoyaltyHowItWorksModal,
 };
 
 export default discountBadgeExports;

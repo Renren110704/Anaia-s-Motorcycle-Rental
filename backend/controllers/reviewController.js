@@ -5,12 +5,13 @@ import { createSystemLog } from "../utils/systemLogService.js";
 import { v2 as cloudinary } from "cloudinary";
 
 // Cloudinary Configuration
-const CLOUDINARY_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
+const CLOUDINARY_FOLDER =
+  process.env.CLOUDINARY_UPLOAD_FOLDER || "anaiasmotorcyclerental";
 const CLOUDINARY_REVIEWS_FOLDER = "reviews";
 const CLOUDINARY_ENABLED = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET,
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET,
 );
 
 if (CLOUDINARY_ENABLED) {
@@ -38,7 +39,8 @@ const summarizeHelpfulVotes = (helpfulVotes = []) => {
     if (entry?.vote === -1) summary.helpfulDislikeCount += 1;
   }
 
-  summary.helpfulVoteCount = summary.helpfulLikeCount - summary.helpfulDislikeCount;
+  summary.helpfulVoteCount =
+    summary.helpfulLikeCount - summary.helpfulDislikeCount;
   return summary;
 };
 
@@ -55,9 +57,17 @@ const censorName = (name) => {
     .join(" ");
 };
 
-const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_REVIEWS_FOLDER) => {
+const uploadFileToCloudinary = async (
+  filePath,
+  targetFolder = CLOUDINARY_REVIEWS_FOLDER,
+) => {
   if (!filePath || !CLOUDINARY_ENABLED) {
-    console.error("[CLOUDINARY] Upload skipped - filePath:", !!filePath, "enabled:", CLOUDINARY_ENABLED);
+    console.error(
+      "[CLOUDINARY] Upload skipped - filePath:",
+      !!filePath,
+      "enabled:",
+      CLOUDINARY_ENABLED,
+    );
     return null;
   }
 
@@ -66,7 +76,9 @@ const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_REVIEW
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath} to folder: ${targetFolder}`);
+      console.log(
+        `[CLOUDINARY] Attempt ${attempt}/${MAX_RETRIES}: uploading ${filePath} to folder: ${targetFolder}`,
+      );
       const result = await cloudinary.uploader.upload(filePath, {
         folder: `${CLOUDINARY_FOLDER}/${targetFolder}`,
         resource_type: "image",
@@ -78,7 +90,9 @@ const uploadFileToCloudinary = async (filePath, targetFolder = CLOUDINARY_REVIEW
         timeout: 30000,
       });
 
-      const url = normalizeUrl(result.secure_url || result.url || result.secureUrl || "");
+      const url = normalizeUrl(
+        result.secure_url || result.url || result.secureUrl || "",
+      );
       if (!url) {
         console.error("[CLOUDINARY] No URL in response:", result);
         lastError = new Error("No URL in Cloudinary response");
@@ -108,16 +122,19 @@ export const createReview = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const {
-      rating,
       feedbackDescription,
       rideComfort,
       condition,
       performance,
       customerService,
+      valueForMoney, // <--- New Criteria
     } = req.body;
-    const isRenterPublic = typeof req.body.isRenterPublic !== "undefined"
-      ? String(req.body.isRenterPublic) === "true" || req.body.isRenterPublic === true
-      : true;
+
+    const isRenterPublic =
+      typeof req.body.isRenterPublic !== "undefined"
+        ? String(req.body.isRenterPublic) === "true" ||
+          req.body.isRenterPublic === true
+        : true;
 
     // Validate booking exists and is completed
     const booking = await MotorcycleBooking.findById(bookingId);
@@ -126,18 +143,40 @@ export const createReview = async (req, res) => {
     }
 
     if (booking.status !== "completed") {
-      return res.status(400).json({ message: "Only completed bookings can be reviewed" });
+      return res
+        .status(400)
+        .json({ message: "Only completed bookings can be reviewed" });
     }
 
     // Check if review already exists
     const existingReview = await Review.findOne({ bookingId });
     if (existingReview) {
-      return res.status(400).json({ message: "Review already exists for this booking" });
+      return res
+        .status(400)
+        .json({ message: "Review already exists for this booking" });
     }
 
-    // Validate rating
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    // Automatically calculate the Overall Rating in the backend
+    const p = performance ? parseInt(performance, 10) : 0;
+    const c = condition ? parseInt(condition, 10) : 0;
+    const cs = customerService ? parseInt(customerService, 10) : 0;
+    const rc = rideComfort ? parseInt(rideComfort, 10) : 0;
+    const vm = valueForMoney ? parseInt(valueForMoney, 10) : 0;
+
+    const validRatings = [p, c, cs, rc, vm].filter((v) => v > 0);
+    const calculatedRating =
+      validRatings.length > 0
+        ? parseFloat(
+            (
+              validRatings.reduce((a, b) => a + b, 0) / validRatings.length
+            ).toFixed(1),
+          )
+        : 0;
+
+    if (calculatedRating < 1 || calculatedRating > 5) {
+      return res
+        .status(400)
+        .json({ message: "Calculated rating must be between 1 and 5" });
     }
 
     // Upload images if provided
@@ -145,7 +184,10 @@ export const createReview = async (req, res) => {
     if (req.files && Array.isArray(req.files)) {
       for (const file of req.files) {
         try {
-          const uploadedUrl = await uploadFileToCloudinary(file.path, CLOUDINARY_REVIEWS_FOLDER);
+          const uploadedUrl = await uploadFileToCloudinary(
+            file.path,
+            CLOUDINARY_REVIEWS_FOLDER,
+          );
           if (uploadedUrl) {
             reviewImages.push(uploadedUrl);
           }
@@ -162,13 +204,14 @@ export const createReview = async (req, res) => {
       renterName: booking.customer,
       renterEmail: booking.email,
       isRenterPublic,
-      rating: Math.min(5, Math.max(1, parseInt(rating, 10))),
+      rating: calculatedRating,
       feedbackDescription: feedbackDescription || "",
       reviewImages,
-      rideComfort: rideComfort ? Math.min(5, Math.max(1, parseInt(rideComfort, 10))) : null,
-      condition: condition ? Math.min(5, Math.max(1, parseInt(condition, 10))) : null,
-      performance: performance ? Math.min(5, Math.max(1, parseInt(performance, 10))) : null,
-      customerService: customerService ? Math.min(5, Math.max(1, parseInt(customerService, 10))) : null,
+      rideComfort: rc || null,
+      condition: c || null,
+      performance: p || null,
+      customerService: cs || null,
+      valueForMoney: vm || null,
       status: "pending",
     });
 
@@ -179,10 +222,10 @@ export const createReview = async (req, res) => {
       action: "REVIEW_SUBMITTED",
       targetType: "Review",
       targetId: newReview._id,
-      description: `New review submitted for booking ${bookingId} with rating ${rating}`,
+      description: `New review submitted for booking ${bookingId} with rating ${calculatedRating}`,
       details: {
         bookingId,
-        rating,
+        rating: calculatedRating,
         hasImages: reviewImages.length > 0,
       },
     });
@@ -272,6 +315,7 @@ export const getAllReviews = async (req, res) => {
     const reviews = await Review.find(query)
       .populate("bookingId")
       .populate("motorcycleId")
+      .populate("userId", "profilePicture firstName lastName")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
@@ -319,7 +363,7 @@ export const updateReviewStatus = async (req, res) => {
         status,
         adminNotes: adminNotes || "",
       },
-      { new: true }
+      { new: true },
     );
 
     // Create system log
@@ -456,7 +500,10 @@ export const setReviewFeatured = async (req, res) => {
  */
 export const getFeaturedTestimonials = async (req, res) => {
   try {
-    const limit = Math.min(12, Math.max(1, parseInt(req.query.limit || "6", 10)));
+    const limit = Math.min(
+      12,
+      Math.max(1, parseInt(req.query.limit || "6", 10)),
+    );
 
     const reviews = await Review.find({
       status: "approved",
@@ -464,14 +511,15 @@ export const getFeaturedTestimonials = async (req, res) => {
       isDeleted: false,
     })
       .populate("motorcycleId", "make model")
+      .populate("userId", "profilePicture")
       .sort({ featuredAt: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 
     const mapped = reviews.map((review) => ({
       id: review._id,
-      name: review.isRenterPublic 
-        ? (review.renterName || "Verified Renter") 
+      name: review.isRenterPublic
+        ? review.renterName || "Verified Renter"
         : censorName(review.renterName),
       role: "Verified Renter",
       comment: review.feedbackDescription || "",
@@ -480,7 +528,15 @@ export const getFeaturedTestimonials = async (req, res) => {
         review?.motorcycleId?.make || review?.motorcycleId?.model
           ? `${review.motorcycleId.make || ""} ${review.motorcycleId.model || ""}`.trim()
           : "Rented Motorcycle",
-      reviewImages: Array.isArray(review.reviewImages) ? review.reviewImages : [],
+      reviewImages: Array.isArray(review.reviewImages)
+        ? review.reviewImages
+        : [],
+      // Only expose the renter's profile picture when they've opted to be
+      // shown publicly (isRenterPublic) — otherwise fall back to the
+      // initial-letter avatar on the frontend.
+      profilePicture: review.isRenterPublic
+        ? review?.userId?.profilePicture || ""
+        : "",
       adminReplyMessage: review.adminReplyMessage || "",
       adminRepliedBy: review.adminRepliedBy || "",
       adminRepliedAt: review.adminRepliedAt || null,
@@ -536,30 +592,55 @@ export const deleteReview = async (req, res) => {
 export const getMotorcycleReviews = async (req, res) => {
   try {
     const { motorcycleId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, rating } = req.query;
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
-    const reviews = await Review.find({
+    const baseQuery = {
       motorcycleId,
       status: "approved",
       isDeleted: false,
-    })
-      .populate("userId", "name")
+    };
+
+    // Optional filter: only reviews rounding to this star (1-5). `rating`
+    // can be a decimal (e.g. 4.6), so this buckets it the same way the
+    // distribution counts above do (nearest whole star) instead of an
+    // exact-value match that decimals would never satisfy.
+    const ratingFilter = parseInt(rating, 10);
+    let query = baseQuery;
+    if (
+      Number.isInteger(ratingFilter) &&
+      ratingFilter >= 1 &&
+      ratingFilter <= 5
+    ) {
+      const lower = ratingFilter - 0.5;
+      const upper = ratingFilter + 0.5;
+      query = {
+        ...baseQuery,
+        rating:
+          ratingFilter === 1
+            ? { $lt: upper }
+            : ratingFilter === 5
+              ? { $gte: lower }
+              : { $gte: lower, $lt: upper },
+      };
+    }
+
+    const reviews = await Review.find(query)
+      .populate("userId", "profilePicture firstName lastName")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
 
-    const total = await Review.countDocuments({
-      motorcycleId,
-      status: "approved",
-      isDeleted: false,
-    });
+    const total = await Review.countDocuments(query);
 
-    // Calculate average rating
+    // Calculate average rating (always over ALL approved reviews for this
+    // motorcycle, regardless of the current star filter, so the overall
+    // rating/count summary stays stable while browsing filtered pages).
     const avgResult = await Review.aggregate([
       {
         $match: {
-          motorcycleId: mongoose.Types.ObjectId.createFromHexString(motorcycleId),
+          motorcycleId:
+            mongoose.Types.ObjectId.createFromHexString(motorcycleId),
           status: "approved",
           isDeleted: false,
         },
@@ -572,28 +653,57 @@ export const getMotorcycleReviews = async (req, res) => {
           avgCondition: { $avg: "$condition" },
           avgPerformance: { $avg: "$performance" },
           avgCustomerService: { $avg: "$customerService" },
+          avgValueForMoney: { $avg: "$valueForMoney" },
           totalReviews: { $sum: 1 },
         },
       },
     ]);
 
-    const stats = avgResult[0] || {
-      avgRating: 0,
-      avgRideComfort: 0,
-      avgCondition: 0,
-      avgPerformance: 0,
-      avgCustomerService: 0,
-      totalReviews: 0,
+    // Per-star counts (1-5) so the filter buttons can show how many
+    // reviews fall under each rating.
+    const distributionResult = await Review.aggregate([
+      {
+        $match: {
+          motorcycleId:
+            mongoose.Types.ObjectId.createFromHexString(motorcycleId),
+          status: "approved",
+          isDeleted: false,
+        },
+      },
+      { $group: { _id: "$rating", count: { $sum: 1 } } },
+    ]);
+    const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    distributionResult.forEach((row) => {
+      const star = Math.round(row._id);
+      if (star >= 1 && star <= 5) ratingCounts[star] = row.count;
+    });
+
+    const stats = {
+      ...(avgResult[0] || {
+        avgRating: 0,
+        avgRideComfort: 0,
+        avgCondition: 0,
+        avgPerformance: 0,
+        avgCustomerService: 0,
+        avgValueForMoney: 0,
+        totalReviews: 0,
+      }),
+      ratingCounts,
     };
 
-   const reviewList = reviews.map((review) => {
+    const reviewList = reviews.map((review) => {
       const reviewObj = review.toObject();
       return {
         ...reviewObj,
-        // Override the renterName with the censored version if they chose private
-        renterName: reviewObj.isRenterPublic 
-          ? reviewObj.renterName 
+        renterName: reviewObj.isRenterPublic
+          ? reviewObj.renterName
           : censorName(reviewObj.renterName),
+        // Only expose the renter's profile picture when they've opted to be
+        // shown publicly — otherwise the frontend falls back to a
+        // letter-initial avatar.
+        profilePicture: reviewObj.isRenterPublic
+          ? reviewObj.userId?.profilePicture || ""
+          : "",
         ...summarizeHelpfulVotes(reviewObj.helpfulVotes || []),
       };
     });
@@ -645,8 +755,12 @@ export const voteOnReview = async (req, res) => {
       return res.status(404).json({ message: "Review not found" });
     }
 
-    const votes = Array.isArray(review.helpfulVotes) ? [...review.helpfulVotes] : [];
-    const existingIndex = votes.findIndex((entry) => String(entry.userId) === String(userId));
+    const votes = Array.isArray(review.helpfulVotes)
+      ? [...review.helpfulVotes]
+      : [];
+    const existingIndex = votes.findIndex(
+      (entry) => String(entry.userId) === String(userId),
+    );
 
     if (existingIndex >= 0) {
       if (votes[existingIndex].vote === normalizedVote) {

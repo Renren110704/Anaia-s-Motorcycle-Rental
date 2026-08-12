@@ -1,36 +1,82 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { FaCheck, FaEye, FaEyeSlash, FaTimes } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import bgImage from "../assets/bgImage2.jpg";
-import {
-  ADMIN_DEFAULT_EMAIL,
-  PASSWORD_RULES,
-  validateStrongPassword,
-} from "../constants/adminAuth";
+import { PASSWORD_RULES, validateStrongPassword } from "../constants/adminAuth";
+
+// Formats a millisecond duration as "M:SS" for the lockout countdown.
+const formatCountdown = (ms) => {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
 
 const AdminLogin = ({ onLogin }) => {
-  const [email, setEmail] = useState(ADMIN_DEFAULT_EMAIL);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Timestamp (from the server's `lockedUntil`) the account unlocks at.
+  const [lockedUntil, setLockedUntil] = useState(null);
+  const [now, setNow] = useState(Date.now());
 
   const validation = useMemo(
     () => validateStrongPassword(password),
     [password],
   );
 
-  const handleSubmit = (e) => {
+  // Tick every second while locked so the countdown stays live.
+  useEffect(() => {
+    if (!lockedUntil) return undefined;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  const remainingMs = lockedUntil
+    ? Math.max(0, new Date(lockedUntil).getTime() - now)
+    : 0;
+  const isLocked = Boolean(lockedUntil) && remainingMs > 0;
+
+  // Once the countdown hits zero, clear the lock so the form re-enables
+  // (the server will re-lock on submit if it disagrees for any reason).
+  useEffect(() => {
+    if (lockedUntil && remainingMs === 0) {
+      setLockedUntil(null);
+      setError("");
+    }
+  }, [remainingMs, lockedUntil]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLocked) return;
     setError("");
 
-    if (!validation.isValid) {
-      setError("Password does not meet the required format.");
-      return;
-    }
+    const nextFieldErrors = {};
+    if (!email.trim()) nextFieldErrors.email = "Email is required";
+    if (!password) nextFieldErrors.password = "Password is required";
+    setFieldErrors(nextFieldErrors);
+    if (Object.keys(nextFieldErrors).length > 0) return;
 
-    const ok = onLogin(email.trim(), password);
-    if (!ok) {
-      setError("Invalid admin email or password.");
+    setIsSubmitting(true);
+    try {
+      // onLogin now performs the actual API call and returns
+      // { ok: boolean, message?: string, lockedUntil?: string } instead of
+      // a plain boolean, since verifying credentials against the server is
+      // asynchronous.
+      const result = await onLogin(email.trim(), password);
+      if (!result?.ok) {
+        setError(result?.message || "Invalid admin email or password.");
+        if (result?.lockedUntil) {
+          setLockedUntil(result.lockedUntil);
+          setNow(Date.now());
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -48,7 +94,6 @@ const AdminLogin = ({ onLogin }) => {
 
       <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden">
         {/* Top accent bar */}
-        
 
         <div className="p-7">
           {/* Logo + brand */}
@@ -75,7 +120,7 @@ const AdminLogin = ({ onLogin }) => {
             Enter your credentials to continue.
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             {/* Email */}
             <div>
               <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
@@ -84,11 +129,24 @@ const AdminLogin = ({ onLogin }) => {
               <input
                 type="text"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 transition-colors"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email)
+                    setFieldErrors((p) => ({ ...p, email: undefined }));
+                }}
+                className={`w-full px-3 py-2.5 rounded-xl border text-[#171717] text-sm placeholder-slate-300 focus:outline-none transition-colors ${
+                  fieldErrors.email
+                    ? "border-[#b50002] bg-[#FDF0F0] focus:border-[#b50002]"
+                    : "border-slate-200 bg-white focus:border-[#b50002]/30"
+                }`}
                 autoComplete="username"
                 required
               />
+              {fieldErrors.email && (
+                <p className="text-xs font-semibold text-[#b50002] mt-1.5">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -100,8 +158,16 @@ const AdminLogin = ({ onLogin }) => {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 transition-colors"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password)
+                      setFieldErrors((p) => ({ ...p, password: undefined }));
+                  }}
+                  className={`w-full px-3 py-2.5 pr-10 rounded-xl border text-[#171717] text-sm placeholder-slate-300 focus:outline-none transition-colors ${
+                    fieldErrors.password
+                      ? "border-[#b50002] bg-[#FDF0F0] focus:border-[#b50002]"
+                      : "border-slate-200 bg-white focus:border-[#b50002]/30"
+                  }`}
                   required
                 />
                 <button
@@ -117,10 +183,21 @@ const AdminLogin = ({ onLogin }) => {
                   )}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-xs font-semibold text-[#b50002] mt-1.5">
+                  {fieldErrors.password}
+                </p>
+              )}
+              <Link
+                to="/forgot-password"
+                className="block text-right text-xs font-semibold text-slate-400 hover:text-[#b50002] transition-colors mt-1.5"
+              >
+                Forgot password?
+              </Link>
             </div>
 
             {/* Password rules */}
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
+            {/* <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
               <p className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2.5">
                 Password Rules
               </p>
@@ -145,21 +222,31 @@ const AdminLogin = ({ onLogin }) => {
                   );
                 })}
               </div>
-            </div>
+            </div> */}
 
             {/* Error */}
             {error && (
               <div className="text-sm text-[#b50002] bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 font-medium">
                 {error}
+                {isLocked && (
+                  <span className="block mt-1 font-mono text-xs">
+                    Try again in {formatCountdown(remainingMs)}
+                  </span>
+                )}
               </div>
             )}
 
             {/* Submit */}
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+              disabled={isSubmitting || isLocked}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#b50002] text-white font-bold text-sm shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isLocked
+                ? `Locked · ${formatCountdown(remainingMs)}`
+                : isSubmitting
+                  ? "Signing in..."
+                  : "Sign In"}
             </button>
           </form>
         </div>

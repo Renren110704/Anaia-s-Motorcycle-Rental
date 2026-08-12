@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middlewares/auth.js";
+import adminAuth from "../middlewares/adminAuth.js";
 import {
   createReview,
   getReviewByBookingId,
@@ -22,7 +23,7 @@ reviewRouter.post(
   "/:bookingId",
   authMiddleware,
   uploads.array("reviewImages", 5),
-  createReview
+  createReview,
 );
 
 // Get review for a specific booking
@@ -41,18 +42,18 @@ reviewRouter.patch("/:reviewId/vote", authMiddleware, voteOnReview);
 reviewRouter.get("/testimonials", getFeaturedTestimonials);
 
 // Admin: Get all reviews
-reviewRouter.get("/", getAllReviews);
+reviewRouter.get("/", adminAuth, getAllReviews);
 
 // Admin: Update review status
-reviewRouter.patch("/:reviewId/status", updateReviewStatus);
+reviewRouter.patch("/:reviewId/status", adminAuth, updateReviewStatus);
 
 // Admin: Reply to review
-reviewRouter.patch("/:reviewId/reply", replyToReview);
+reviewRouter.patch("/:reviewId/reply", adminAuth, replyToReview);
 
 // Admin: Feature/unfeature review for testimonials
-reviewRouter.patch("/:reviewId/featured", setReviewFeatured);
+reviewRouter.patch("/:reviewId/featured", adminAuth, setReviewFeatured);
 
 // Admin: Delete review
-reviewRouter.delete("/:reviewId", deleteReview);
+reviewRouter.delete("/:reviewId", adminAuth, deleteReview);
 
 export default reviewRouter;

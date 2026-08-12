@@ -2,6 +2,7 @@ import express from "express";
 import {
   login,
   register,
+  checkAvailability,
   verifyEmail,
   resendVerificationOTP,
   verifyLoginOTP,
@@ -11,12 +12,12 @@ import {
   getUserProfile,
   updateProfile,
   changePassword,
-  requestEmailChangeOTP, 
-  verifyEmailChangeOTP, 
+  requestEmailChangeOTP,
+  verifyEmailChangeOTP,
   removeProfilePicture,
   getAllUsers,
   toggleUserStatus,
-  deleteUser
+  deleteUser,
 } from "../controllers/userController.js";
 import authMiddleware from "../middlewares/auth.js";
 import multer from "multer";
@@ -27,15 +28,15 @@ import { uploadProfilePicture } from "../controllers/userController.js";
 // Setup multer storage above your route definitions
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = 'uploads/';
-    if (!fs.existsSync(dir)){
-        fs.mkdirSync(dir, { recursive: true });
+    const dir = "uploads/";
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
     cb(null, dir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
+    cb(null, Date.now() + "-" + file.originalname);
+  },
 });
 const upload = multer({ storage: storage });
 
@@ -43,6 +44,7 @@ const userRouter = express.Router();
 
 // Registration & Email Verification
 userRouter.post("/register", register);
+userRouter.post("/check-availability", checkAvailability);
 userRouter.post("/verify-email", verifyEmail);
 userRouter.post("/resend-verification-otp", resendVerificationOTP);
 
@@ -61,12 +63,29 @@ userRouter.put("/update-profile", authMiddleware, updateProfile);
 userRouter.put("/change-password", authMiddleware, changePassword);
 
 // Email Change with OTP (Protected Routes)
-userRouter.post("/request-email-change-otp", authMiddleware, requestEmailChangeOTP);
-userRouter.post("/verify-email-change-otp", authMiddleware, verifyEmailChangeOTP);
+userRouter.post(
+  "/request-email-change-otp",
+  authMiddleware,
+  requestEmailChangeOTP,
+);
+userRouter.post(
+  "/verify-email-change-otp",
+  authMiddleware,
+  verifyEmailChangeOTP,
+);
 
-userRouter.post("/upload-profile-picture", authMiddleware, upload.single("image"), uploadProfilePicture);
+userRouter.post(
+  "/upload-profile-picture",
+  authMiddleware,
+  upload.single("image"),
+  uploadProfilePicture,
+);
 
-userRouter.delete("/remove-profile-picture", authMiddleware, removeProfilePicture);
+userRouter.delete(
+  "/remove-profile-picture",
+  authMiddleware,
+  removeProfilePicture,
+);
 
 userRouter.get("/users", getAllUsers);
 userRouter.patch("/users/:id/status", toggleUserStatus);
@@ -114,7 +133,8 @@ userRouter.post("/push-test", authMiddleware, async (req, res) => {
       return res.json({
         ok: false,
         stage: "no_tokens",
-        message: "No push tokens saved for this user. The app never registered a token.",
+        message:
+          "No push tokens saved for this user. The app never registered a token.",
         userId: user._id,
       });
     }
@@ -146,10 +166,16 @@ userRouter.post("/push-test", authMiddleware, async (req, res) => {
     }
 
     const errors = tickets.filter((t) => t.status === "error");
-    console.log(`[Push] Test for userId=${user._id} tokens=${validTokens.length} errors=${errors.length}`);
+    console.log(
+      `[Push] Test for userId=${user._id} tokens=${validTokens.length} errors=${errors.length}`,
+    );
     tickets.forEach((t, i) => {
       if (t.status === "error") {
-        console.error(`[Push] Test ticket error token=${validTokens[i]}:`, t.message, t.details);
+        console.error(
+          `[Push] Test ticket error token=${validTokens[i]}:`,
+          t.message,
+          t.details,
+        );
       }
     });
 
@@ -162,7 +188,9 @@ userRouter.post("/push-test", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[Push] Test error:", err.message);
-    res.status(500).json({ ok: false, stage: "exception", message: err.message });
+    res
+      .status(500)
+      .json({ ok: false, stage: "exception", message: err.message });
   }
 });
 

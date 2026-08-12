@@ -108,10 +108,12 @@ const CORRIDOR_WIDTH = 5000;
 
 const isOutsideGeofence = (lat, lng, destinationStr = "") => {
   // Free roaming for CALABARZON and NCR (Allow up to 150km radius from Bacoor)
-  const isFreeRegion = /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
+  const isFreeRegion =
+    /NCR|National Capital Region|CALABARZON|Region IV-A/i.test(destinationStr);
   if (isFreeRegion) {
-    if (haversineDistance(lat, lng, ORIGIN.lat, ORIGIN.lng) <= 150000) return false;
-    return true; 
+    if (haversineDistance(lat, lng, ORIGIN.lat, ORIGIN.lng) <= 150000)
+      return false;
+    return true;
   }
 
   const dest = resolveDestinationCoords(destinationStr);
@@ -369,25 +371,42 @@ const MotorcycleListItem = ({ motorcycle, isSelected, onClick }) => {
       {motorcycle.trackerStats && (
         <div className="grid grid-cols-2 gap-1.5 mb-2.5">
           <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
-            <p className={labelCls} style={{ marginBottom: "1px" }}>Current Speed</p>
+            <p className={labelCls} style={{ marginBottom: "1px" }}>
+              Current Speed
+            </p>
             <p className="text-[11px] font-bold text-[#171717]">
-              {motorcycle.trackerStats.speed ? Number(motorcycle.trackerStats.speed).toFixed(1) : "0.0"} km/h
+              {motorcycle.trackerStats.speed
+                ? Number(motorcycle.trackerStats.speed).toFixed(1)
+                : "0.0"}{" "}
+              km/h
             </p>
           </div>
           <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
-            <p className={labelCls} style={{ marginBottom: "1px" }}>Total Distance</p>
+            <p className={labelCls} style={{ marginBottom: "1px" }}>
+              Total Distance
+            </p>
             <p className="text-[11px] font-bold text-[#171717]">
-              {motorcycle.trackerStats.totalDistance ? Number(motorcycle.trackerStats.totalDistance).toFixed(1) : "0.0"} km
+              {motorcycle.trackerStats.totalDistance
+                ? Number(motorcycle.trackerStats.totalDistance).toFixed(1)
+                : "0.0"}{" "}
+              km
             </p>
           </div>
           <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
-            <p className={labelCls} style={{ marginBottom: "1px" }}>Avg Speed</p>
+            <p className={labelCls} style={{ marginBottom: "1px" }}>
+              Avg Speed
+            </p>
             <p className="text-[11px] font-bold text-[#171717]">
-              {motorcycle.trackerStats.averageSpeed ? Number(motorcycle.trackerStats.averageSpeed).toFixed(1) : "0.0"} km/h
+              {motorcycle.trackerStats.averageSpeed
+                ? Number(motorcycle.trackerStats.averageSpeed).toFixed(1)
+                : "0.0"}{" "}
+              km/h
             </p>
           </div>
           <div className="bg-slate-50 rounded-xl px-2.5 py-1.5">
-            <p className={labelCls} style={{ marginBottom: "1px" }}>Stops Made</p>
+            <p className={labelCls} style={{ marginBottom: "1px" }}>
+              Stops Made
+            </p>
             <p className="text-[11px] font-bold text-[#171717]">
               {motorcycle.trackerStats.stopsMade || 0}
             </p>
@@ -470,225 +489,234 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[9990] flex justify-end bg-black/20 backdrop-blur-sm"
+      className="fixed inset-0 z-[9990] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-md"
+      style={{ animation: "modal-backdrop-in 0.2s ease-out" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-[#f7f8fa] h-full overflow-y-auto shadow-2xl flex flex-col"
+        className="relative w-full max-w-lg max-h-[88vh] bg-[#f7f8fa] rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.35)] ring-1 ring-black/5 flex flex-col"
+        style={{ animation: "modal-panel-in 0.25s cubic-bezier(0.16,1,0.3,1)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.15em] text-[#b50002] uppercase mb-0.5">
+        <div className="relative z-10 bg-gradient-to-br from-[#171717] to-[#2a2a2a] px-6 py-5 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold tracking-[0.2em] text-[#ff4d4f] uppercase mb-1">
               {motorcycle.unitId || "Unit"}
             </p>
-            <h2 className="font-black text-[#171717] text-lg leading-tight">
+            <h2 className="font-black text-white text-xl leading-tight truncate">
               {motorcycle.make} {motorcycle.model}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white hover:rotate-90 transition-all duration-200 flex-shrink-0"
           >
             <FaTimes className="text-sm" />
           </button>
         </div>
 
-        {/* Geofence alert */}
-        {motorcycle.exceededGeofence && (
-          <div className="mx-4 mt-4 flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
-            <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-[#b50002]" />
-            </div>
-            <div>
-              <p className="font-black text-[#b50002] text-sm">
-                Geofence Exceeded
-              </p>
-              <p className="text-[11px] text-red-400">
-                Unit is outside the primary destination zone
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="p-4 space-y-3 flex-1">
-          {/* Status chips */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              {
-                label: "Status",
-                value:
-                  String(motorcycle.trackerStatus || "active").toLowerCase() ===
-                  "online"
-                    ? "Online"
-                    : String(
-                          motorcycle.trackerStatus || "active",
-                        ).toLowerCase() === "offline"
-                      ? "Offline"
-                      : motorcycle.exceededGeofence
-                        ? "Exceeded"
-                        : "Active",
-                color:
-                  String(motorcycle.trackerStatus || "").toLowerCase() ===
-                  "online"
-                    ? "text-emerald-600"
-                    : motorcycle.exceededGeofence
-                      ? "text-[#b50002]"
-                      : "text-slate-600",
-              },
-              {
-                label: "Daily Rate",
-                value: formatPrice(dailyRate),
-                color: "text-[#171717]",
-              },
-              { label: "Duration", value: `${days}d`, color: "text-[#171717]" },
-            ].map(({ label, value, color }) => (
-              <div
-                key={label}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 text-center"
-              >
-                <p className="text-[9px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1">
-                  {label}
-                </p>
-                <p className={`font-black text-sm ${color}`}>{value}</p>
+        <div className="overflow-y-auto flex-1">
+          {/* Geofence alert */}
+          {motorcycle.exceededGeofence && (
+            <div className="mx-4 mt-4 flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+              <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-4 h-4 text-[#b50002]" />
               </div>
-            ))}
-          </div>
+              <div>
+                <p className="font-black text-[#b50002] text-sm">
+                  Geofence Exceeded
+                </p>
+                <p className="text-[11px] text-red-400">
+                  Unit is outside the primary destination zone
+                </p>
+              </div>
+            </div>
+          )}
 
-          <Section id="customer" title="Customer" icon={FaUser}>
-            <Row label="Name" value={b.customer} />
-            <Row label="Email" value={b.email} />
-            <Row label="Phone" value={b.phone || "-"} />
-            {motorcycle.renterAddress && (
-              <Row label="Address" value={motorcycle.renterAddress} />
-            )}
-          </Section>
+          <div className="p-4 space-y-3">
+            {/* Status chips */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "Status",
+                  value:
+                    String(
+                      motorcycle.trackerStatus || "active",
+                    ).toLowerCase() === "online"
+                      ? "Online"
+                      : String(
+                            motorcycle.trackerStatus || "active",
+                          ).toLowerCase() === "offline"
+                        ? "Offline"
+                        : motorcycle.exceededGeofence
+                          ? "Exceeded"
+                          : "Active",
+                  color:
+                    String(motorcycle.trackerStatus || "").toLowerCase() ===
+                    "online"
+                      ? "text-emerald-600"
+                      : motorcycle.exceededGeofence
+                        ? "text-[#b50002]"
+                        : "text-slate-600",
+                },
+                {
+                  label: "Daily Rate",
+                  value: formatPrice(dailyRate),
+                  color: "text-[#171717]",
+                },
+                {
+                  label: "Duration",
+                  value: `${days}d`,
+                  color: "text-[#171717]",
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 text-center"
+                >
+                  <p className="text-[9px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1">
+                    {label}
+                  </p>
+                  <p className={`font-black text-sm ${color}`}>{value}</p>
+                </div>
+              ))}
+            </div>
 
-          <Section
-            id="dates"
-            title="Booking Dates & Times"
-            icon={FaCalendarAlt}
-          >
-            <Row
-              label="Pickup"
-              value={`${formatDate(b.pickupDate)} · ${formatTime(b.pickupTime)}`}
-            />
-            <Row
-              label="Return"
-              value={`${formatDate(b.returnDate)} · ${formatTime(b.returnTime)}`}
-            />
-            <Row
-              label="Duration"
-              value={`${days} ${days === 1 ? "day" : "days"}`}
-            />
-            <Row label="Destination" value={b.destination || "-"} />
-            {details.destinationCity && (
-              <Row label="Destination City" value={details.destinationCity} />
-            )}
-          </Section>
+            <Section id="customer" title="Customer" icon={FaUser}>
+              <Row label="Name" value={b.customer} />
+              <Row label="Email" value={b.email} />
+              <Row label="Phone" value={b.phone || "-"} />
+              {motorcycle.renterAddress && (
+                <Row label="Address" value={motorcycle.renterAddress} />
+              )}
+            </Section>
 
-          <Section id="specs" title="Specifications" icon={FaMotorcycle}>
-            <Row
-              label="Make / Model"
-              value={`${motorcycle.make} ${motorcycle.model}`}
-            />
-            {motorcycle.unitId && (
-              <Row label="Unit ID" value={motorcycle.unitId} />
-            )}
-            {motorcycle.year && <Row label="Year" value={motorcycle.year} />}
-            {motorcycle.engineSize && (
-              <Row label="Engine" value={`${motorcycle.engineSize}cc`} />
-            )}
-            {motorcycle.transmission && (
-              <Row label="Transmission" value={motorcycle.transmission} />
-            )}
-            {motorcycle.fuelType && (
-              <Row label="Fuel Type" value={motorcycle.fuelType} />
-            )}
-            <Row label="ABS" value={motorcycle.hasABS ? "Yes" : "No"} />
-          </Section>
-
-          <Section id="fees" title="Fee Breakdown" icon={FaMoneyBillWave}>
-            {dailyRate > 0 && (
+            <Section
+              id="dates"
+              title="Booking Dates & Times"
+              icon={FaCalendarAlt}
+            >
               <Row
-                label={`Rate/day (₱${dailyRate.toLocaleString()} x ${days}d)`}
-                value={formatPrice(baseRental)}
+                label="Pickup"
+                value={`${formatDate(b.pickupDate)} · ${formatTime(b.pickupTime)}`}
               />
-            )}
-            {distanceFee > 0 && (
               <Row
-                label={`Distance Fee${details.distanceTierLabel ? ` (${details.distanceTierLabel})` : ""}`}
-                value={`+${formatPrice(distanceFee)}`}
-                accent="text-amber-600"
+                label="Return"
+                value={`${formatDate(b.returnDate)} · ${formatTime(b.returnTime)}`}
               />
-            )}
-            {details.helmetRequested && helmetFee > 0 && (
               <Row
-                label="Additional Helmet"
-                value={`+${formatPrice(helmetFee)}`}
+                label="Duration"
+                value={`${days} ${days === 1 ? "day" : "days"}`}
+              />
+              <Row label="Destination" value={b.destination || "-"} />
+              {details.destinationCity && (
+                <Row label="Destination City" value={details.destinationCity} />
+              )}
+            </Section>
+
+            <Section id="specs" title="Specifications" icon={FaMotorcycle}>
+              <Row
+                label="Make / Model"
+                value={`${motorcycle.make} ${motorcycle.model}`}
+              />
+              {motorcycle.unitId && (
+                <Row label="Unit ID" value={motorcycle.unitId} />
+              )}
+              {motorcycle.year && <Row label="Year" value={motorcycle.year} />}
+              {motorcycle.engineSize && (
+                <Row label="Engine" value={`${motorcycle.engineSize}cc`} />
+              )}
+              {motorcycle.transmission && (
+                <Row label="Transmission" value={motorcycle.transmission} />
+              )}
+              {motorcycle.fuelType && (
+                <Row label="Fuel Type" value={motorcycle.fuelType} />
+              )}
+              <Row label="ABS" value={motorcycle.hasABS ? "Yes" : "No"} />
+            </Section>
+
+            <Section id="fees" title="Fee Breakdown" icon={FaMoneyBillWave}>
+              {dailyRate > 0 && (
+                <Row
+                  label={`Rate/day (₱${dailyRate.toLocaleString()} x ${days}d)`}
+                  value={formatPrice(baseRental)}
+                />
+              )}
+              {distanceFee > 0 && (
+                <Row
+                  label={`Distance Fee${details.distanceTierLabel ? ` (${details.distanceTierLabel})` : ""}`}
+                  value={`+${formatPrice(distanceFee)}`}
+                  accent="text-amber-600"
+                />
+              )}
+              {details.helmetRequested && helmetFee > 0 && (
+                <Row
+                  label="Additional Helmet"
+                  value={`+${formatPrice(helmetFee)}`}
+                  accent="text-[#b50002]"
+                />
+              )}
+              <div className="flex items-center justify-between pt-2 mt-1 border-t border-slate-100">
+                <span className="text-[11px] font-black text-[#171717]">
+                  Total
+                </span>
+                <span className="text-sm font-black text-[#171717]">
+                  {formatPrice(grossTotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-slate-400">
+                  Downpayment (paid)
+                </span>
+                <span className="text-[11px] font-bold text-emerald-600">
+                  -{formatPrice(downpayment)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 mt-1">
+                <span className="text-[11px] font-black text-[#171717]">
+                  Due at Pickup
+                </span>
+                <span className="text-sm font-black text-[#b50002]">
+                  {formatPrice(dueAtPickup)}
+                </span>
+              </div>
+            </Section>
+
+            <Section id="payment" title="Payment" icon={FaCreditCard}>
+              <Row
+                label="Downpayment"
+                value={`${formatPrice(downpayment)} — Paid`}
+                accent="text-emerald-600"
+              />
+              <Row
+                label="Due at Pickup"
+                value={formatPrice(dueAtPickup)}
                 accent="text-[#b50002]"
               />
-            )}
-            <div className="flex items-center justify-between pt-2 mt-1 border-t border-slate-100">
-              <span className="text-[11px] font-black text-[#171717]">
-                Total
-              </span>
-              <span className="text-sm font-black text-[#171717]">
-                {formatPrice(grossTotal)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-slate-400">
-                Downpayment (paid)
-              </span>
-              <span className="text-[11px] font-bold text-emerald-600">
-                -{formatPrice(downpayment)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 mt-1">
-              <span className="text-[11px] font-black text-[#171717]">
-                Due at Pickup
-              </span>
-              <span className="text-sm font-black text-[#b50002]">
-                {formatPrice(dueAtPickup)}
-              </span>
-            </div>
-          </Section>
+              <Row
+                label="Payment Method"
+                value={motorcycle.reservationPaymentMethod || "-"}
+              />
+              <Row
+                label="Payment Status"
+                value={
+                  motorcycle.paymentStatus === "fully_paid"
+                    ? "Fully Paid"
+                    : "Downpayment Paid"
+                }
+                accent={
+                  motorcycle.paymentStatus === "fully_paid"
+                    ? "text-emerald-600"
+                    : "text-amber-600"
+                }
+              />
+            </Section>
 
-          <Section id="payment" title="Payment" icon={FaCreditCard}>
-            <Row
-              label="Downpayment"
-              value={`${formatPrice(downpayment)} — Paid`}
-              accent="text-emerald-600"
-            />
-            <Row
-              label="Due at Pickup"
-              value={formatPrice(dueAtPickup)}
-              accent="text-[#b50002]"
-            />
-            <Row
-              label="Payment Method"
-              value={motorcycle.reservationPaymentMethod || "-"}
-            />
-            <Row
-              label="Payment Status"
-              value={
-                motorcycle.paymentStatus === "fully_paid"
-                  ? "Fully Paid"
-                  : "Downpayment Paid"
-              }
-              accent={
-                motorcycle.paymentStatus === "fully_paid"
-                  ? "text-emerald-600"
-                  : "text-amber-600"
-              }
-            />
-          </Section>
-
-          <p className="text-center text-slate-300 text-[10px] pb-2">
-            Last updated: {motorcycle.lastUpdate.toLocaleTimeString()}
-          </p>
+            <p className="text-center text-slate-300 text-[10px] pb-2">
+              Last updated: {motorcycle.lastUpdate.toLocaleTimeString()}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -858,11 +886,18 @@ const MotorcycleTracking = () => {
         trackerStats: {
           speed: trackerSnap.speed,
           totalDistance: baseline
-            ? Math.max(0, (trackerSnap.totalDistance ?? 0) - (baseline.totalDistanceKm ?? 0))
+            ? Math.max(
+                0,
+                (trackerSnap.totalDistance ?? 0) -
+                  (baseline.totalDistanceKm ?? 0),
+              )
             : 0,
           averageSpeed: trackerSnap.averageSpeed,
           stopsMade: baseline
-            ? Math.max(0, (trackerSnap.stopsMade ?? 0) - (baseline.stopsMade ?? 0))
+            ? Math.max(
+                0,
+                (trackerSnap.stopsMade ?? 0) - (baseline.stopsMade ?? 0),
+              )
             : 0,
           lastUpdatedAt: trackerSnap.lastUpdatedAt,
         },
@@ -887,13 +922,22 @@ const MotorcycleTracking = () => {
     const promises = [];
     motorcycles.forEach((m) => {
       const bookingId = m.booking?._id;
-      if (!bookingId || m.booking?.trackingBaseline || baselineCapturedRef.current.has(bookingId)) return;
+      if (
+        !bookingId ||
+        m.booking?.trackingBaseline ||
+        baselineCapturedRef.current.has(bookingId)
+      )
+        return;
       baselineCapturedRef.current.add(bookingId);
       needsRefetch = true;
-      promises.push(api.post(`/api/tracking/baseline/${bookingId}`).catch(() => {}));
+      promises.push(
+        api.post(`/api/tracking/baseline/${bookingId}`).catch(() => {}),
+      );
     });
     if (needsRefetch) {
-      Promise.all(promises).then(() => fetchMotorcycles()).catch(() => {});
+      Promise.all(promises)
+        .then(() => fetchMotorcycles())
+        .catch(() => {});
     }
   }, [motorcycles, fetchMotorcycles]);
 
@@ -1026,6 +1070,14 @@ const MotorcycleTracking = () => {
         @keyframes pulse-red {
           0%, 100% { box-shadow: 0 0 0 0 rgba(181,0,2,0.5); }
           50%       { box-shadow: 0 0 0 10px rgba(181,0,2,0); }
+        }
+        @keyframes modal-backdrop-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes modal-panel-in {
+          from { opacity: 0; transform: scale(0.94) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>
 
@@ -1167,7 +1219,6 @@ const MotorcycleTracking = () => {
                 ))
               )}
             </div>
-
           </div>
 
           {/* Map — 3/4 */}

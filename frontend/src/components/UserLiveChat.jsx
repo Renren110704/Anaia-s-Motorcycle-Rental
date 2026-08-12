@@ -5,17 +5,16 @@ import axios from "axios";
 import API_BASE_URL from "../apiBase";
 
 const themeRed = "#b50002";
-const themeGray = "#e3e3e3";
 
 // Helper to keep the chat alive after a page refresh
-const getPersistentChatId = () => {
-  let id = localStorage.getItem("anaia_chat_id");
-  if (!id) {
-    id = "user_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem("anaia_chat_id", id);
-  }
-  return id;
-};
+// const getPersistentChatId = () => {
+//   let id = localStorage.getItem("anaia_chat_id");
+//   if (!id) {
+//     id = "user_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+//     localStorage.setItem("anaia_chat_id", id);
+//   }
+//   return id;
+// };
 
 export default function UserLiveChat() {
   const [isOpen, setIsOpen] = useState(false);

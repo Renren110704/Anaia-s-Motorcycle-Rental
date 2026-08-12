@@ -246,6 +246,16 @@ const calculateDays = (from, to) => {
 };
 const formatMoney = (n) => `₱${Number(n || 0).toLocaleString("en-PH")}`;
 
+// Statuses that mean the customer already has a booking in progress and
+// therefore cannot start a new walk-in rental until it's resolved.
+const BLOCKING_BOOKING_STATUSES = [
+  "pending",
+  "pending_reservation",
+  "pending_full_payment",
+  "active",
+  "inspection",
+];
+
 // ── Calendar Helpers ────────────────────────────────────────────
 const toDateKey = (date) => {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
@@ -1127,16 +1137,6 @@ const WalkInRentals = () => {
     }
     setFormData((p) => ({ ...p, returnDate: dateISO }));
   };
-
-  // Statuses that mean the customer already has a booking in progress and
-  // therefore cannot start a new walk-in rental until it's resolved.
-  const BLOCKING_BOOKING_STATUSES = [
-    "pending",
-    "pending_reservation",
-    "pending_full_payment",
-    "active",
-    "inspection",
-  ];
 
   const describeBlockingStatus = (status) => {
     const s = String(status || "").toLowerCase();

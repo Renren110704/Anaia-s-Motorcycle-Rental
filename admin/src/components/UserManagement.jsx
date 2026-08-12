@@ -629,6 +629,8 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
   );
 };
 
+const TIER_RANKS = { Platinum: 4, Gold: 3, Silver: 2, None: 1 };
+
 // ── Main Component ────────────────────────────────────────────────────────────
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -638,8 +640,6 @@ const UserManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [colSort, setColSort] = useState({ key: null, dir: null });
   const [drawerUser, setDrawerUser] = useState(null);
-
-  const TIER_RANKS = { Platinum: 4, Gold: 3, Silver: 2, None: 1 };
 
   const fetchUsers = useCallback(async () => {
     try {

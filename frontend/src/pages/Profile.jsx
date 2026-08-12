@@ -13,11 +13,9 @@ import {
   FaMapMarkerAlt,
   FaChevronDown,
   FaCheckCircle,
-  FaShieldAlt,
   FaKey,
   FaCalendarAlt,
   FaTrash,
-  FaTrophy,
 } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import axios from "axios";

@@ -4,15 +4,12 @@ import API_BASE_URL from "../apiBase";
 import {
   FaCalendarAlt,
   FaCheckCircle,
-  FaExclamationTriangle,
   FaFileExport,
-  FaFileInvoiceDollar,
   FaFilter,
   FaMoneyBillWave,
   FaMotorcycle,
   FaPrint,
   FaRedo,
-  FaShieldAlt,
 } from "react-icons/fa";
 import {
   Bike,

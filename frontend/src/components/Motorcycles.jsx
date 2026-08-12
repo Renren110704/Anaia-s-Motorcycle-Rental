@@ -14,13 +14,10 @@ import {
   FaCogs,
   FaSearch,
   FaTimes,
-  FaMotorcycle,
   FaFilter,
   FaChevronLeft,
   FaChevronRight,
   FaStar,
-  FaStarHalfAlt,
-  FaRegStar,
   FaHeart,
 } from "react-icons/fa";
 import axios from "axios";
@@ -843,16 +840,16 @@ const Motorcycles = () => {
     // return <span style={badgeStyle("green")}>Available</span>;
   };
 
-  const badgeStyle = (color) => ({
-    fontSize: 10,
-    fontWeight: 700,
-    padding: "3px 9px",
-    borderRadius: 999,
-    background: color === "green" ? "rgba(22,163,74,0.1)" : "rgba(181,0,2,0.1)",
-    color: color === "green" ? "#16a34a" : "#b50002",
-    fontFamily: "'Space Grotesk',sans-serif",
-    letterSpacing: "0.3px",
-  });
+  // const badgeStyle = (color) => ({
+  //   fontSize: 10,
+  //   fontWeight: 700,
+  //   padding: "3px 9px",
+  //   borderRadius: 999,
+  //   background: color === "green" ? "rgba(22,163,74,0.1)" : "rgba(181,0,2,0.1)",
+  //   color: color === "green" ? "#16a34a" : "#b50002",
+  //   fontFamily: "'Space Grotesk',sans-serif",
+  //   letterSpacing: "0.3px",
+  // });
 
   const isBookDisabled = (motorcycle) => {
     const eff = computeEffectiveAvailability(motorcycle);

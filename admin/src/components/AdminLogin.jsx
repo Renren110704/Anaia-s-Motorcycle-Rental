@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaCheck, FaEye, FaEyeSlash, FaTimes } from "react-icons/fa";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import bgImage from "../assets/bgImage2.jpg";
-import { PASSWORD_RULES, validateStrongPassword } from "../constants/adminAuth";
+import { validateStrongPassword } from "../constants/adminAuth";
 
 // Formats a millisecond duration as "M:SS" for the lockout countdown.
 const formatCountdown = (ms) => {
@@ -24,10 +24,10 @@ const AdminLogin = ({ onLogin }) => {
   const [lockedUntil, setLockedUntil] = useState(null);
   const [now, setNow] = useState(Date.now());
 
-  const validation = useMemo(
-    () => validateStrongPassword(password),
-    [password],
-  );
+  // const validation = useMemo(
+  //   () => validateStrongPassword(password),
+  //   [password],
+  // );
 
   // Tick every second while locked so the countdown stays live.
   useEffect(() => {

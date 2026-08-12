@@ -19,7 +19,7 @@ import {
 
 const LOGOUT_ENDPOINT = "/api/auth/logout";
 const ME_ENDPOINT = "/api/auth/me";
-const MY_BOOKINGS_ENDPOINT = "/api/motorcycle-bookings/mybooking";
+// const MY_BOOKINGS_ENDPOINT = "/api/motorcycle-bookings/mybooking";
 const NOTIFICATIONS_ENDPOINT = "/api/notifications";
 
 const navLinks = [
@@ -50,7 +50,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [reuploadBadgeCount, setReuploadBadgeCount] = useState(0);
+  // const [reuploadBadgeCount, setReuploadBadgeCount] = useState(0);
 
   // Notifications State
   const [notifications, setNotifications] = useState([]);
@@ -242,31 +242,31 @@ const Navbar = () => {
   const fetchUserData = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setReuploadBadgeCount(0);
+      // setReuploadBadgeCount(0);
       setNotifications([]);
       setUnreadCount(0);
       return;
     }
 
     // 1. Re-upload badge count is still derived from the bookings list.
-    try {
-      const res = await api.get(MY_BOOKINGS_ENDPOINT, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 8000,
-      });
-      const raw = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data || res.data?.bookings || [];
-
-      const uploadCount = raw.filter(
-        (b) =>
-          !b?.isDeleted &&
-          (b?.requiresProofReupload || b?.paymentStatus === "rejected"),
-      ).length;
-      setReuploadBadgeCount(uploadCount);
-    } catch {
-      setReuploadBadgeCount(0);
-    }
+    // try {
+    //   const res = await api.get(MY_BOOKINGS_ENDPOINT, {
+    //     headers: { Authorization: `Bearer ${token}` },
+    //     timeout: 8000,
+    //   });
+    //   const raw = Array.isArray(res.data)
+    //     ? res.data
+    //     : res.data?.data || res.data?.bookings || [];
+    //
+    //   const uploadCount = raw.filter(
+    //     (b) =>
+    //       !b?.isDeleted &&
+    //       (b?.requiresProofReupload || b?.paymentStatus === "rejected"),
+    //   ).length;
+    //   setReuploadBadgeCount(uploadCount);
+    // } catch {
+    //   setReuploadBadgeCount(0);
+    // }
 
     // 2. Notifications are now persisted server-side (see
     // notificationService.js + /api/notifications) instead of being

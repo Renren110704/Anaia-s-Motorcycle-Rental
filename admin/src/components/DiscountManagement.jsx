@@ -26,7 +26,6 @@ import {
   Save,
   RotateCcw,
   Award,
-  Info,
 } from "lucide-react";
 import axios from "axios";
 import { createPortal } from "react-dom";

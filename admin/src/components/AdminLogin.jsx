@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import bgImage from "../assets/bgImage2.jpg";
-import { validateStrongPassword } from "../constants/adminAuth";
 
 // Formats a millisecond duration as "M:SS" for the lockout countdown.
 const formatCountdown = (ms) => {

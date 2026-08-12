@@ -1837,18 +1837,18 @@ const BookingRow = ({
       : Math.min(extensionAppliedDiscount.discountValue, extensionBaseRental)
     : 0;
 
-  const discountedExtensionBase = Math.round(
-    Math.max(0, extensionBaseRental - extensionDiscountAmount),
-  );
+  // const discountedExtensionBase = Math.round(
+  //   Math.max(0, extensionBaseRental - extensionDiscountAmount),
+  // );
 
   // The extension fee IS the (possibly discounted) incremental cost — no
   // one-time fees to re-add, and no diffing against the original total
   // (which would re-introduce/cancel whatever discount applied at checkout).
   // const extensionGrossTotal = grossTotal + discountedExtensionBase;
   // const extensionAdditionalAmount = discountedExtensionBase;
-  const latestExtension = Array.isArray(booking.raw?.extensions)
-    ? booking.raw.extensions[booking.raw.extensions.length - 1]
-    : null;
+  // const latestExtension = Array.isArray(booking.raw?.extensions)
+  //   ? booking.raw.extensions[booking.raw.extensions.length - 1]
+  //   : null;
   // const originalReturnDateFromExtension =
   //   latestExtension?.previousReturnDate || null;
   // const originalReturnTimeFromExtension =

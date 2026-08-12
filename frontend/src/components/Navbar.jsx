@@ -169,7 +169,7 @@ const Navbar = () => {
     refreshFavorites(); // no token now -> clears the favorites cache/badge
 
     navigate("/", { replace: true });
-  }, [navigate, api]);
+  }, [navigate]);
 
   useEffect(() => {
     setIsOpen(false);

@@ -24,10 +24,19 @@ import {
 import { FaMotorcycle } from "react-icons/fa";
 import axios from "axios";
 import API_BASE_URL from "../apiBase";
+import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { Accept: "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 const navLinks = [
@@ -353,8 +362,7 @@ const Sidebar = ({
   }, [location.pathname, fetchPending]);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
     onLogout();
     navigate("/login", { replace: true });
   }, [navigate, onLogout]);

@@ -35,7 +35,7 @@ export const handleChat = async (req, res) => {
 
     // Call Groq API
     const response = await client.chat.completions.create({
-      model: "llama-3.1-8b-instant", // Fast + free
+      model: "openai/gpt-oss-20b", // Fast + free
       max_tokens: 1024,
       messages: [
         { role: "system", content: SYSTEM_INSTRUCTION },

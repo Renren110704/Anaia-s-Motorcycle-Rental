@@ -1509,7 +1509,7 @@ const ActiveBookingBlockModal = ({
             fontFamily: "'Space Grotesk',sans-serif",
           }}
         >
-          Only one motorcycle can be rented per account at a time.
+          Only one vehicle can be rented per account at a time.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <button
@@ -3562,11 +3562,11 @@ const MotorcycleDetail = () => {
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
-        "This motorcycle is currently being rented by someone else.";
+        "This vehicle is currently being rented by someone else.";
       if (err?.response?.data?.code === "MOTORCYCLE_LOCKED") {
         await alertModal(msg, {
           isError: true,
-          title: "Motorcycle Unavailable",
+          title: "Vehicle Unavailable",
         });
       } else toast.error(msg);
       return false;
@@ -3679,13 +3679,13 @@ const MotorcycleDetail = () => {
         });
         const payload = res.data?.data ?? res.data ?? null;
         if (payload) setMotorcycle(payload);
-        else setMotorcycleError("Motorcycle not found.");
+        else setMotorcycleError("Vehicle not found.");
       } catch (err) {
         const canceled =
           err?.code === "ERR_CANCELED" || err?.name === "CanceledError";
         if (!canceled)
           setMotorcycleError(
-            err?.response?.data?.message || "Failed to load motorcycle",
+            err?.response?.data?.message || "Failed to load vehicle",
           );
       } finally {
         setLoadingMotorcycle(false);
@@ -3834,7 +3834,7 @@ const MotorcycleDetail = () => {
             fontFamily: "'Space Grotesk',sans-serif",
           }}
         >
-          Motorcycle not found.
+          Vehicle not found.
         </p>
       </div>
     );
@@ -4139,7 +4139,7 @@ const MotorcycleDetail = () => {
             year: "numeric",
           });
           toast.error(
-            `This motorcycle is scheduled for maintenance on ${sl === el ? sl : `${sl} — ${el}`}. Please select different dates.`,
+            `This vehicle is scheduled for maintenance on ${sl === el ? sl : `${sl} — ${el}`}. Please select different dates.`,
           );
           return;
         }
@@ -5183,7 +5183,7 @@ const MotorcycleDetail = () => {
                         lineHeight: 1.6,
                       }}
                     >
-                      This motorcycle is currently under inspection. We are
+                      This vehicle is currently under inspection. We are
                       doing our best to ensure it is in excellent condition and
                       will make it available for booking as soon as the
                       inspection is complete. Thank you for your patience and
@@ -6172,7 +6172,7 @@ const MotorcycleDetail = () => {
                             fontFamily: "'Space Grotesk',sans-serif",
                           }}
                         >
-                          Motorcycle held for checkout
+                          Vehicle held for checkout
                         </span>
                         <span
                           style={{

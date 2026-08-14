@@ -26,11 +26,20 @@ import {
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
+import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
   baseURL: BASE,
   headers: { Accept: "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 const ITEMS_PER_PAGE = 10;
 const MAINTENANCE_INTERVAL_MONTHS = 6;

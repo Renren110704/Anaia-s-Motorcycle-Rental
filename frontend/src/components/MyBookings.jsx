@@ -5213,7 +5213,7 @@ const MyBookings = () => {
             signal: controller.signal,
             params: { limit: 1000, includeDeleted: "false" },
           }),
-          axios.get(`${API_BASE}/api/discounts`, {
+          axios.get(`${API_BASE}/api/discounts/active`, {
             signal: controller.signal,
           }),
         ]);

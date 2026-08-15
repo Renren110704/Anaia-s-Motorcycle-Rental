@@ -140,7 +140,7 @@ router.get("/loyalty/status/:userId", async (req, res) => {
 });
 
 // GET /api/discounts/loyalty/config — admin: read the loyalty program settings
-router.get("/loyalty/config", adminAuth, async (req, res) => {
+router.get("/loyalty/config", async (req, res) => {
   try {
     const config = await getLoyaltyConfig({ skipCache: true });
     res.json(config);

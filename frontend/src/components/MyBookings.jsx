@@ -3441,7 +3441,7 @@ const BookingRow = ({
                     }}
                   >
                     {booking.status === "inspection"
-                      ? "Your motorcycle is under inspection. Please wait for the admin to clear it or settle any penalties."
+                      ? "Your vehicle is under inspection. Please wait for the admin to clear it or settle any penalties."
                       : "Return inspection details and settled fees."}
                   </p>
 
@@ -6107,7 +6107,7 @@ const MyBookings = () => {
                     transition: "all 0.18s",
                   }}
                 >
-                  <FaMotorcycle style={{ fontSize: 12 }} /> Browse Motorcycles{" "}
+                  <FaMotorcycle style={{ fontSize: 12 }} /> Browse Vehicles{" "}
                   <FaArrowRight style={{ fontSize: 10 }} />
                 </Link>
               )}

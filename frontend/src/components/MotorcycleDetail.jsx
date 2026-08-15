@@ -2620,11 +2620,41 @@ const AllReviewsModal = ({ motorcycleId, motorcycleName, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
+  const [votingReviewId, setVotingReviewId] = useState("");
 
   const applyRatingFilter = (star) => {
     setRatingFilter(star);
     setPage(1);
   };
+
+  const voteOnReview = useCallback(async (reviewId, vote) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please log in to vote on a review.");
+      return;
+    }
+    try {
+      setVotingReviewId(reviewId);
+      const res = await api.patch(
+        `/api/reviews/${reviewId}/vote`,
+        { vote },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const updated = res.data?.review || null;
+      if (updated)
+        setReviews((prev) =>
+          prev.map((r) =>
+            String(r._id || r.id) === String(reviewId)
+              ? { ...r, ...updated }
+              : r,
+          ),
+        );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save vote.");
+    } finally {
+      setVotingReviewId("");
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -3044,6 +3074,35 @@ const AllReviewsModal = ({ motorcycleId, motorcycleName, onClose }) => {
                       </p>
                     </div>
                   )}
+
+                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                    <button
+                      className="md-vote-btn"
+                      disabled={votingReviewId === (r._id || r.id)}
+                      onClick={() => voteOnReview(r._id || r.id, "like")}
+                      style={{
+                        borderColor: "rgba(22,163,74,0.25)",
+                        background: "rgba(22,163,74,0.06)",
+                        color: "#16a34a",
+                      }}
+                    >
+                      <FaThumbsUp size={10} /> Helpful (
+                      {r.helpfulLikeCount ?? 0})
+                    </button>
+                    <button
+                      className="md-vote-btn"
+                      disabled={votingReviewId === (r._id || r.id)}
+                      onClick={() => voteOnReview(r._id || r.id, "dislike")}
+                      style={{
+                        borderColor: "rgba(181,0,2,0.2)",
+                        background: "rgba(181,0,2,0.05)",
+                        color: "#b50002",
+                      }}
+                    >
+                      <FaThumbsDown size={10} /> Not Helpful (
+                      {r.helpfulDislikeCount ?? 0})
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -5183,11 +5242,10 @@ const MotorcycleDetail = () => {
                         lineHeight: 1.6,
                       }}
                     >
-                      This vehicle is currently under inspection. We are
-                      doing our best to ensure it is in excellent condition and
-                      will make it available for booking as soon as the
-                      inspection is complete. Thank you for your patience and
-                      understanding.
+                      This vehicle is currently under inspection. We are doing
+                      our best to ensure it is in excellent condition and will
+                      make it available for booking as soon as the inspection is
+                      complete. Thank you for your patience and understanding.
                     </p>
                   </div>
                 </div>

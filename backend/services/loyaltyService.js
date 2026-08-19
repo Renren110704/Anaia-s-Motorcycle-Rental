@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import User from "../models/userModel.js";
 import LoyaltyConfig from "../models/loyaltyConfigModel.js";
+import {
+  notifyNewLoyaltyCode,
+  notifyLoyaltyTierUp,
+} from "./notificationService.js";
 
 // ── Fallback defaults ─────────────────────────────────────────────────────
 // Used only if the LoyaltyConfig collection is empty/unreachable, so the
@@ -161,6 +165,8 @@ export const evaluateLoyaltyAfterCompletion = async (userId) => {
 
   const newTier = getTierForCount(newCount, config);
   const issuedCodes = [];
+  let tierJustChanged = false;
+  let newTierBenefits = null;
 
   // ── Tier-up bonus code ────────────────────────────────────────────────────
   if (newTier !== "None" && newTier !== previousTier) {
@@ -177,6 +183,8 @@ export const evaluateLoyaltyAfterCompletion = async (userId) => {
     issuedCodes.push(code);
     user.loyaltyTier = newTier;
     user.loyaltyTierUpdatedAt = new Date();
+    tierJustChanged = true;
+    newTierBenefits = tierConfig;
   }
 
   // ── Milestone code (independent of tier naming, admin-configurable) ──────
@@ -219,6 +227,21 @@ export const evaluateLoyaltyAfterCompletion = async (userId) => {
   }
 
   await user.save();
+
+  // ── Notifications ──────────────────────────────────────────────────────
+  // Fired after save so they only go out once the codes/tier are actually
+  // persisted. Each is independently deduped in notificationService.js
+  // (by code string / tier name), so this stays safe to call repeatedly.
+  if (tierJustChanged) {
+    notifyLoyaltyTierUp(userId, newTier, newTierBenefits).catch((e) =>
+      console.error("[Push] notifyLoyaltyTierUp:", e.message),
+    );
+  }
+  for (const code of issuedCodes) {
+    notifyNewLoyaltyCode(userId, code).catch((e) =>
+      console.error("[Push] notifyNewLoyaltyCode:", e.message),
+    );
+  }
 
   return {
     completedRentalsCount: user.completedRentalsCount,

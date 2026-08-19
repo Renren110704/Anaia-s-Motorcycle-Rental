@@ -1,6 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
-import { notifyNewPromo } from "../services/notificationService.js";
+import {
+  notifyNewPromo,
+  removePromoNotifications,
+} from "../services/notificationService.js";
 import User from "../models/userModel.js";
 import LoyaltyConfig from "../models/loyaltyConfigModel.js";
 import {
@@ -509,7 +512,11 @@ router.patch("/:id/toggle", adminAuth, async (req, res) => {
     if (!promo) return res.status(404).json({ message: "Discount not found" });
     promo.isActive = !promo.isActive;
     const updated = await promo.save();
-    if (updated.isActive) notifyNewPromo(updated).catch(() => {});
+    if (updated.isActive) {
+      notifyNewPromo(updated).catch(() => {});
+    } else {
+      removePromoNotifications(updated._id).catch(() => {});
+    }
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -537,6 +544,7 @@ router.delete("/:id", adminAuth, async (req, res) => {
   try {
     const promo = await Discount.findByIdAndDelete(req.params.id);
     if (!promo) return res.status(404).json({ message: "Discount not found" });
+    removePromoNotifications(promo._id).catch(() => {});
     res.json({ message: "Discount deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });

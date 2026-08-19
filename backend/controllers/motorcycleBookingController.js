@@ -1223,7 +1223,7 @@ export const createMotorcycleBooking = async (req, res) => {
       },
     });
 
-    notifyBookingCreated(saved.userId).catch((e) =>
+    notifyBookingCreated(saved.userId, saved._id).catch((e) =>
       console.error("[Push] notifyBookingCreated:", e.message),
     );
 

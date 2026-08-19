@@ -326,9 +326,82 @@ export async function notifyVehicleCleared(userId, bookingId) {
 }
 
 // ── Promo notifications ────────────────────────────────────────────────────
-// (Broadcast promos stay push-only / not persisted per-user — add a
-// per-user Notification record here too if you want them to show up in
-// the in-app dropdown.)
+
+// Delete the per-user Notification records for a promo, e.g. when it's
+// deactivated or deleted by an admin — so a promo that's no longer valid
+// quietly disappears from users' notification dropdowns instead of sitting
+// there advertising a discount that no longer works. No new notification is
+// sent; this only cleans up the one from notifyNewPromo.
+//
+// Hard-deleted (not soft-deleted via `deleted: true`) so that if the promo
+// is later reactivated, notifyNewPromo's upsert (which uses $setOnInsert)
+// finds no existing doc for the dedupeKey and inserts a fresh one — giving
+// users a new notification instead of silently no-op'ing against a
+// resurrected-but-hidden record.
+export async function removePromoNotifications(promoId) {
+  if (!promoId) return;
+  try {
+    await Notification.deleteMany({ dedupeKey: `promo-${promoId}` });
+  } catch (err) {
+    console.error(
+      "[Notifications] removePromoNotifications error:",
+      err.message,
+    );
+  }
+}
+
+// Formats a date the same way the admin UI does (en-PH, e.g. "19 Aug 2026").
+const formatPromoDate = (d) => {
+  if (!d) return null;
+  try {
+    return new Intl.DateTimeFormat("en-PH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(d));
+  } catch {
+    return null;
+  }
+};
+
+// Builds the extra detail lines (validity window, max uses, minimum rental
+// duration, applicable vehicles) appended to the in-app notification message
+// for a promo. Kept out of the push body, which stays short.
+function buildPromoDetailLines(promo) {
+  const lines = [];
+
+  const start = formatPromoDate(promo.startDate);
+  const end = formatPromoDate(promo.endDate);
+  if (start && end) lines.push(`Valid ${start} – ${end}`);
+  else if (start) lines.push(`Valid from ${start}`);
+  else if (end) lines.push(`Valid until ${end}`);
+
+  lines.push(
+    promo.maxUses != null
+      ? `Limited to ${Number(promo.maxUses).toLocaleString()} use${Number(promo.maxUses) === 1 ? "" : "s"}`
+      : "Unlimited uses",
+  );
+
+  lines.push(
+    promo.minRentalDays
+      ? `Minimum rental: ${promo.minRentalDays} day${promo.minRentalDays === 1 ? "" : "s"}`
+      : "No minimum rental duration",
+  );
+
+  if (promo.applicableCategories?.length) {
+    lines.push(`Applies to: ${promo.applicableCategories.join(", ")}`);
+  } else if (promo.applicableVehicleIds?.length) {
+    lines.push(
+      `Applies to ${promo.applicableVehicleIds.length} specific vehicle unit${
+        promo.applicableVehicleIds.length === 1 ? "" : "s"
+      }`,
+    );
+  } else {
+    lines.push("Applies to all vehicles");
+  }
+
+  return lines;
+}
 
 export async function notifyNewPromo(promo) {
   const discountLabel =
@@ -336,9 +409,96 @@ export async function notifyNewPromo(promo) {
       ? `${promo.discountValue}% off`
       : `₱${promo.discountValue} off`;
 
+  const title = `New Promo: ${promo.name}`;
+  const pushBody = `${discountLabel} — ${promo.description || "Limited time offer. Book now!"}`;
+  // Push stays short and punchy; the in-app record gets the full details so
+  // users can see them in the notifications dropdown without opening the promo.
+  const recordMessage = [pushBody, ...buildPromoDetailLines(promo)].join("\n");
+
   await notifyAllUsers({
-    title: `New Promo: ${promo.name}`,
-    body: `${discountLabel} — ${promo.description || "Limited time offer. Book now!"}`,
+    title,
+    body: pushBody,
     data: { screen: "Motorcycles" },
+  });
+
+  // Also persist an in-app Notification record for every user (not just
+  // those with push tokens) so the promo shows up in the dropdown even
+  // after reload / on a different device. Keyed on the promo's own _id, so
+  // re-notifying (e.g. re-toggling isActive on) never duplicates it.
+  try {
+    const users = await User.find({}, "_id");
+    await Promise.all(
+      users.map((u) =>
+        createNotificationRecord({
+          userId: u._id,
+          dedupeKey: `promo-${promo._id}`,
+          title,
+          message: recordMessage,
+          step: 0,
+          screen: "Motorcycles",
+        }),
+      ),
+    );
+  } catch (err) {
+    console.error("[Notifications] notifyNewPromo record error:", err.message);
+  }
+}
+
+// ── Loyalty notifications ───────────────────────────────────────────────────
+
+// Sent when a new loyalty coupon code is issued to a user (e.g. from
+// evaluateLoyaltyAfterCompletion in loyaltyService.js). `code` is expected to
+// be the loyalty code subdocument/object — at minimum { code, discountType,
+// discountValue }. dedupeKey is keyed on the code string itself since each
+// generated code should be unique per user.
+export async function notifyNewLoyaltyCode(userId, code) {
+  if (!code?.code) return;
+
+  const discountLabel =
+    code.discountType === "percentage"
+      ? `${code.discountValue}% off`
+      : `₱${code.discountValue} off`;
+
+  const title = "New Reward Code Unlocked!";
+  const body = `You've earned a new code (${code.code}) for ${discountLabel} your next booking.`;
+
+  await notifyUser(userId, {
+    title,
+    body,
+    data: { screen: "Profile", code: code.code },
+  });
+  await createNotificationRecord({
+    userId,
+    dedupeKey: `loyalty-code-${code.code}`,
+    title,
+    message: body,
+    step: 0,
+    screen: "Profile",
+  });
+}
+
+// Sent when a user's loyalty tier increases (e.g. Bronze -> Silver). Keyed
+// on the tier name so re-evaluating loyalty after future completions never
+// re-notifies for a tier already reached.
+export async function notifyLoyaltyTierUp(userId, tier, tierBenefits) {
+  if (!tier || tier === "None") return;
+
+  const title = `You've Reached ${tier} Tier!`;
+  const body = tierBenefits?.description
+    ? `Congrats! You're now a ${tier} member: ${tierBenefits.description}`
+    : `Congrats! You're now a ${tier} member. Check your profile for your new perks.`;
+
+  await notifyUser(userId, {
+    title,
+    body,
+    data: { screen: "Profile", tier },
+  });
+  await createNotificationRecord({
+    userId,
+    dedupeKey: `loyalty-tier-${tier}`,
+    title,
+    message: body,
+    step: 0,
+    screen: "Profile",
   });
 }

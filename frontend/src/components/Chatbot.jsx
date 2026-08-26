@@ -241,9 +241,16 @@ export default function Chatbot() {
           className="w-14 h-14 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center overflow-hidden bg-white"
           aria-label="Open Chatbot"
         >
+          {/* PERF: robot.gif is an animated GIF — GIFs are a very
+              inefficient format (no inter-frame compression like
+              video). Re-export the same animation as an animated
+              WebP (or a short muted <video>/APNG) at /images/robot.webp;
+              it'll typically be 5-10x smaller at the same quality. */}
           <img
-            src="/images/robot.gif"
-            alt="Robot GIF"
+            src="/images/robot.webp"
+            alt="Chat with Anaia's AI"
+            loading="lazy"
+            decoding="async"
             className="w-14 h-14 object-contain block rounded-full"
           />
         </button>

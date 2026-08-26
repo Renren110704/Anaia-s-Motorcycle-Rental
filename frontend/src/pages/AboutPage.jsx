@@ -84,7 +84,6 @@ export default function AboutPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;0,800;1,700;1,800&family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap');
 
         /* ── Reset & base ── */
         .ab-root {
@@ -788,7 +787,11 @@ export default function AboutPage() {
           <div
             className={`ab-hero-bg ${mounted ? "loaded" : ""}`}
             style={{
-              backgroundImage: `url(https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1800&q=80)`,
+              // PERF: this section renders well below the fold, but the
+              // width/quality were oversized for what's ever displayed.
+              // auto=format already lets Unsplash serve WebP/AVIF —
+              // capping width+quality is the remaining win.
+              backgroundImage: `url(https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1200&q=60)`,
             }}
           />
           <div className="ab-hero-overlay" />
@@ -870,9 +873,9 @@ export default function AboutPage() {
               </p>
               <p className="ab-story-body">
                 We started with just three units and a love for motorcycles.
-                Today, our fleet spans scooters, big bikes, and underbones as well as
-                pickup, sedan, MPV, and SUV cars from the Philippines' top
-                brands — all maintained to the highest standard and ready to
+                Today, our fleet spans scooters, big bikes, and underbones as
+                well as pickup, sedan, MPV, and SUV cars from the Philippines'
+                top brands — all maintained to the highest standard and ready to
                 ride.
               </p>
               <p className="ab-story-body">
@@ -892,6 +895,8 @@ export default function AboutPage() {
                   className="ab-story-img"
                   src="/images/about-story.jpg"
                   alt="Honda Click at Anaia's Motorcycle Rental"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             </div>
@@ -981,8 +986,8 @@ export default function AboutPage() {
                 is <em>one click away.</em>
               </h2>
               <p className="ab-cta-sub">
-                Browse our full fleet and book your preferred unit in minutes. Pick
-                up at our place in Bacoor — no delivery, no fuss.
+                Browse our full fleet and book your preferred unit in minutes.
+                Pick up at our place in Bacoor — no delivery, no fuss.
               </p>
             </div>
 

@@ -263,6 +263,15 @@ const HomeMotorcycles = () => {
     .slice(0, LIMIT);
 
   /* image helper */
+  // PERF: inject Cloudinary's f_auto (best format: AVIF/WebP per browser),
+  // q_auto (auto quality) and a capped width right after "/upload/" so we
+  // stop shipping full-resolution originals for a ~280px card thumbnail.
+  const CLOUDINARY_TRANSFORM = "f_auto,q_auto,w_600/";
+  const withCloudinaryTransform = (url) =>
+    url.includes("/upload/") && !url.includes("/upload/f_auto")
+      ? url.replace("/upload/", `/upload/${CLOUDINARY_TRANSFORM}`)
+      : url;
+
   const buildImageSrc = (image) => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];
@@ -270,9 +279,11 @@ const HomeMotorcycles = () => {
     const t = image.trim();
     if (!t) return "";
     if (/^data:image\//i.test(t)) return t;
-    if (/^https?:\/\//i.test(t)) return t;
-    if (t.startsWith("res.cloudinary.com/")) return "https://" + t;
-    if (t.startsWith("/")) return "https://res.cloudinary.com" + t;
+    if (/^https?:\/\//i.test(t)) return withCloudinaryTransform(t);
+    if (t.startsWith("res.cloudinary.com/"))
+      return withCloudinaryTransform("https://" + t);
+    if (t.startsWith("/"))
+      return withCloudinaryTransform("https://res.cloudinary.com" + t);
     return `${API_BASE_URL}/uploads/` + t;
   };
 
@@ -334,7 +345,6 @@ const HomeMotorcycles = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
         .hm-root {
           padding: 64px 48px 80px;
@@ -793,6 +803,8 @@ const HomeMotorcycles = () => {
                       src={imgSrc}
                       alt={name}
                       className="hm-img"
+                      loading="lazy"
+                      decoding="async"
                       onError={handleImageError}
                     />
 

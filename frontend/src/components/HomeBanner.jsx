@@ -8,8 +8,14 @@ import suzukiLogo from "../assets/logos/suzuki.svg";
 import kawasakiLogo from "../assets/logos/kawasaki.svg";
 import toyotaLogo from "../assets/logos/toyota.svg";
 import nissanLogo from "../assets/logos/nissan.svg";
-// Import your background image here (Adjust the path if necessary)
-import mainBg from "../assets/MainBG.png";
+// PERF: the hero bg is the page's LCP element. It now lives in
+// /public/images/hero-bg.webp (NOT imported/bundled) so index.html
+// can <link rel="preload"> it at a fixed path and the browser can
+// start fetching it before React even mounts. Convert the original
+// MainBG.png to WebP (~80% smaller) and drop it there. See the <img>
+// below — fetchpriority="high" tells the browser to fetch it before
+// lower-priority images on the page.
+const HERO_BG = "/images/hero-bg.webp";
 
 // ─── Map each tab to its own motorcycle image ───────────────────────
 const TAB_IMAGES = {
@@ -201,17 +207,25 @@ export default function HeroBanner() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700;800&display=swap');
-
         .hb-root {
           position: relative;
           width: 100%;
           min-height: 100vh;
           overflow: hidden;
-          background-color: #F8F7F5; /* Serves as fallback */
+          background-color: #F8F7F5; /* Shows instantly while hb-bg-img loads */
           display: flex;
           flex-direction: column;
           font-family: 'Inter', sans-serif;
+        }
+
+        .hb-bg-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center;
+          z-index: 0;
         }
 
         .hb-dots {
@@ -436,17 +450,20 @@ export default function HeroBanner() {
         }
       `}</style>
 
-      {/* Added Inline Styles here to set the background image */}
-      <div
-        ref={wrapRef}
-        className="hb-root"
-        style={{
-          backgroundImage: `url(${mainBg})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
+      <div ref={wrapRef} className="hb-root">
+        {/* LCP image: real <img> (not a CSS background) so the browser
+            can discover + fetch it at high priority. loading="eager"
+            because this is always above the fold. */}
+        <img
+          src={HERO_BG}
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
+          className="hb-bg-img"
+        />
+
         {/* Background Patterns (You can remove these if you want the image completely clean) */}
         <div className="hb-dots" />
         <div className="hb-pattern" />

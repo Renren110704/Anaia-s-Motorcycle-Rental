@@ -71,8 +71,6 @@ export default function FAQPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
-
         /* ── FAQ section wrapper ── */
         .faq-page {
           background: #F5F5F3;

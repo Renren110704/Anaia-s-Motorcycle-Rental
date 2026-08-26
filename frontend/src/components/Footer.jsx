@@ -14,8 +14,6 @@ const Footer = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
-
         .ft-root {
         background: #F5F5F3;
         font-family: 'Space Grotesk', sans-serif;
@@ -204,8 +202,8 @@ const Footer = () => {
                 <img src={logo} alt="ANAIA'S Logo" className="ft-logo-img" />
               </Link>
               <p className="ft-desc">
-                Rental service with the latest models and exceptional
-                customer service. Ride your dream vehicle today!
+                Rental service with the latest models and exceptional customer
+                service. Ride your dream vehicle today!
               </p>
               <div className="ft-socials">
                 {[
@@ -304,10 +302,7 @@ const Footer = () => {
               rights reserved.
             </p>
             <p>
-              Designed by{" "}
-              <span className="ft-designer">
-                QUADCORE
-              </span>
+              Designed by <span className="ft-designer">QUADCORE</span>
             </p>
           </div>
         </div>

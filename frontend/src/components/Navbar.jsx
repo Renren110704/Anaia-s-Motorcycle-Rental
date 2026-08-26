@@ -340,7 +340,6 @@ const Navbar = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
         .nav-root {
           position: fixed; top: 0; left: 0; right: 0; z-index: 100;

@@ -149,13 +149,14 @@ export default function AdminLiveChat() {
   const chatEntries = Object.entries(activeChats);
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] flex">
+    <main className="min-h-screen bg-[#f7f8fa] flex">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36 w-full flex gap-6 h-[calc(100vh-2rem)]">
         {/* Sidebar */}
         <div className="w-1/3 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <h2 className="font-black text-[#171717]">Active Chats</h2>
             <select
+              aria-label="Admin Status"
               value={adminStatus}
               onChange={handleStatusChange}
               className={`text-xs font-bold px-3 py-1.5 rounded-lg border focus:outline-none ${
@@ -173,7 +174,7 @@ export default function AdminLiveChat() {
           </div>
           <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
             {chatEntries.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-400 mt-10">
+              <div className="p-4 text-center text-sm text-slate-600 mt-10">
                 No active chats currently.
               </div>
             ) : (
@@ -332,13 +333,13 @@ export default function AdminLiveChat() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-600">
               <MessageCircle size={48} className="mb-4 opacity-20" />
               <p>Select a chat from the sidebar to start messaging</p>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

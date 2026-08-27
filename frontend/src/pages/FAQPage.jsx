@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 
+const FAQ = "/images/faq-page.webp";
+
 function useScrollReveal(options = {}) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -344,7 +346,7 @@ export default function FAQPage() {
           >
             <img
               className="faq-person"
-              src="https://imgcdn.zigwheels.ph/large/gallery/exterior/73/1823/honda-click-150i-front-tyre-687406.jpg"
+              src={FAQ}
               alt="FAQ illustration"
               onError={(e) => {
                 e.target.style.display = "none";

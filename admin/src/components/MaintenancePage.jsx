@@ -213,7 +213,7 @@ const getMonthGrid = (monthDate) => {
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 // ── InlineDatePicker Component ─────────────────────────────────────────────────
 const InlineDatePicker = ({
@@ -327,6 +327,7 @@ const InlineDatePicker = ({
           >
             <button
               type="button"
+              aria-label="Previous month"
               onClick={() => setViewMonth((v) => calAddMonths(v, -1))}
               style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
             >
@@ -337,6 +338,7 @@ const InlineDatePicker = ({
             </span>
             <button
               type="button"
+              aria-label="Next month"
               onClick={() => setViewMonth((v) => calAddMonths(v, 1))}
               style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
             >
@@ -504,14 +506,14 @@ const InlineDatePicker = ({
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  available: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  rented: "bg-blue-50 text-blue-600 border-blue-200",
-  maintenance: "bg-amber-50 text-amber-600 border-amber-200",
-  pending: "bg-violet-50 text-violet-600 border-violet-200",
+  available: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  rented: "bg-blue-50 text-blue-700 border-blue-200",
+  maintenance: "bg-amber-50 text-amber-700 border-amber-200",
+  pending: "bg-violet-50 text-violet-700 border-violet-200",
 };
 const StatusBadge = ({ status }) => {
   const cls =
-    STATUS_STYLE[status] ?? "bg-slate-50 text-slate-500 border-slate-200";
+    STATUS_STYLE[status] ?? "bg-slate-50 text-slate-700 border-slate-200";
   const label = status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span
@@ -666,7 +668,7 @@ const ScheduleModal = ({
               />
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
+          <p className="text-[11px] text-slate-500 mt-2">
             Set a start and end date for maintenance. Past dates are blocked.
           </p>
 
@@ -777,7 +779,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -846,15 +848,16 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   return (
     <div className="flex items-center justify-center gap-2 mt-6">
       <button
+        aria-label="Previous page"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -873,9 +876,10 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         ),
       )}
       <button
+        aria-label="Next page"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -920,13 +924,13 @@ const MotorcycleCard = ({
             <h3 className="font-black text-[#171717] text-[15px] leading-tight">
               {m.make} {m.model}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {m.year} · {m.category}
             </p>
           </div>
           <div className="text-right">
             <p className="text-xl font-black text-[#171717]">₱{m.dailyRate}</p>
-            <p className="text-[10px] text-slate-400">/day</p>
+            <p className="text-[10px] text-slate-500">/day</p>
           </div>
         </div>
 
@@ -948,7 +952,7 @@ const MotorcycleCard = ({
 
         <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 mb-4">
           <div>
-            <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+            <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
               Next maintenance
             </p>
             <p
@@ -1017,7 +1021,7 @@ const MotorcycleTable = ({
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                     ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
                   <span className="inline-flex items-center">
@@ -1067,7 +1071,7 @@ const MotorcycleTable = ({
                         <p className="font-black text-[13px] text-[#171717] leading-tight">
                           {m.make} {m.model}
                         </p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-500">
                           {m.category}
                         </p>
                       </div>
@@ -1138,7 +1142,7 @@ const EmptyState = ({ onReset }) => (
       <FaTools className="text-slate-200 text-3xl" />
     </div>
     <h3 className="font-black text-[#171717] text-lg mb-1">No units found</h3>
-    <p className="text-slate-400 text-sm mb-4">
+    <p className="text-slate-500 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
     <button
@@ -1427,7 +1431,7 @@ const MaintenancePage = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <style>{`
         @keyframes calFadeIn { 
           from { opacity:0; transform:translateY(6px) scale(0.97); } 
@@ -1440,7 +1444,7 @@ const MaintenancePage = () => {
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Maintenance Management
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             Set units to maintenance mode or return them to the active fleet.
           </p>
         </div>
@@ -1451,7 +1455,7 @@ const MaintenancePage = () => {
             label="Total Units"
             value={counts.all}
             sub=""
-            subColor="text-slate-400"
+            subColor="text-slate-500"
             icon={ClipboardList}
             accent="bg-slate-400"
             loading={loading}
@@ -1487,7 +1491,7 @@ const MaintenancePage = () => {
               {tab.label}
               <span
                 className={`px-1.5 py-0.5 rounded-full text-[10px] font-black
-                ${selectedStatus === tab.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"}`}
+                ${selectedStatus === tab.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}
               >
                 {loading ? "—" : tab.count}
               </span>
@@ -1509,6 +1513,7 @@ const MaintenancePage = () => {
               />
               {searchTerm && (
                 <button
+                  aria-label="Clear search"
                   onClick={() => setSearchTerm("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
                 >
@@ -1583,7 +1588,7 @@ const MaintenancePage = () => {
 
         {/* Result count */}
         <div className="flex items-center justify-between px-1 mb-3">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-700 font-semibold">
             Showing{" "}
             {filteredMotorcycles.length === 0
               ? 0
@@ -1654,7 +1659,7 @@ const MaintenancePage = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

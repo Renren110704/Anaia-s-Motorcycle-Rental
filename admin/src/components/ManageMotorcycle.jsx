@@ -108,7 +108,7 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 const fieldCls =
   "w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30";
 const fieldClsError =
@@ -135,10 +135,10 @@ const IconField = ({ icon: Icon, label, error, children }) => (
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  available: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  rented: "bg-blue-50 text-blue-600 border-blue-200",
-  maintenance: "bg-amber-50 text-amber-600 border-amber-200",
-  pending: "bg-violet-50 text-violet-600 border-violet-200",
+  available: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  rented: "bg-blue-50 text-blue-700 border-blue-200",
+  maintenance: "bg-amber-50 text-amber-700 border-amber-200",
+  pending: "bg-violet-50 text-violet-700 border-violet-200",
   deleted: "bg-red-50 text-[#b50002] border-red-200",
 };
 // ── GPS Tracker indicator (icon-only) ─────────────────────────────────────────
@@ -377,7 +377,7 @@ const BookingHistoryRow = ({ booking: b }) => {
             {b.customer || "Unknown customer"}
           </p>
           {b.email && (
-            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+            <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
               <Mail className="w-3 h-3 flex-shrink-0" /> {b.email}
             </p>
           )}
@@ -402,7 +402,7 @@ const BookingHistoryRow = ({ booking: b }) => {
         </span>
       </div>
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
-        <span className="text-[11px] text-slate-400">
+        <span className="text-[11px] text-slate-500">
           Booked {formatBookingDate(b.bookingDate)}
         </span>
         <span className="font-black text-[13px] text-[#171717]">
@@ -448,7 +448,7 @@ const BookingHistoryRow = ({ booking: b }) => {
                 )}
             </div>
             {b.returnInspection.damageNotes && (
-              <p className="text-[11px] text-slate-400 mt-1 leading-snug line-clamp-2">
+              <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
                 {b.returnInspection.damageNotes}
               </p>
             )}
@@ -540,7 +540,7 @@ const BookingHistoryModal = ({ motorcycle, onClose }) => {
               <h3 className="text-[15px] font-black text-[#171717] truncate">
                 Booking History
               </h3>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-500 truncate">
                 {motorcycle.unitId ? `${motorcycle.unitId} · ` : ""}
                 {motorcycle.make} {motorcycle.model}
               </p>
@@ -548,7 +548,7 @@ const BookingHistoryModal = ({ motorcycle, onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors flex-shrink-0"
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-600 transition-colors flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -564,7 +564,7 @@ const BookingHistoryModal = ({ motorcycle, onClose }) => {
               total reservation{bookings.length !== 1 ? "s" : ""} ·{" "}
               <span className="text-[#b50002] font-black">{currentCount}</span>{" "}
               current ·{" "}
-              <span className="text-slate-400 font-black">{pastCount}</span>{" "}
+              <span className="text-slate-500 font-black">{pastCount}</span>{" "}
               past
             </p>
           </div>
@@ -590,7 +590,7 @@ const BookingHistoryModal = ({ motorcycle, onClose }) => {
               <p className="text-sm text-slate-500 font-semibold">
                 No bookings yet
               </p>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 This unit hasn't been rented by anyone.
               </p>
             </div>
@@ -624,7 +624,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -695,13 +695,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Previous Page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -718,7 +719,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Next Page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -739,7 +741,7 @@ const QuickAction = ({ onClick, icon: Icon, title, desc, accent }) => (
     </div>
     <div className="flex-1 min-w-0">
       <p className="font-bold text-[#171717] text-sm leading-tight">{title}</p>
-      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{desc}</p>
+      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{desc}</p>
     </div>
     <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-[#b50002] group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
   </button>
@@ -784,13 +786,13 @@ const MotorcycleCard = ({
             </span>
             <GpsIndicator hasGps={!!m.traccarDeviceId} />
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {m.year} · {m.category}
           </p>
         </div>
         <div className="text-right">
           <p className="text-xl font-black text-[#171717]">₱{m.dailyRate}</p>
-          <p className="text-[10px] text-slate-400">/day</p>
+          <p className="text-[10px] text-slate-500">/day</p>
         </div>
       </div>
       {m.description && (
@@ -814,7 +816,7 @@ const MotorcycleCard = ({
         ))}
       </div>
       {m.isDeleted && m.deletedAt && (
-        <p className="text-[10px] text-slate-400 mb-3">
+        <p className="text-[10px] text-slate-500 mb-3">
           Deleted{" "}
           {new Date(m.deletedAt).toLocaleDateString("en-PH", {
             month: "short",
@@ -899,7 +901,7 @@ const MotorcycleTable = ({
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                     ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
                   <span className="inline-flex items-center">
@@ -949,7 +951,7 @@ const MotorcycleTable = ({
                         </span>
                         <GpsIndicator hasGps={!!m.traccarDeviceId} />
                       </p>
-                      <p className="text-[11px] text-slate-400">{m.category}</p>
+                      <p className="text-[11px] text-slate-500">{m.category}</p>
                       {m.isDeleted && m.deletedAt && (
                         <p className="text-[10px] text-[#b50002] mt-0.5">
                           Deleted {new Date(m.deletedAt).toLocaleDateString()}
@@ -1184,7 +1186,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition-colors"
           >
             <FaTimes className="text-sm" />
           </button>
@@ -1226,7 +1228,7 @@ const AddMotorcycleModal = ({ onClose, onSuccess, motorcycles }) => {
               </IconField>
             </div>
             {data.traccarDeviceId && (
-              <p className="text-[11px] text-slate-400 mt-1.5 ml-1">
+              <p className="text-[11px] text-slate-500 mt-1.5 ml-1">
                 📡 Must match the device's unique ID in Traccar.
               </p>
             )}
@@ -1717,7 +1719,7 @@ const EditModal = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
           >
             <FaTimes className="text-sm" />
           </button>
@@ -1937,7 +1939,7 @@ const EmptyState = ({ onReset }) => (
       <FaMotorcycle className="text-slate-200 text-3xl" />
     </div>
     <h3 className="font-black text-[#171717] text-lg mb-1">No units found</h3>
-    <p className="text-slate-400 text-sm mb-4">
+    <p className="text-slate-500 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
     <button
@@ -2233,7 +2235,7 @@ const ManageMotorcycle = () => {
       label: "Available",
       value: counts.available,
       sub: "Ready to rent",
-      subColor: "text-emerald-500",
+      subColor: "text-emerald-700",
       icon: Bike,
       accent: "bg-emerald-500",
       status: "available",
@@ -2242,7 +2244,7 @@ const ManageMotorcycle = () => {
       label: "Pending",
       value: counts.pending,
       sub: "Awaiting action",
-      subColor: "text-violet-500",
+      subColor: "text-violet-700",
       icon: FaHourglassHalf,
       accent: "bg-violet-500",
       status: "pending",
@@ -2251,7 +2253,7 @@ const ManageMotorcycle = () => {
       label: "Rented",
       value: counts.rented,
       sub: `${activeTotal ? Math.round((counts.rented / activeTotal) * 100) : 0}% fleet out`,
-      subColor: "text-blue-500",
+      subColor: "text-blue-700",
       icon: FaMotorcycle,
       accent: "bg-blue-500",
       status: "rented",
@@ -2260,7 +2262,7 @@ const ManageMotorcycle = () => {
       label: "Maintenance",
       value: counts.maintenance,
       sub: counts.maintenance > 0 ? "Needs attention" : "All clear",
-      subColor: counts.maintenance > 0 ? "text-amber-500" : "text-slate-400",
+      subColor: counts.maintenance > 0 ? "text-amber-500" : "text-slate-500",
       icon: Wrench,
       accent: "bg-amber-500",
       status: "maintenance",
@@ -2269,7 +2271,7 @@ const ManageMotorcycle = () => {
       label: "Deleted",
       value: counts.deleted,
       sub: "Soft deleted units",
-      subColor: "text-slate-400",
+      subColor: "text-slate-500",
       icon: Trash2,
       accent: "bg-slate-400",
       status: "deleted",
@@ -2277,7 +2279,7 @@ const ManageMotorcycle = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7 flex items-end justify-between gap-4">
@@ -2285,7 +2287,7 @@ const ManageMotorcycle = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Vehicle Management
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Manage units, monitor availability, and keep fleet details
               accurate.
             </p>
@@ -2453,7 +2455,7 @@ const ManageMotorcycle = () => {
 
             {/* Result count */}
             <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] text-slate-400 font-semibold">
+              <p className="text-[11px] text-slate-700 font-semibold">
                 Showing{" "}
                 {filteredMotorcycles.length === 0
                   ? 0
@@ -2523,9 +2525,9 @@ const ManageMotorcycle = () => {
           <div className="flex flex-col gap-4">
             {/* Fleet summary */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-black text-[#171717] text-[14px] mb-4">
+              <h2 className="font-black text-[#171717] text-[14px] mb-4">
                 Fleet Summary
-              </h3>
+              </h2>
               <div className="space-y-3">
                 {[
                   {
@@ -2576,9 +2578,9 @@ const ManageMotorcycle = () => {
 
             {/* Quick Actions */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-black text-[#171717] text-[14px] mb-3">
+              <h2 className="font-black text-[#171717] text-[14px] mb-3">
                 Quick Actions
-              </h3>
+              </h2>
               <div className="space-y-2">
                 <QuickAction
                   onClick={() => setShowAddModal(true)}
@@ -2648,7 +2650,7 @@ const ManageMotorcycle = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

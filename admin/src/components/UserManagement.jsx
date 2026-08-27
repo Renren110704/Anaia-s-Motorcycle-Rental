@@ -42,7 +42,7 @@ const ITEMS_PER_PAGE = 10;
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 // const labelCls =
-//   "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+//   "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const nextSortState = (cur) =>
@@ -224,7 +224,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -295,13 +295,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Previous page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -318,7 +319,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Next page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -331,8 +333,8 @@ const VerifiedBadge = ({ isVerified }) => (
   <span
     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
       isVerified
-        ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-        : "bg-amber-50 text-amber-600 border-amber-200"
+        ? "bg-emerald-50 text-emerald-800 border-emerald-200" // Updated to text-emerald-800
+        : "bg-amber-50 text-amber-800 border-amber-200" // Updated to text-amber-800
     }`}
   >
     {isVerified ? "Verified" : "Unverified"}
@@ -346,7 +348,7 @@ const EmptyState = ({ onReset }) => (
       <FaSearch className="text-slate-200 text-3xl" />
     </div>
     <h3 className="font-black text-[#171717] text-lg mb-1">No users found</h3>
-    <p className="text-slate-400 text-sm mb-4">
+    <p className="text-slate-500 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
     <button
@@ -363,7 +365,7 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
   const Section = ({ title, children }) => (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-4">
       <div className="px-5 py-3 border-b border-slate-50">
-        <h3 className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+        <h3 className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
           {title}
         </h3>
       </div>
@@ -374,7 +376,7 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
   const Row = ({ icon: Icon, label, value, valueClass = "" }) => (
     <div className="flex items-start gap-3 mb-2.5 last:mb-0">
       <Icon className="text-[#b50002] text-sm flex-shrink-0 mt-0.5" />
-      <span className="text-slate-400 text-xs w-24 flex-shrink-0 font-medium pt-0.5">
+      <span className="text-slate-500 text-xs w-24 flex-shrink-0 font-medium pt-0.5">
         {label}
       </span>
       <span
@@ -416,7 +418,8 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
+              aria-label="Close user profile"
+              className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
             >
               <FaTimes />
             </button>
@@ -433,7 +436,7 @@ const DetailDrawer = ({ user, onClose, onDelete }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400 text-3xl font-black">
+                <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-500 text-3xl font-black">
                   {user.firstName?.charAt(0) || <FaUser />}
                 </div>
               )}
@@ -522,7 +525,7 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                     ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
                   <span className="inline-flex items-center">
@@ -547,7 +550,7 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
                 {/* User Info (Avatar + Name) */}
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center text-slate-400 font-bold">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center text-slate-500 font-bold">
                       {user.profilePicture ? (
                         <img
                           src={makeImageUrl(user.profilePicture)}
@@ -562,7 +565,7 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
                       <p className="font-black text-[13px] text-[#171717] leading-tight">
                         {user.firstName} {user.lastName}
                       </p>
-                      <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                      <p className="text-[11px] text-slate-500 truncate max-w-[140px]">
                         {user._id || user.id}
                       </p>
                     </div>
@@ -591,7 +594,7 @@ const UserTable = ({ users, onRowClick, colSort, onColSort, onDelete }) => {
                       <LoyaltyTierBadge tier={user.loyaltyTier} />
                     </div>
                   ) : (
-                    <span className="text-[11px] text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-500 font-medium">
                       None
                     </span>
                   )}
@@ -789,7 +792,7 @@ const UserManagement = () => {
       label: "Total Users",
       value: counts.all,
       sub: "All registered users",
-      subColor: "text-blue-500",
+      subColor: "text-blue-700",
       icon: Users,
       accent: "bg-blue-500",
       status: "all",
@@ -798,7 +801,7 @@ const UserManagement = () => {
       label: "Unverified",
       value: counts.unverified,
       sub: "Pending email verification",
-      subColor: "text-amber-500",
+      subColor: "text-amber-700",
       icon: AlertTriangle,
       accent: "bg-amber-500",
       status: "unverified",
@@ -809,14 +812,14 @@ const UserManagement = () => {
     statCards.find((s) => s.status === selectedStatus)?.label ?? "Users";
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             User Management
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             Manage your registered users, monitor verification status, and
             handle account access.
           </p>
@@ -849,6 +852,7 @@ const UserManagement = () => {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
               >
                 <FaTimes className="text-sm" />
@@ -859,7 +863,7 @@ const UserManagement = () => {
 
         {/* Result count */}
         <div className="flex items-center justify-between px-1 mb-4">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-700 font-semibold">
             Showing{" "}
             {filteredUsers.length === 0
               ? 0
@@ -914,7 +918,7 @@ const UserManagement = () => {
           onDelete={handleDelete}
         />
       )}
-    </div>
+    </main>
   );
 };
 

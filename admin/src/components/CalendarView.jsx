@@ -142,7 +142,7 @@ const MaintenanceAlertBanner = ({ maintenanceItems, selectedDate }) => {
               ? "1 unit under maintenance"
               : `${count} units under maintenance`}
           </p>
-          <p className="text-[11px] text-violet-500 mt-0.5 leading-relaxed">
+          <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
             <strong>{names}</strong> {count === 1 ? "is" : "are"} unavailable
             for rental on {formatLongDate(selectedDate)}.
           </p>
@@ -169,8 +169,7 @@ const BufferDayAlertBanner = ({ bufferedItems }) => {
         </div>
         <div>
           <p className="text-[13px] font-black text-amber-700">
-            Last return date for{" "}
-            {count === 1 ? "1 unit" : `${count} units`}
+            Last return date for {count === 1 ? "1 unit" : `${count} units`}
           </p>
           <p className="text-[11px] text-amber-600 mt-0.5 leading-relaxed">
             <strong>{names}</strong> {count === 1 ? "has" : "have"} maintenance
@@ -189,7 +188,7 @@ const MotoImage = ({ src, alt, className }) => {
   if (!src || errored) {
     return (
       <div
-        className={`flex items-center justify-center bg-slate-50 text-slate-300 ${className}`}
+        className={`flex items-center justify-center bg-slate-50 text-slate-500 ${className}`}
       >
         <FaMotorcycle className="text-2xl" />
       </div>
@@ -251,7 +250,7 @@ const BookingCard = ({ booking, selectedKey }) => {
             {label}
           </h3>
           {booking.customerName || booking.renterName ? (
-            <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
               {booking.customerName || booking.renterName}
             </p>
           ) : null}
@@ -260,7 +259,7 @@ const BookingCard = ({ booking, selectedKey }) => {
         {/* Date row */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-50 rounded-xl p-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-slate-400 uppercase mb-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-slate-500 uppercase mb-1">
               <FaMapMarkerAlt className="w-2.5 h-2.5" />
               Pick-up
             </div>
@@ -269,7 +268,7 @@ const BookingCard = ({ booking, selectedKey }) => {
             </p>
           </div>
           <div className="bg-slate-50 rounded-xl p-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-slate-400 uppercase mb-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] text-slate-500 uppercase mb-1">
               <FaClock className="w-2.5 h-2.5" />
               Return
             </div>
@@ -302,7 +301,7 @@ const MaintenanceCard = ({ s }) => (
         </div>
       )}
       <div className="absolute top-2.5 right-2.5">
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-violet-500 text-white">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-violet-700 text-white">
           <Wrench className="w-3 h-3" />
           Maintenance
         </span>
@@ -323,11 +322,11 @@ const MaintenanceCard = ({ s }) => (
           : "Unknown vehicle"}
       </h3>
       {s.notes && (
-        <p className="text-[11px] text-slate-400 mt-0.5">{s.notes}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">{s.notes}</p>
       )}
 
       <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5">
-        <Info className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+        <Info className="w-3.5 h-3.5 text-violet-700 flex-shrink-0" />
         <p className="text-[11px] text-violet-600 font-semibold">
           Not available for rental during this period.
         </p>
@@ -335,7 +334,7 @@ const MaintenanceCard = ({ s }) => (
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="bg-slate-50 rounded-xl p-2.5">
-          <div className="text-[10px] font-black tracking-[0.12em] text-slate-400 uppercase mb-1">
+          <div className="text-[10px] font-black tracking-[0.12em] text-slate-500 uppercase mb-1">
             Start
           </div>
           <p className="text-[12px] font-bold text-[#171717]">
@@ -343,7 +342,7 @@ const MaintenanceCard = ({ s }) => (
           </p>
         </div>
         <div className="bg-slate-50 rounded-xl p-2.5">
-          <div className="text-[10px] font-black tracking-[0.12em] text-slate-400 uppercase mb-1">
+          <div className="text-[10px] font-black tracking-[0.12em] text-slate-500 uppercase mb-1">
             End
           </div>
           <p className="text-[12px] font-bold text-[#171717]">
@@ -568,7 +567,7 @@ const CalendarView = () => {
   const today = toDateKey(new Date());
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header — same pattern as Dashboard */}
         <div className="mb-7 flex items-end justify-between gap-4">
@@ -576,7 +575,7 @@ const CalendarView = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Fleet Calendar
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Bookings and maintenance windows across your fleet.
             </p>
           </div>
@@ -597,13 +596,14 @@ const CalendarView = () => {
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
               <button
                 type="button"
+                aria-label="Previous month"
                 onClick={() => setSelectedMonth((v) => addMonths(v, -1))}
-                className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:border-[#b50002] hover:text-[#b50002] transition-all"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 text-slate-500 hover:border-[#b50002] hover:text-[#b50002] transition-all"
               >
                 <FaChevronLeft className="w-3 h-3" />
               </button>
               <div className="text-center">
-                <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+                <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
                   Month
                 </p>
                 <h2 className="font-black text-[#171717] text-[15px] mt-0.5">
@@ -612,8 +612,9 @@ const CalendarView = () => {
               </div>
               <button
                 type="button"
+                aria-label="Next month"
                 onClick={() => setSelectedMonth((v) => addMonths(v, 1))}
-                className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:border-[#b50002] hover:text-[#b50002] transition-all"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 text-slate-500 hover:border-[#b50002] hover:text-[#b50002] transition-all"
               >
                 <FaChevronRight className="w-3 h-3" />
               </button>
@@ -625,7 +626,7 @@ const CalendarView = () => {
                 {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                   <div
                     key={d}
-                    className="text-center text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase py-2"
+                    className="text-center text-[10px] font-black tracking-[0.15em] text-slate-600 uppercase py-2"
                   >
                     {d}
                   </div>
@@ -677,11 +678,11 @@ const CalendarView = () => {
                           new Date(date.getFullYear(), date.getMonth(), 1),
                         );
                       }}
-                      className={`relative min-h-[56px] sm:min-h-[64px] rounded-xl border text-left p-1.5 transition-all duration-200 ${cellBg} ${!inMonth ? "opacity-30 cursor-default pointer-events-none" : ""}`}
+                      className={`relative min-h-[56px] sm:min-h-[64px] rounded-xl border text-left p-1.5 transition-all duration-200 ${cellBg} ${!inMonth ? "bg-slate-50 text-slate-500 cursor-default pointer-events-none" : ""}`}
                     >
                       <div className="flex items-start justify-between">
                         <span
-                          className={`text-[11px] font-black leading-none ${isSelected ? "text-white" : isToday ? "text-[#b50002]" : inMonth ? "text-[#171717]" : "text-slate-300"}`}
+                          className={`text-[11px] font-black leading-none ${isSelected ? "text-white" : isToday ? "text-[#b50002]" : inMonth ? "text-[#171717]" : "text-slate-600"}`}
                         >
                           {date.getDate()}
                           {isToday && !isSelected && (
@@ -733,7 +734,7 @@ const CalendarView = () => {
                         })}
                         {bookingMatches.length > 2 && (
                           <span
-                            className={`text-[8px] font-black leading-none px-1 ${isSelected ? "text-white/70" : "text-slate-400"}`}
+                            className={`text-[8px] font-black leading-none px-1 ${isSelected ? "text-white/70" : "text-slate-500"}`}
                           >
                             +{bookingMatches.length - 2}
                           </span>
@@ -744,7 +745,7 @@ const CalendarView = () => {
                             className={`inline-flex items-center rounded-full px-1 py-0.5 text-[8px] font-bold leading-none ${
                               isSelected
                                 ? "bg-white/20 text-white"
-                                : "bg-violet-100 text-violet-600"
+                                : "bg-violet-100 text-violet-700"
                             }`}
                           >
                             <Wrench className="w-2.5 h-2.5" />
@@ -772,7 +773,7 @@ const CalendarView = () => {
             <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 overflow-hidden">
               <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl bg-[#b50002]" />
               <div className="flex items-start justify-between mb-1">
-                <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+                <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
                   Selected Day
                 </p>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-rose-50">
@@ -802,7 +803,7 @@ const CalendarView = () => {
                 {dayBookings.length === 0 &&
                   dayMaintenance.length === 0 &&
                   dayBufferItems.length === 0 && (
-                    <span className="text-[11px] text-slate-400 font-semibold">
+                    <span className="text-[11px] text-slate-500 font-semibold">
                       All clear
                     </span>
                   )}
@@ -847,7 +848,7 @@ const CalendarView = () => {
                   dayBufferItems.length === 0 && (
                     <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center">
                       <FaMotorcycle className="w-6 h-6 text-slate-200 mx-auto mb-2" />
-                      <p className="text-sm text-slate-400 font-medium">
+                      <p className="text-sm text-slate-500 font-medium">
                         No bookings or maintenance on this date.
                       </p>
                     </div>
@@ -867,7 +868,7 @@ const CalendarView = () => {
 
             {/* Buffer rule info card */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase mb-2">
+              <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase mb-2">
                 Booking Buffer Rule
               </p>
               <p className="text-[12px] text-slate-500 leading-relaxed">
@@ -885,7 +886,7 @@ const CalendarView = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

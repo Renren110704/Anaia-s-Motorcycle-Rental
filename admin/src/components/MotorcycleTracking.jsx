@@ -266,7 +266,7 @@ const persistLocationSnapshots = (units = [], liveTrackersByUnit = {}) => {
 
 // ── Shared label style from ManageMotorcycle ──────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 // ── Stat Card (same as ManageMotorcycle) ─────────────────────────────────────
 const StatCard = ({
@@ -285,7 +285,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -356,7 +356,7 @@ const MotorcycleListItem = ({ motorcycle, isSelected, onClick }) => {
       </div>
       <div className="flex items-center gap-1.5 mb-3">
         <MapPin className="text-slate-300 w-3 h-3 flex-shrink-0" />
-        <p className="text-xs text-slate-400 truncate">
+        <p className="text-xs text-slate-500 truncate">
           {motorcycle.booking.destination}
         </p>
       </div>
@@ -416,7 +416,7 @@ const MotorcycleListItem = ({ motorcycle, isSelected, onClick }) => {
       <div className="flex items-center justify-between pt-2.5 border-t border-slate-50">
         <div className="flex items-center gap-1">
           <Clock className="text-slate-300 w-3 h-3" />
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-slate-500">
             {motorcycle.lastUpdate.toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -459,7 +459,7 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
         onClick={() => toggle(id)}
         className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
       >
-        <span className="flex items-center gap-2 text-[11px] font-black tracking-[0.1em] text-slate-400 uppercase">
+        <span className="flex items-center gap-2 text-[11px] font-black tracking-[0.1em] text-slate-500 uppercase">
           <Icon className="text-[#b50002]" /> {title}
         </span>
         {collapsed[id] ? (
@@ -478,7 +478,7 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
 
   const Row = ({ label, value, accent }) => (
     <div className="flex items-start justify-between py-1.5 border-b border-slate-50 last:border-0">
-      <span className="text-[11px] text-slate-400">{label}</span>
+      <span className="text-[11px] text-slate-500">{label}</span>
       <span
         className={`text-[11px] font-bold text-right max-w-[60%] ${accent || "text-[#171717]"}`}
       >
@@ -575,7 +575,7 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
                   key={label}
                   className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 text-center"
                 >
-                  <p className="text-[9px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1">
+                  <p className="text-[9px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1">
                     {label}
                   </p>
                   <p className={`font-black text-sm ${color}`}>{value}</p>
@@ -666,7 +666,7 @@ const BookingDetailPanel = ({ motorcycle, onClose }) => {
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-slate-500">
                   Downpayment (paid)
                 </span>
                 <span className="text-[11px] font-bold text-emerald-600">
@@ -1065,7 +1065,7 @@ const MotorcycleTracking = () => {
   const withGpsCount = displayedMotorcycles.filter((m) => m.location).length;
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <style>{`
         @keyframes pulse-red {
           0%, 100% { box-shadow: 0 0 0 0 rgba(181,0,2,0.5); }
@@ -1088,7 +1088,7 @@ const MotorcycleTracking = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               GPS Tracking
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Live tracking · refreshes every 30 seconds
             </p>
           </div>
@@ -1115,7 +1115,7 @@ const MotorcycleTracking = () => {
             label="Active Rentals"
             value={displayedMotorcycles.length}
             sub="Currently out"
-            subColor="text-blue-500"
+            subColor="text-blue-700"
             icon={FaMotorcycle}
             accent="bg-blue-500"
             loading={loading}
@@ -1124,7 +1124,7 @@ const MotorcycleTracking = () => {
             label="Online"
             value={onlineCount}
             sub="GPS transmitting"
-            subColor="text-emerald-500"
+            subColor="text-emerald-700"
             icon={FaSatelliteDish}
             accent="bg-emerald-500"
             loading={loading}
@@ -1133,7 +1133,7 @@ const MotorcycleTracking = () => {
             label="With GPS"
             value={withGpsCount}
             sub="Location known"
-            subColor="text-violet-500"
+            subColor="text-violet-700"
             icon={MapPin}
             accent="bg-violet-500"
             loading={loading}
@@ -1142,7 +1142,7 @@ const MotorcycleTracking = () => {
             label="Exceeded"
             value={exceededCount}
             sub={exceededCount > 0 ? "Needs attention" : "All clear"}
-            subColor={exceededCount > 0 ? "text-[#b50002]" : "text-slate-400"}
+            subColor={exceededCount > 0 ? "text-[#b50002]" : "text-slate-500"}
             icon={AlertTriangle}
             accent={exceededCount > 0 ? "bg-red-500" : "bg-slate-400"}
             loading={loading}
@@ -1173,7 +1173,7 @@ const MotorcycleTracking = () => {
                   </button>
                 )}
               </div>
-              <p className="text-[10px] text-slate-400 mt-2 px-1">
+              <p className="text-[10px] text-slate-500 mt-2 px-1">
                 {filteredMotorcycles.length} of {displayedMotorcycles.length}{" "}
                 units shown
               </p>
@@ -1204,7 +1204,7 @@ const MotorcycleTracking = () => {
                   <p className="font-black text-[#171717] text-sm mb-1">
                     No active units
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500">
                     Only units with active bookings are tracked
                   </p>
                 </div>
@@ -1230,11 +1230,11 @@ const MotorcycleTracking = () => {
                   <h2 className="font-black text-[#171717] text-[14px]">
                     Live Map
                   </h2>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Click a unit to view full booking details
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-[11px] text-slate-400 font-semibold">
+                <div className="flex items-center gap-4 text-[11px] text-slate-500 font-semibold">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                     Within zone
@@ -1277,7 +1277,7 @@ const MotorcycleTracking = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

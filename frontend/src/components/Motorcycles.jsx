@@ -74,7 +74,7 @@ const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
       <p
         style={{
           fontSize: 13,
-          color: "rgba(0,0,0,0.45)",
+          color: "rgba(0,0,0,0.65)",
           fontFamily: "'Space Grotesk',sans-serif",
         }}
       >
@@ -96,7 +96,7 @@ const Pagination = ({ currentPage, totalPages, totalItems, onPageChange }) => {
               key={`e-${idx}`}
               style={{
                 padding: "0 4px",
-                color: "rgba(0,0,0,0.3)",
+                color: "rgba(0,0,0,0.6)",
                 fontSize: 13,
               }}
             >
@@ -227,6 +227,8 @@ const PriceSlider = ({ min, max, value, onChange }) => {
           step={10}
           value={low}
           onChange={handleLow}
+          aria-label="Minimum price"
+          aria-valuetext={`₱${low.toLocaleString()}`}
         />
         <input
           type="range"
@@ -237,6 +239,8 @@ const PriceSlider = ({ min, max, value, onChange }) => {
           step={10}
           value={high}
           onChange={handleHigh}
+          aria-label="Maximum price"
+          aria-valuetext={`₱${high.toLocaleString()}`}
         />
       </div>
       <div className="ps-labels">
@@ -278,8 +282,9 @@ const SidebarContent = ({
         marginBottom: 20,
       }}
     >
-      <span
+      <h2
         style={{
+          margin: 0,
           fontSize: 14,
           fontWeight: 800,
           color: "#0E0E0E",
@@ -288,7 +293,7 @@ const SidebarContent = ({
         }}
       >
         Filters
-      </span>
+      </h2>
       {hasActiveFilters && (
         <button
           onClick={clearFilters}
@@ -310,8 +315,11 @@ const SidebarContent = ({
     </div>
 
     <div style={{ marginBottom: 16 }}>
-      <label style={labelStyle}>Category</label>
+      <label style={labelStyle} htmlFor="mc-filter-category">
+        Category
+      </label>
       <select
+        id="mc-filter-category"
         style={selectStyle}
         value={selectedCategory}
         onChange={(e) => setSelectedCategory(e.target.value)}
@@ -326,8 +334,11 @@ const SidebarContent = ({
     </div>
 
     <div style={{ marginBottom: 16 }}>
-      <label style={labelStyle}>Fuel Type</label>
+      <label style={labelStyle} htmlFor="mc-filter-fuel">
+        Fuel Type
+      </label>
       <select
+        id="mc-filter-fuel"
         style={selectStyle}
         value={selectedFuelType}
         onChange={(e) => setSelectedFuelType(e.target.value)}
@@ -342,8 +353,11 @@ const SidebarContent = ({
     </div>
 
     <div style={{ marginBottom: 16 }}>
-      <label style={labelStyle}>Transmission</label>
+      <label style={labelStyle} htmlFor="mc-filter-transmission">
+        Transmission
+      </label>
       <select
+        id="mc-filter-transmission"
         style={selectStyle}
         value={selectedTransmission}
         onChange={(e) => setSelectedTransmission(e.target.value)}
@@ -407,7 +421,7 @@ const SidebarContent = ({
               cursor: "pointer",
               transition: "all 0.15s",
               background: sortBy === val ? "rgba(181,0,2,0.07)" : "none",
-              color: sortBy === val ? "#b50002" : "rgba(0,0,0,0.55)",
+              color: sortBy === val ? "#b50002" : "rgba(0,0,0,0.68)",
               fontWeight: sortBy === val ? 700 : 400,
             }}
           >
@@ -900,7 +914,7 @@ const Motorcycles = () => {
     fontWeight: 700,
     letterSpacing: "2px",
     textTransform: "uppercase",
-    color: "rgba(0,0,0,0.35)",
+    color: "rgba(0,0,0,0.65)",
     marginBottom: 6,
     fontFamily: "'Space Grotesk',sans-serif",
   };
@@ -1011,9 +1025,9 @@ const Motorcycles = () => {
 
         .mc-card-body { padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
         .mc-card-name { font-size: 16px; font-weight: 800; color: #0E0E0E; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mc-card-type { font-size: 12px; color: rgba(0,0,0,0.38); margin-top: 2px; font-weight: 500; }
+        .mc-card-type { font-size: 12px; color: rgba(0,0,0,0.62); margin-top: 2px; font-weight: 500; }
         .mc-specs { display: flex; flex-wrap: wrap; gap: 7px; }
-        .mc-spec { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: rgba(0,0,0,0.5); background: #F5F5F3; padding: 4px 9px; border-radius: 999px; }
+        .mc-spec { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: rgba(0,0,0,0.68); background: #F5F5F3; padding: 4px 9px; border-radius: 999px; }
 
         .mc-card-action {
           display: flex; flex-direction: column; align-items: flex-end;
@@ -1039,7 +1053,7 @@ const Motorcycles = () => {
         .mc-skeleton { background: #fff; border-radius: 18px; height: 180px; border: 1.5px solid rgba(0,0,0,0.06); overflow: hidden; position: relative; }
         .mc-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 50%, transparent 100%); animation: shimmer 1.4s infinite; }
         @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-        .mc-empty { text-align: center; padding: 60px 20px; color: rgba(0,0,0,0.4); font-size: 14px; }
+        .mc-empty { text-align: center; padding: 60px 20px; color: rgba(0,0,0,0.62); font-size: 14px; }
       `}</style>
 
       {/* Mobile drawer overlay */}
@@ -1053,6 +1067,7 @@ const Motorcycles = () => {
         <button
           className="mc-drawer-close"
           onClick={() => setSidebarOpen(false)}
+          aria-label="Close filters"
         >
           <FaTimes size={13} />
         </button>
@@ -1078,7 +1093,7 @@ const Motorcycles = () => {
         />
       </div>
 
-      <div className="mc-page">
+      <main className="mc-page">
         <div className="mc-inner">
           {/* Header */}
           <div className="mc-top">
@@ -1117,11 +1132,13 @@ const Motorcycles = () => {
           </div>
 
           {/* Results count */}
-          <p
+          <h2
             ref={topRef}
             style={{
+              margin: 0,
+              fontWeight: "normal",
               fontSize: 13,
-              color: "rgba(0,0,0,0.45)",
+              color: "rgba(0,0,0,0.65)",
               marginBottom: 20,
               fontFamily: "'Space Grotesk',sans-serif",
             }}
@@ -1129,12 +1146,12 @@ const Motorcycles = () => {
             {filteredMotorcycles.length} unit
             {filteredMotorcycles.length !== 1 ? "s" : ""}
             {totalPages > 1 && (
-              <span style={{ color: "rgba(0,0,0,0.3)" }}>
+              <span style={{ color: "rgba(0,0,0,0.6)" }}>
                 {" "}
                 — page {currentPage} of {totalPages}
               </span>
             )}
-          </p>
+          </h2>
 
           <div className="mc-layout">
             {/* List */}
@@ -1226,7 +1243,7 @@ const Motorcycles = () => {
 
                       <div className="mc-card-body">
                         <div>
-                          <div className="mc-card-name">{name}</div>
+                          <h3 className="mc-card-name">{name}</h3>
                           <div className="mc-card-type">
                             {motorcycle.category ??
                               motorcycle.type ??
@@ -1285,7 +1302,7 @@ const Motorcycles = () => {
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: "rgba(0,0,0,0.4)",
+                                  color: "rgba(0,0,0,0.62)",
                                   fontFamily: "'Space Grotesk',sans-serif",
                                   fontWeight: 600,
                                   marginTop: 1,
@@ -1301,7 +1318,7 @@ const Motorcycles = () => {
                             <span
                               style={{
                                 fontSize: 12,
-                                color: "rgba(0,0,0,0.4)",
+                                color: "rgba(0,0,0,0.62)",
                                 fontFamily: "'Space Grotesk',sans-serif",
                                 fontWeight: 500,
                               }}
@@ -1377,7 +1394,7 @@ const Motorcycles = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </>
   );
 };

@@ -46,7 +46,7 @@ const PAGE_SIZE = 10;
 
 // ── Shared style tokens ────────────────────────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const formatActionLabel = (value) => {
@@ -75,28 +75,32 @@ const formatDateTime = (value) => {
 const ACTOR_CONFIG = {
   admin: {
     icon: FaUserCog,
-    cls: "bg-blue-50 text-blue-600 border-blue-200",
+    // Changed text-blue-600 to text-blue-700
+    cls: "bg-blue-50 text-blue-700 border-blue-200",
     label: "Admin",
     accent: "bg-blue-500",
     subColor: "text-blue-500",
   },
   user: {
     icon: FaUser,
-    cls: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    // Changed text-emerald-600 to text-emerald-700
+    cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
     label: "User",
     accent: "bg-emerald-500",
     subColor: "text-emerald-500",
   },
   system: {
     icon: FaServer,
-    cls: "bg-slate-50 text-slate-500 border-slate-200",
+    // Changed text-slate-500 to text-slate-700
+    cls: "bg-slate-50 text-slate-700 border-slate-200",
     label: "System",
     accent: "bg-slate-400",
-    subColor: "text-slate-400",
+    subColor: "text-slate-500",
   },
   unknown: {
     icon: FaServer,
-    cls: "bg-slate-50 text-slate-400 border-slate-200",
+    // Changed text-slate-500 to text-slate-700
+    cls: "bg-slate-50 text-slate-700 border-slate-200",
     label: "Unknown",
     accent: "bg-slate-300",
     subColor: "text-slate-300",
@@ -182,7 +186,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -256,15 +260,16 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   return (
     <div className="flex items-center justify-center gap-2 mt-6">
       <button
+        aria-label="Previous page"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -283,9 +288,10 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         ),
       )}
       <button
+        aria-label="Next page"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -396,7 +402,7 @@ const SystemLog = () => {
       label: "Admin",
       value: counts.admin,
       sub: "Admin actions",
-      subColor: "text-blue-500",
+      subColor: "text-blue-700",
       icon: ShieldCheck,
       accent: "bg-blue-500",
       filter: "admin",
@@ -405,7 +411,7 @@ const SystemLog = () => {
       label: "User",
       value: counts.user,
       sub: "User actions",
-      subColor: "text-emerald-500",
+      subColor: "text-emerald-700",
       icon: User,
       accent: "bg-emerald-500",
       filter: "user",
@@ -414,7 +420,7 @@ const SystemLog = () => {
       label: "System",
       value: counts.system,
       sub: "Automated events",
-      subColor: "text-slate-400",
+      subColor: "text-slate-500",
       icon: MonitorDot,
       accent: "bg-slate-400",
       filter: "system",
@@ -422,7 +428,7 @@ const SystemLog = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7 flex items-end justify-between gap-4">
@@ -430,7 +436,7 @@ const SystemLog = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               System Log
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Track admin and user actions with exact date and time.
             </p>
           </div>
@@ -520,6 +526,7 @@ const SystemLog = () => {
               </button>
               <button
                 type="button"
+                aria-label="Refresh logs"
                 onClick={fetchLogs}
                 disabled={loading}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all disabled:opacity-60"
@@ -530,6 +537,7 @@ const SystemLog = () => {
               </button>
               <button
                 type="button"
+                aria-label="Clear logs"
                 onClick={handleClearLogs}
                 disabled={loading || total === 0}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-[#b50002] font-bold text-xs hover:bg-red-100 transition-all sm:hidden disabled:opacity-60"
@@ -598,7 +606,7 @@ const SystemLog = () => {
 
         {/* Result count */}
         <div className="flex items-center px-1 mb-4">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-600 font-semibold">
             <span className="text-[#171717] font-black">{total}</span> total log
             entries
             {actorType && (
@@ -617,13 +625,13 @@ const SystemLog = () => {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Table header */}
           <div className="border-b border-slate-50 px-5 py-3 hidden sm:grid grid-cols-[1fr_2fr_1fr] gap-4">
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
               Actor / Action
             </p>
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
               Summary
             </p>
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
               Time / Target
             </p>
           </div>
@@ -642,7 +650,7 @@ const SystemLog = () => {
               <h3 className="font-black text-[#171717] text-sm mb-1">
                 No logs found
               </h3>
-              <p className="text-slate-400 text-xs">
+              <p className="text-slate-500 text-xs">
                 {hasFilters
                   ? "Try adjusting your filters"
                   : "The system log is empty"}
@@ -668,7 +676,7 @@ const SystemLog = () => {
                     <ActorBadge actorType={log.actorType} />
                     <ActionBadge action={log.action} />
                     {(log.actorName || log.actorEmail) && (
-                      <p className="text-[10px] text-slate-400 font-medium truncate max-w-full">
+                      <p className="text-[10px] text-slate-500 font-medium truncate max-w-full">
                         {log.actorName || "Unknown"}
                         {log.actorEmail ? ` · ${log.actorEmail}` : ""}
                       </p>
@@ -684,17 +692,17 @@ const SystemLog = () => {
 
                   {/* Time + Target */}
                   <div className="mt-2 sm:mt-0 space-y-1">
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       <FaRegClock className="text-[#b50002] text-[9px] flex-shrink-0" />
                       <span>{formatDateTime(log.createdAt)}</span>
                     </div>
                     {log.targetType && (
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-slate-500">
                         <span className="font-semibold text-slate-500">
                           {log.targetType}
                         </span>
                         {log.targetId ? (
-                          <span className="text-slate-300">
+                          <span className="text-slate-500">
                             {" "}
                             · {log.targetId}
                           </span>
@@ -728,7 +736,7 @@ const SystemLog = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

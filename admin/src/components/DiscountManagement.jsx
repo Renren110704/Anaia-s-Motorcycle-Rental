@@ -84,7 +84,7 @@ const isPromoActive = (promo) => {
 
 const getPromoStatus = (promo) => {
   if (!promo.isActive)
-    return { label: "Inactive", color: "text-slate-400 bg-slate-100" };
+    return { label: "Inactive", color: "text-slate-700 bg-slate-100" };
   const now = new Date();
   if (promo.startDate && new Date(promo.startDate) > now)
     return { label: "Scheduled", color: "text-amber-700 bg-amber-50" };
@@ -176,7 +176,7 @@ const ConfirmModal = ({ title, message, onConfirm, onCancel }) =>
         <h3 className="text-base font-black text-[#171717] text-center mb-1">
           {title}
         </h3>
-        <p className="text-sm text-slate-400 text-center mb-6">{message}</p>
+        <p className="text-sm text-slate-500 text-center mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
@@ -377,7 +377,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 {form.discountType === "percentage"
                   ? "Percentage-Based Discount"
                   : "Fixed Amount Discount"}
@@ -487,7 +487,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -496,7 +496,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
           <div>
             <label className="block text-xs font-bold text-[#171717]/60 uppercase tracking-wider mb-2">
               Applicable Categories
-              <span className="ml-1.5 text-slate-400 font-normal normal-case">
+              <span className="ml-1.5 text-slate-500 font-normal normal-case">
                 (leave empty = all categories)
               </span>
             </label>
@@ -528,7 +528,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
             >
               <Bike className="w-3.5 h-3.5" />
               Applicable Vehicle Units
-              <span className="ml-1 text-slate-400 font-normal normal-case">
+              <span className="ml-1 text-slate-500 font-normal normal-case">
                 (leave empty = all vehicles)
               </span>
               {showVehicles ? (
@@ -540,7 +540,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
             {showVehicles && (
               <div className="mt-2 max-h-40 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-3 bg-slate-50">
                 {motorcycles.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-2">
+                  <p className="text-xs text-slate-500 text-center py-2">
                     No units found
                   </p>
                 ) : (
@@ -581,7 +581,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
           <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <div>
               <p className="text-sm font-bold text-[#171717]">Promo Status</p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {form.isActive
                   ? "Promo is active and visible to customers"
                   : "Promo is disabled"}
@@ -595,7 +595,7 @@ const PromoFormModal = ({ promo, motorcycles, onSave, onClose }) => {
               {form.isActive ? (
                 <ToggleRight className="w-9 h-9 text-green-600" />
               ) : (
-                <ToggleLeft className="w-9 h-9 text-slate-400" />
+                <ToggleLeft className="w-9 h-9 text-slate-500" />
               )}
             </button>
           </div>
@@ -634,8 +634,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
 
   return (
     <tr
-      className={`border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 transition-colors align-top
-      ${!isPromoActive(promo) ? "opacity-60" : ""}`}
+      className={`border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 transition-colors align-top`}
     >
       {/* Promo (name, code, description) */}
       <td className="px-4 py-4 min-w-[220px]">
@@ -659,7 +658,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
           </button>
         )}
         {promo.description && (
-          <p className="text-xs text-slate-500 mt-1.5 max-w-xs line-clamp-2">
+          <p className="text-xs text-slate-600 mt-1.5 max-w-xs line-clamp-2">
             {promo.description}
           </p>
         )}
@@ -672,7 +671,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
             ? `${promo.discountValue}%`
             : `₱${promo.discountValue}`}
         </div>
-        <div className="text-[10px] text-slate-400 font-semibold uppercase">
+        <div className="text-[10px] text-slate-600 font-semibold uppercase">
           {promo.discountType === "percentage" ? "Percentage" : "Fixed"}
         </div>
       </td>
@@ -680,7 +679,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
       {/* Validity */}
       <td className="px-4 py-4 whitespace-nowrap">
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
-          <Calendar className="w-3 h-3 text-slate-400" />
+          <Calendar className="w-3 h-3 text-slate-500" />
           {promo.startDate ? formatDate(promo.startDate) : "Now"}
           {" → "}
           {promo.endDate ? formatDate(promo.endDate) : "No end"}
@@ -710,7 +709,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
           )}
           {!promo.applicableCategories?.length &&
             !promo.applicableVehicleIds?.length && (
-              <span className="text-[10px] text-slate-400 font-semibold">
+              <span className="text-[10px] text-slate-600 font-semibold">
                 All vehicles
               </span>
             )}
@@ -721,7 +720,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
       <td className="px-4 py-4 min-w-[140px]">
         {promo.maxUses != null ? (
           <div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 mb-1">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-600 mb-1">
               <span className="flex items-center gap-1">
                 <Users className="w-2.5 h-2.5" />
                 {promo.usedCount ?? 0} / {promo.maxUses}
@@ -735,7 +734,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
             </div>
           </div>
         ) : (
-          <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+          <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
             <Users className="w-2.5 h-2.5" />
             {promo.usedCount ?? 0} uses · Unlimited
           </span>
@@ -753,7 +752,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
             {promo.isActive ? (
               <ToggleRight className="w-4 h-4 text-green-600" />
             ) : (
-              <ToggleLeft className="w-4 h-4 text-slate-400" />
+              <ToggleLeft className="w-4 h-4 text-slate-500" />
             )}
           </button>
           <button
@@ -766,7 +765,7 @@ const PromoRow = ({ promo, onEdit, onToggle, onDelete, onCopyCode }) => {
           <button
             onClick={() => onDelete(promo)}
             title="Delete"
-            className="flex-shrink-0 p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-[#b50002] hover:border-red-200 transition-all"
+            className="flex-shrink-0 p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-[#b50002] hover:border-red-200 transition-all"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -839,7 +838,7 @@ const StatsBar = ({ promos }) => {
             <Icon className={`w-4 h-4 ${color}`} />
           </div>
           <div className={`text-xl font-black ${color}`}>{value}</div>
-          <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
+          <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
             {label}
           </div>
         </div>
@@ -1204,7 +1203,7 @@ const LoyaltyConfigPanel = ({ showToast }) => {
                       {errors[`${tierName}.minRentalDays`]}
                     </p>
                   ) : (
-                    <p className="text-[10px] text-slate-400 mt-1">
+                    <p className="text-[10px] text-slate-500 mt-1">
                       Min. rental days to redeem this tier's codes. 0 = no
                       minimum.
                     </p>
@@ -1261,7 +1260,7 @@ const LoyaltyConfigPanel = ({ showToast }) => {
                     }
                     className={inputCls(`${tierName}.periodicEveryRentals`)}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-slate-500 mt-1">
                     Leave blank for no recurring reward codes at this tier.
                   </p>
                 </div>
@@ -1284,7 +1283,7 @@ const LoyaltyConfigPanel = ({ showToast }) => {
                     }
                     className={inputCls(`${tierName}.codeExpiryDays`)}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-slate-500 mt-1">
                     0 = never expires
                   </p>
                 </div>
@@ -1318,7 +1317,7 @@ const LoyaltyConfigPanel = ({ showToast }) => {
             </div>
             <div>
               <h3 className="font-black text-[#171717]">Milestone Reward</h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 A one-time bonus code fired at a specific rental count,
                 independent of tier.
               </p>
@@ -1383,7 +1382,7 @@ const LoyaltyConfigPanel = ({ showToast }) => {
                 {errors["milestone.minRentalDays"]}
               </p>
             ) : (
-              <p className="text-[10px] text-slate-400 mt-1">
+              <p className="text-[10px] text-slate-500 mt-1">
                 Min. rental days to redeem. 0 = no minimum.
               </p>
             )}
@@ -1605,7 +1604,7 @@ const DiscountManagement = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       {toast && (
         <Toast
           message={toast.message}
@@ -1640,7 +1639,7 @@ const DiscountManagement = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Discounts & Promos
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Create and manage promotional offers for your fleet
             </p>
           </div>
@@ -1687,7 +1686,7 @@ const DiscountManagement = () => {
             {/* Search & Filter */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search by name, code, or description..."
@@ -1698,7 +1697,7 @@ const DiscountManagement = () => {
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1742,7 +1741,7 @@ const DiscountManagement = () => {
                 <p className="text-[#171717] font-bold text-base">
                   No promos found
                 </p>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-slate-500 text-sm mt-1">
                   {search || filterStatus !== "all"
                     ? "Try adjusting your search or filter"
                     : "Create your first promotional offer"}
@@ -1765,22 +1764,22 @@ const DiscountManagement = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/60">
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Promo
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Discount
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Validity
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Applies To
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Usage
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-600">
                         Actions
                       </th>
                     </tr>
@@ -1806,7 +1805,7 @@ const DiscountManagement = () => {
 
             {/* Results count */}
             {!loading && filteredPromos.length > 0 && (
-              <p className="text-center text-xs text-slate-400 mt-6">
+              <p className="text-center text-xs text-slate-600 mt-6">
                 Showing {filteredPromos.length} of {promos.length} promo
                 {promos.length !== 1 ? "s" : ""}
               </p>
@@ -1814,7 +1813,7 @@ const DiscountManagement = () => {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 };
 

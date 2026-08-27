@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
+const ABOUT1 = "/images/about-1.webp";
+
 // ─── Scroll reveal hook (same pattern as other pages) ───────────────
 function useScrollReveal(options = {}) {
   const ref = useRef(null);
@@ -791,7 +793,7 @@ export default function AboutPage() {
               // width/quality were oversized for what's ever displayed.
               // auto=format already lets Unsplash serve WebP/AVIF —
               // capping width+quality is the remaining win.
-              backgroundImage: `url(https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1200&q=60)`,
+              backgroundImage: `url(${ABOUT1})`,
             }}
           />
           <div className="ab-hero-overlay" />
@@ -893,7 +895,7 @@ export default function AboutPage() {
               <div className="ab-story-img-wrap">
                 <img
                   className="ab-story-img"
-                  src="/images/about-story.jpg"
+                  src="/images/about-story.webp"
                   alt="Honda Click at Anaia's Motorcycle Rental"
                   loading="lazy"
                   decoding="async"

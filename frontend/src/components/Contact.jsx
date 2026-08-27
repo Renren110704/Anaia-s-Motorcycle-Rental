@@ -493,7 +493,7 @@ export default function Contact() {
       `}</style>
 
       {/* Added Inline Styles here to set the background image */}
-      <div
+      <main
         className="ct-root"
         style={{
           backgroundImage: `url(${mainBg})`,
@@ -531,18 +531,21 @@ export default function Contact() {
                   {
                     Icon: FaFacebookF,
                     href: "https://www.facebook.com/anaiasmotorcyclerental",
+                    label: "Visit our Facebook page"
                   },
                   {
                     Icon: FaTiktok,
                     href: "https://www.tiktok.com/@anaiasmotorcyclerental",
+                    label: "Visit our TikTok page"
                   },
-                ].map(({ Icon, href }, i) => (
+                ].map(({ Icon, href, label }, i) => (
                   <a
                     key={i}
                     href={href}
                     className="ct-social"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={label}
                   >
                     <Icon />
                   </a>
@@ -775,7 +778,7 @@ export default function Contact() {
             ))}
           </div>
         </section>
-      </div>
+      </main>
     </>
   );
 }

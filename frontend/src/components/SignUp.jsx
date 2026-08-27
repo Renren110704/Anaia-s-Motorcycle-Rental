@@ -647,6 +647,7 @@ const TermsModal = ({ onClose, onAccept }) => (
         </h2>
         <button
           onClick={onClose}
+          aria-label="Close terms and conditions"
           style={{
             background: "none",
             border: "none",
@@ -1228,7 +1229,7 @@ const SignUp = () => {
         />
       )}
 
-      <div className="su-root">
+      <main className="su-root">
         <div className="su-card">
           {/* LEFT */}
           <div className="su-left">
@@ -1396,16 +1397,20 @@ const SignUp = () => {
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             style={{
                               position: "absolute",
-                              right: 12,
-                              background: "none",
+                              right: 4,
+                              minWidth: 44, // <-- Add this
+                              minHeight: 44, // <-- Add this
+                              display: "flex", // <-- Add this
+                              justifyContent: "center", // <-- Add this
+                              alignItems: "center", // <-- Add this
+                              background: "transparent",
                               border: "none",
                               cursor: "pointer",
                               color: "rgba(0,0,0,0.3)",
-                              display: "flex",
-                              alignItems: "center",
-                              fontSize: 13,
+                              fontSize: 16,
                             }}
                           >
                             {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -1465,16 +1470,20 @@ const SignUp = () => {
                             onClick={() =>
                               setShowConfirmPassword(!showConfirmPassword)
                             }
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             style={{
                               position: "absolute",
-                              right: 12,
-                              background: "none",
+                              right: 4,
+                              minWidth: 44, // <-- Add this
+                              minHeight: 44, // <-- Add this
+                              display: "flex", // <-- Add this
+                              justifyContent: "center", // <-- Add this
+                              alignItems: "center", // <-- Add this
+                              background: "transparent",
                               border: "none",
                               cursor: "pointer",
                               color: "rgba(0,0,0,0.3)",
-                              display: "flex",
-                              alignItems: "center",
-                              fontSize: 13,
+                              fontSize: 16,
                             }}
                           >
                             {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
@@ -1961,7 +1970,7 @@ const SignUp = () => {
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       <ToastContainer
         position="top-right"

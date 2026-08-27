@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import img1 from "../assets/scooter.png";
-import img2 from "../assets/car.png";
-import img3 from "../assets/underbone.png";
+import img1 from "../assets/scooter.webp";
+import img2 from "../assets/car.webp";
+import img3 from "../assets/underbone.webp";
 import hondaLogo from "../assets/logos/honda.svg";
 import yamahaLogo from "../assets/logos/yamaha.svg";
 import suzukiLogo from "../assets/logos/suzuki.svg";
@@ -83,7 +83,7 @@ function BrandMarquee() {
                     fontWeight: 600,
                     fontSize: 12,
                     letterSpacing: 2,
-                    color: "#999",
+                    color: "#5c5c5c",
                   }}
                 >
                   {brand}
@@ -366,7 +366,7 @@ export default function HeroBanner() {
           font-family: 'Inter', sans-serif;
           font-size: 11px; font-weight: 600; letter-spacing: 1px;
           border: none; background: transparent;
-          color: rgba(0,0,0,0.26); cursor: pointer;
+          color: rgba(0,0,0,0.6); cursor: pointer;
           position: relative; transition: color 0.2s, background 0.2s;
           text-transform: uppercase;
         }
@@ -376,7 +376,7 @@ export default function HeroBanner() {
           position: absolute; bottom: -1px; left: 20px; right: 20px;
           height: 1.5px; background: #b50002; border-radius: 2px;
         }
-        .hb-tab:hover:not(.active) { color: rgba(0,0,0,0.55); }
+        .hb-tab:hover:not(.active) { color: rgba(0,0,0,0.7); }
 
         .hb-stats {
           display: flex; gap: 24px; align-items: center;
@@ -415,7 +415,7 @@ export default function HeroBanner() {
           font-family: 'Inter', sans-serif;
           font-size: 9px; font-weight: 600;
           letter-spacing: 3.5px; text-transform: uppercase;
-          color: rgba(0,0,0,0.2);
+          color: rgba(0,0,0,0.6);
           text-align: center; margin-bottom: 18px;
         }
 

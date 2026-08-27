@@ -477,7 +477,7 @@ const QRChanger = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       {toast && (
         <Toast
           message={toast.message}
@@ -512,7 +512,7 @@ const QRChanger = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Payment QR Codes
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Manage the QR codes displayed to customers during checkout.
             </p>
           </div>
@@ -568,11 +568,11 @@ const QRChanger = () => {
                       {/* Header */}
                       <div className="flex items-center justify-between mb-4 gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <h3 className="font-black text-[#171717] text-lg truncate">
+                          <h2 className="font-black text-[#171717] text-lg truncate">
                             {method.name}
-                          </h3>
+                          </h2>
                           {isDisabled && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full flex-shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-900 px-2 py-0.5 rounded-full flex-shrink-0">
                               Disabled
                             </span>
                           )}
@@ -695,7 +695,7 @@ const QRChanger = () => {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 };
 

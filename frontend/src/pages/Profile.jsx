@@ -344,25 +344,22 @@ const InfoRow = ({ icon: Icon, label, value, accent }) => (
 
 /* ── Section heading ─────────────────────────────────────────────── */
 const SectionLabel = ({ children }) => (
-  <div
-    style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}
+  <h3
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      margin: "0 0 14px 0" /* Added margin reset for h3 */,
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: "2.5px",
+      textTransform: "uppercase",
+      color: "#b50002",
+      fontFamily: "'Space Grotesk', sans-serif",
+    }}
   >
-    {/* <div
-      style={{ width: 20, height: 1.5, background: "#b50002", borderRadius: 2 }}
-    /> */}
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "2.5px",
-        textTransform: "uppercase",
-        color: "#b50002",
-        fontFamily: "'Space Grotesk', sans-serif",
-      }}
-    >
-      {children}
-    </span>
-  </div>
+    {children}
+  </h3>
 );
 
 /* ── Main Component ──────────────────────────────────────────────── */
@@ -1144,7 +1141,7 @@ const Profile = () => {
 
       <Navbar />
 
-      <div className="pf-page">
+      <main className="pf-page">
         <div className="pf-inner">
           {/* Page header */}
           <div className="pf-top">
@@ -1385,7 +1382,9 @@ const Profile = () => {
               {/* Panel header */}
               <div className="pf-panel-head">
                 <div>
-                  <div className="pf-panel-title">{panelTitle}</div>
+                  <h2 className="pf-panel-title" style={{ margin: 0 }}>
+                    {panelTitle}
+                  </h2>
                   <div className="pf-panel-sub">{panelSub}</div>
                 </div>
                 {(editMode || changingPassword) && (
@@ -1933,7 +1932,7 @@ const Profile = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* ADD THIS RIGHT ABOVE <Footer /> */}
       {showDeleteConfirm && (

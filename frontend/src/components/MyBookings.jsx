@@ -597,7 +597,7 @@ const ConfirmModal = ({ message, onConfirm, onCancel, confirmLabel }) => (
       >
         <FaExclamationTriangle style={{ color: "#b50002", fontSize: 20 }} />
       </div>
-      <h3
+      <h2
         style={{
           color: "#0E0E0E",
           fontSize: 17,
@@ -607,7 +607,7 @@ const ConfirmModal = ({ message, onConfirm, onCancel, confirmLabel }) => (
         }}
       >
         Confirm Action
-      </h3>
+      </h2>
       <p
         style={{
           color: "rgba(14,14,14,0.5)",
@@ -652,7 +652,7 @@ const AlertModal = ({ message, onClose, isError }) => (
           <FaInfoCircle style={{ color: "rgba(14,14,14,0.5)", fontSize: 20 }} />
         )}
       </div>
-      <h3
+      <h2
         style={{
           color: "#0E0E0E",
           fontSize: 17,
@@ -662,7 +662,7 @@ const AlertModal = ({ message, onClose, isError }) => (
         }}
       >
         {isError ? "Error" : "Notice"}
-      </h3>
+      </h2>
       <p
         style={{
           color: "rgba(14,14,14,0.5)",
@@ -5694,7 +5694,7 @@ const MyBookings = () => {
         }
       `}</style>
 
-      <div
+      <main
         className="mybookings-root"
         style={{
           minHeight: "100vh",
@@ -6028,7 +6028,7 @@ const MyBookings = () => {
                 )}
               </div>
               <div>
-                <h3
+                <h2
                   style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: 800,
@@ -6041,7 +6041,7 @@ const MyBookings = () => {
                   {searchTerm
                     ? "No matching bookings"
                     : `No ${activeTabConfig.label.toLowerCase()} bookings`}
-                </h3>
+                </h2>
                 <p
                   style={{
                     fontSize: 13,
@@ -6148,7 +6148,7 @@ const MyBookings = () => {
             />
           )}
         </div>
-      </div>
+      </main>
       {/* Lightbox Modal */}
       {previewImage &&
         createPortal(

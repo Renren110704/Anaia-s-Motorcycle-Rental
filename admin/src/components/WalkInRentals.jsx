@@ -40,7 +40,7 @@ const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
 
 // ── Shared styles ──────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 const fieldClsIcon =
   "w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[#171717] text-sm placeholder-slate-300 focus:outline-none focus:border-[#b50002]/30 appearance-none";
 const fieldClsIconError =
@@ -373,7 +373,7 @@ const InlineDatePicker = ({
         className={`w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-left flex items-center justify-between transition-colors focus:outline-none focus:border-[#b50002]/30 ${disabled ? "opacity-60 cursor-not-allowed bg-slate-50" : "cursor-pointer hover:border-[#b50002]/30"} ${open ? "border-[#b50002]/50 ring-1 ring-[#b50002]/10" : ""}`}
       >
         <FaCalendarAlt className="absolute left-3 text-[#b50002] text-sm pointer-events-none" />
-        <span className={value ? "text-[#171717]" : "text-slate-400"}>
+        <span className={value ? "text-[#171717]" : "text-slate-500"}>
           {displayValue || `Select ${label}`}
         </span>
         <FaChevronDown
@@ -408,7 +408,7 @@ const InlineDatePicker = ({
             {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
               <div
                 key={d}
-                className="text-center text-[10px] font-bold text-slate-400 py-1"
+                className="text-center text-[10px] font-bold text-slate-500 py-1"
               >
                 {d}
               </div>
@@ -801,6 +801,7 @@ const DestinationSelect = ({ value, onChange }) => {
         iconEl={<FaMapMarkerAlt className="text-[#b50002] text-sm" />}
         selectEl={
           <select
+            aria-label="Select Region"
             value={sel.regionCode}
             onChange={handleRegion}
             disabled={loading.regions}
@@ -823,6 +824,7 @@ const DestinationSelect = ({ value, onChange }) => {
           iconEl={<FaMapMarkerAlt className="text-[#b50002] text-sm" />}
           selectEl={
             <select
+              aria-label="Select Province"
               value={sel.provinceCode}
               onChange={handleProvince}
               disabled={loading.provinces}
@@ -847,6 +849,7 @@ const DestinationSelect = ({ value, onChange }) => {
           iconEl={<FaMapMarkerAlt className="text-[#b50002] text-sm" />}
           selectEl={
             <select
+              aria-label="Select City / Municipality"
               value={sel.cityCode}
               onChange={handleCity}
               disabled={
@@ -876,6 +879,7 @@ const DestinationSelect = ({ value, onChange }) => {
           iconEl={<FaMapMarkerAlt className="text-[#b50002] text-sm" />}
           selectEl={
             <select
+              aria-label="Select Barangay"
               value={sel.barangayCode}
               onChange={handleBarangay}
               disabled={loading.barangays}
@@ -1740,14 +1744,14 @@ const WalkInRentals = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Walk-In Rentals
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-600 text-sm mt-1">
             Create walk-in rentals with a minimum 24-hour rental duration.
           </p>
         </div>
@@ -1790,7 +1794,7 @@ const WalkInRentals = () => {
                       {showUnitSuggestions && unitIdInput.trim() && (
                         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                           {loadingUnitSuggestions ? (
-                            <div className="px-4 py-3 text-xs text-slate-400">
+                            <div className="px-4 py-3 text-xs text-slate-500">
                               Searching unit IDs...
                             </div>
                           ) : unitSuggestions.length ? (
@@ -1833,7 +1837,7 @@ const WalkInRentals = () => {
                                     <p className="text-xs font-black text-[#b50002] uppercase tracking-wider">
                                       {m.unitId || "N/A"}
                                     </p>
-                                    <p className="text-[11px] text-slate-400">
+                                    <p className="text-[11px] text-slate-500">
                                       {(m.make || "") + " " + (m.model || "")}
                                     </p>
                                   </div>
@@ -1846,7 +1850,7 @@ const WalkInRentals = () => {
                               );
                             })
                           ) : (
-                            <div className="px-4 py-3 text-xs text-slate-400">
+                            <div className="px-4 py-3 text-xs text-slate-500">
                               No matching Unit IDs found.
                             </div>
                           )}
@@ -1890,7 +1894,7 @@ const WalkInRentals = () => {
                           <p className="font-black text-[#171717] text-[15px] leading-tight">
                             {motorcycle.make} {motorcycle.model}
                           </p>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <p className="text-xs text-slate-500 mt-0.5">
                             {motorcycle.year} · {motorcycle.category}
                           </p>
                         </div>
@@ -2057,6 +2061,7 @@ const WalkInRentals = () => {
                       error={errors.region}
                     >
                       <select
+                        aria-label="Select Region"
                         value={address.regionCode}
                         onChange={(e) => {
                           onAddressRegion(e);
@@ -2087,6 +2092,7 @@ const WalkInRentals = () => {
                     {hasProvinces ? (
                       <SelectRow icon={FaMapMarkerAlt} label="">
                         <select
+                          aria-label="Select Province"
                           value={address.provinceCode}
                           onChange={onAddressProvince}
                           disabled={!address.regionCode || loading.provinces}
@@ -2111,6 +2117,7 @@ const WalkInRentals = () => {
                         error={errors.city}
                       >
                         <select
+                          aria-label="Select City / Municipality"
                           value={address.cityCode}
                           onChange={(e) => {
                             onAddressCity(e);
@@ -2147,6 +2154,7 @@ const WalkInRentals = () => {
                         error={errors.city}
                       >
                         <select
+                          aria-label="Select City / Municipality"
                           value={address.cityCode}
                           onChange={(e) => {
                             onAddressCity(e);
@@ -2182,6 +2190,7 @@ const WalkInRentals = () => {
                       error={errors.barangay}
                     >
                       <select
+                        aria-label="Select Barangay"
                         value={address.barangayCode}
                         onChange={(e) => {
                           onAddressBarangay(e);
@@ -2249,6 +2258,7 @@ const WalkInRentals = () => {
                     <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
                       <FaClock className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
                       <select
+                        aria-label="Select Pickup Time"
                         value={formData.pickupTime}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -2303,6 +2313,7 @@ const WalkInRentals = () => {
                     <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30 transition-colors">
                       <FaClock className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
                       <select
+                        aria-label="Select Return Time"
                         value={formData.returnTime}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -2396,7 +2407,7 @@ const WalkInRentals = () => {
                       <span className="text-sm font-semibold text-[#171717]">
                         Include extra helmet
                       </span>
-                      <span className="text-xs text-slate-400 ml-auto">
+                      <span className="text-xs text-slate-500 ml-auto">
                         +{formatMoney(HELMET_FEE)}
                       </span>
                     </label>
@@ -2406,6 +2417,7 @@ const WalkInRentals = () => {
                     <div className="relative flex items-center bg-white rounded-xl focus-within:border-[#b50002]/30">
                       <FaTag className="absolute left-3 text-[#b50002] text-sm pointer-events-none z-10" />
                       <select
+                        aria-label="Select Payment Method"
                         value={formData.paymentMethod}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -2431,16 +2443,16 @@ const WalkInRentals = () => {
             <div className="flex flex-col gap-4">
               {/* Fee Breakdown */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                <h2 className="font-black text-[#171717] text-[14px] mb-4">
                   Fee Breakdown
-                </h3>
+                </h2>
                 <div className="space-y-2">
                   {[
                     {
                       label: "Daily Rate",
                       value: applicableDiscount ? (
                         <span className="flex items-center gap-2">
-                          <span className="line-through text-slate-400 font-normal">
+                          <span className="line-through text-slate-500 font-normal">
                             {formatMoney(price)}
                           </span>
                           <span className="text-[#b50002]">
@@ -2463,7 +2475,7 @@ const WalkInRentals = () => {
                       label: "Rental Subtotal",
                       value: applicableDiscount ? (
                         <span className="flex items-center gap-2">
-                          <span className="line-through text-slate-400 font-normal">
+                          <span className="line-through text-slate-500 font-normal">
                             {formatMoney(baseRental)}
                           </span>
                           <span>
@@ -2502,7 +2514,7 @@ const WalkInRentals = () => {
                         key={label}
                         className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0"
                       >
-                        <span className="text-[12px] text-slate-400">
+                        <span className="text-[12px] text-slate-500">
                           {label}
                         </span>
                         <span
@@ -2523,7 +2535,7 @@ const WalkInRentals = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       Due at pickup
                     </span>
                     <span className="text-sm font-black text-[#b50002]">
@@ -2536,9 +2548,9 @@ const WalkInRentals = () => {
               {/* Rental summary */}
               {motorcycle && (
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                  <h3 className="font-black text-[#171717] text-[14px] mb-4">
+                  <h2 className="font-black text-[#171717] text-[14px] mb-4">
                     Rental Summary
-                  </h3>
+                  </h2>
                   <div className="space-y-2">
                     {[
                       { label: "Unit", value: motorcycle.unitId || "—" },
@@ -2574,7 +2586,7 @@ const WalkInRentals = () => {
                         key={label}
                         className="flex items-start justify-between py-1.5 border-b border-slate-50 last:border-0"
                       >
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-slate-500">
                           {label}
                         </span>
                         <span className="text-[11px] font-bold text-[#171717] text-right max-w-[55%]\">
@@ -2597,7 +2609,7 @@ const WalkInRentals = () => {
               </button>
 
               {!motorcycle && !errors.unitId && (
-                <p className="text-center text-[11px] text-slate-400">
+                <p className="text-center text-[11px] text-slate-600">
                   Load a unit by Unit ID to enable booking
                 </p>
               )}
@@ -2616,7 +2628,7 @@ const WalkInRentals = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

@@ -914,7 +914,7 @@ const Navbar = () => {
           id="mobile-menu"
           ref={menuRef}
           className={`mobile-drawer ${isOpen ? "open" : "closed"}`}
-          aria-hidden={!isOpen}
+          inert={!isOpen ? true : undefined}
         >
           <div className="mobile-drawer-inner">
             {navLinks.map((link) => (

@@ -32,7 +32,7 @@ import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 
 const api = axios.create({
-  baseURL: API_BASE_URL, 
+  baseURL: API_BASE_URL,
   headers: { Accept: "application/json" },
 });
 
@@ -46,7 +46,7 @@ api.interceptors.request.use((config) => {
 
 // ── Shared style tokens ────────────────────────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 const STATUS_OPTIONS = ["approved", "rejected"];
 const ITEMS_PER_PAGE = 10;
@@ -123,7 +123,7 @@ const ConfirmModal = ({
           Confirm Delete
         </h3>
         <p className="text-slate-500 text-sm mb-2">{message}</p>
-        {detail && <p className="text-slate-400 text-xs mb-6">{detail}</p>}
+        {detail && <p className="text-slate-500 text-xs mb-6">{detail}</p>}
         <div className="flex gap-3">
           <button
             onClick={onCancel}
@@ -235,7 +235,7 @@ const StarRating = ({ rating, size = 12, showValue = true }) => {
         })}
       </div>
       {showValue && (
-        <span className="text-[11px] font-bold text-slate-400">
+        <span className="text-[11px] font-bold text-slate-500">
           {numericRating > 0 ? numericRating.toFixed(1) : "0.0"}/5.0
         </span>
       )}
@@ -245,8 +245,8 @@ const StarRating = ({ rating, size = 12, showValue = true }) => {
 
 // ── Status badge ───────────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  pending: "bg-violet-50 text-violet-600 border-violet-200",
-  approved: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  pending: "bg-violet-50 text-violet-700 border-violet-200",
+  approved: "bg-emerald-50 text-emerald-700 border-emerald-200", // Passes
   rejected: "bg-red-50 text-[#b50002] border-red-200",
 };
 
@@ -309,7 +309,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -380,13 +380,13 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -403,7 +403,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -418,7 +418,7 @@ const EmptyState = ({ onReset }) => (
       <MessageSquare className="text-slate-200 w-7 h-7" />
     </div>
     <h3 className="font-black text-[#171717] text-sm mb-1">No reviews found</h3>
-    <p className="text-slate-400 text-xs mb-4">
+    <p className="text-slate-500 text-xs mb-4">
       Try adjusting your search or status filter
     </p>
     <button
@@ -483,7 +483,7 @@ const ReviewTable = ({
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                     ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
                   <span className="inline-flex items-center">
@@ -542,7 +542,7 @@ const ReviewTable = ({
                             <Sparkles className="w-3 h-3 text-amber-500 flex-shrink-0" />
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate max-w-[160px]">
+                        <p className="text-[11px] text-slate-500 truncate max-w-[160px]">
                           {review.renterEmail || "No email"}
                         </p>
                       </div>
@@ -668,14 +668,14 @@ const ReviewDetailDrawer = ({
               <h2 className="font-black text-[#171717] text-base leading-tight truncate">
                 {review.renterName || "Renter"}
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {formatDateTime(review.createdAt)}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors flex-shrink-0"
+            className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors flex-shrink-0"
           >
             <FaTimes />
           </button>
@@ -686,7 +686,7 @@ const ReviewDetailDrawer = ({
           {review.isFeatured && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2 flex items-center gap-2 mb-4">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-[11px] font-bold text-amber-600 tracking-wide uppercase">
+              <span className="text-[11px] font-bold text-amber-700 tracking-wide uppercase">
                 Featured in Testimonials
               </span>
             </div>
@@ -695,13 +695,13 @@ const ReviewDetailDrawer = ({
           {/* Reviewer + overall rating + status */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
             <div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {review.renterEmail || "No email"}
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase">
                   Overall
                 </span>
                 <StarRating rating={review.rating} />
@@ -750,31 +750,31 @@ const ReviewDetailDrawer = ({
           {/* Detailed criteria breakdown */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Performance
               </span>
               <StarRating rating={review.performance} />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Condition
               </span>
               <StarRating rating={review.condition} />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Customer Service
               </span>
               <StarRating rating={review.customerService} />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Value for Money
               </span>
               <StarRating rating={review.valueForMoney} />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Ride Comfort
               </span>
               <StarRating rating={review.rideComfort} />
@@ -807,7 +807,7 @@ const ReviewDetailDrawer = ({
                 {review.adminReplyMessage}
               </p>
               {review.adminRepliedAt && (
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-[10px] text-slate-500 mt-1">
                   {formatDateTime(review.adminRepliedAt)}
                 </p>
               )}
@@ -872,8 +872,8 @@ const ReviewDetailDrawer = ({
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all disabled:opacity-50
                   ${
                     review.isFeatured
-                      ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
-                      : "border-slate-200 text-slate-500 hover:border-amber-200 hover:text-amber-600"
+                      ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                      : "border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700"
                   }`}
               >
                 <Sparkles className="w-3 h-3" />
@@ -1298,7 +1298,7 @@ const ReviewManagement = () => {
       label: "Featured",
       value: counts.featured,
       sub: "In testimonials",
-      subColor: "text-amber-500",
+      subColor: "text-amber-700",
       icon: Sparkles,
       accent: "bg-amber-500",
       status: null,
@@ -1306,14 +1306,14 @@ const ReviewManagement = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Review Management
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             Moderate renter feedback and choose which approved reviews appear in
             testimonials. (New reviews are automatically approved).
           </p>
@@ -1385,7 +1385,7 @@ const ReviewManagement = () => {
 
               {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400">
+                  <span className="text-xs font-bold text-slate-500">
                     {selectedIds.size} selected
                   </span>
                   {availableBulkActions.map((actionKey) => {
@@ -1417,7 +1417,7 @@ const ReviewManagement = () => {
 
         {/* Result count */}
         <div className="flex items-center justify-between px-1 mb-4">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-600 font-semibold">
             Showing{" "}
             {filteredReviews.length === 0
               ? 0
@@ -1554,7 +1554,7 @@ const ReviewManagement = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

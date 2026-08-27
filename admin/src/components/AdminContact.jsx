@@ -165,11 +165,12 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
             <h2 className="font-black text-[#171717] text-lg leading-tight">
               {msg.name || "Anonymous"}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">{msg.email}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{msg.email}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
+            aria-label="Close drawer"
+            className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
           >
             <FaTimes />
           </button>
@@ -178,12 +179,12 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
         <div className="p-5 space-y-4">
           {/* Customer info */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
               Customer Info
             </p>
             <div className="flex items-center gap-3">
               <FaUser className="text-[#b50002] text-sm flex-shrink-0" />
-              <span className="text-slate-400 text-xs w-16 font-medium">
+              <span className="text-slate-500 text-xs w-16 font-medium">
                 Name
               </span>
               <span className="text-[#171717] text-sm font-semibold">
@@ -192,7 +193,7 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
             </div>
             <div className="flex items-center gap-3">
               <FaEnvelope className="text-[#b50002] text-sm flex-shrink-0" />
-              <span className="text-slate-400 text-xs w-16 font-medium">
+              <span className="text-slate-500 text-xs w-16 font-medium">
                 Email
               </span>
               <span className="text-[#171717] text-sm font-semibold break-all">
@@ -201,7 +202,7 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
             </div>
             <div className="flex items-center gap-3">
               <FaPhone className="text-[#b50002] text-sm flex-shrink-0" />
-              <span className="text-slate-400 text-xs w-16 font-medium">
+              <span className="text-slate-500 text-xs w-16 font-medium">
                 Phone
               </span>
               <span className="text-[#171717] text-sm font-semibold">
@@ -210,7 +211,7 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
             </div>
             <div className="flex items-center gap-3">
               <FaClock className="text-[#b50002] text-sm flex-shrink-0" />
-              <span className="text-slate-400 text-xs w-16 font-medium">
+              <span className="text-slate-500 text-xs w-16 font-medium">
                 Sent
               </span>
               <span className="text-[#171717] text-sm font-semibold">
@@ -221,7 +222,7 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
 
           {/* Original message */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase mb-3">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase mb-3">
               Message
             </p>
             <p className="text-[#171717] text-sm leading-relaxed whitespace-pre-wrap">
@@ -249,10 +250,10 @@ const ReplyDrawer = ({ message: msg, onClose, onReplySent }) => {
 
           {/* Reply composer */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase mb-3 flex items-center gap-1.5">
+            <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase mb-3 flex items-center gap-1.5">
               <FaReply className="text-[#b50002]" /> Reply via Email
             </p>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-slate-500 mb-3">
               Your reply will be sent to{" "}
               <span className="font-semibold text-[#171717]">{msg.email}</span>.
             </p>
@@ -328,7 +329,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -386,13 +387,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Previous page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -409,7 +411,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        aria-label="Next page"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -420,11 +423,11 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 // ── Status Badge ──────────────────────────────────────────────────────────────
 const ReplyBadge = ({ replied }) =>
   replied ? (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-50 text-emerald-600 border-emerald-200">
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-50 text-emerald-800 border-emerald-200">
       <FaCheckCircle className="text-[9px]" /> Replied
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-amber-50 text-amber-600 border-amber-200">
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-amber-50 text-amber-800 border-amber-200">
       <FaInbox className="text-[9px]" /> Pending
     </span>
   );
@@ -438,7 +441,7 @@ const EmptyState = ({ onReset }) => (
     <h3 className="font-black text-[#171717] text-lg mb-1">
       No messages found
     </h3>
-    <p className="text-slate-400 text-sm mb-4">
+    <p className="text-slate-500 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
     <button
@@ -576,7 +579,7 @@ const AdminContact = () => {
       label: "All Messages",
       value: counts.all,
       sub: "Total inquiries",
-      subColor: "text-slate-400",
+      subColor: "text-slate-500",
       icon: Mail,
       accent: "bg-slate-400",
       status: "all",
@@ -585,7 +588,7 @@ const AdminContact = () => {
       label: "Pending Reply",
       value: counts.pending,
       sub: "Awaiting response",
-      subColor: "text-amber-500",
+      subColor: "text-amber-700",
       icon: MessageSquare,
       accent: "bg-amber-500",
       status: "pending",
@@ -594,7 +597,7 @@ const AdminContact = () => {
       label: "Replied",
       value: counts.replied,
       sub: "Customers notified",
-      subColor: "text-emerald-500",
+      subColor: "text-emerald-700",
       icon: CheckCircle2,
       accent: "bg-emerald-500",
       status: "replied",
@@ -602,14 +605,14 @@ const AdminContact = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Contact Messages
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             View customer inquiries and send email replies directly from here.
           </p>
         </div>
@@ -641,6 +644,7 @@ const AdminContact = () => {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
               >
                 <FaTimes className="text-sm" />
@@ -651,7 +655,7 @@ const AdminContact = () => {
 
         {/* Count */}
         <div className="flex items-center justify-between px-1 mb-4">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-700 font-semibold">
             Showing{" "}
             {filteredMessages.length === 0
               ? 0
@@ -696,7 +700,7 @@ const AdminContact = () => {
                             ? () => handleColSort(col.key)
                             : undefined
                         }
-                        className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                        className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                           ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                       >
                         <span className="inline-flex items-center">
@@ -725,7 +729,7 @@ const AdminContact = () => {
                         <p className="font-black text-[13px] text-[#171717] leading-tight">
                           {msg.name || "—"}
                         </p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-500">
                           {msg.phone || "—"}
                         </p>
                       </td>
@@ -795,7 +799,7 @@ const AdminContact = () => {
           onReplySent={handleReplySent}
         />
       )}
-    </div>
+    </main>
   );
 };
 

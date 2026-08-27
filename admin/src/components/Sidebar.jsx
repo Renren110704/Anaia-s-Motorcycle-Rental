@@ -98,6 +98,7 @@ const NavItem = ({ link, active, collapsed, pendingCount, onClick }) => {
       to={link.path}
       onClick={onClick}
       title={collapsed ? link.label : undefined}
+      aria-label={collapsed ? link.label : undefined}
       className={`relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none
         ${collapsed ? "justify-center px-0 py-3 mx-2" : "px-3 py-2.5 mx-2"}
         ${
@@ -135,7 +136,7 @@ const LogoutModal = ({ onConfirm, onCancel }) =>
         <h3 className="text-lg font-black text-[#171717] text-center mb-1">
           Confirm Logout
         </h3>
-        <p className="text-sm text-slate-400 text-center mb-6">
+        <p className="text-sm text-slate-500 text-center mb-6">
           You'll need to sign in again to access the admin panel.
         </p>
         <div className="flex gap-3">
@@ -185,7 +186,8 @@ const SidebarInner = ({
         {isMobile && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 ml-auto flex-shrink-0"
+            aria-label="Close menu"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 ml-auto flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -194,7 +196,7 @@ const SidebarInner = ({
 
       {/* Label */}
       {(!collapsed || isMobile) && (
-        <p className="text-[9px] font-semibold tracking-[0.2em] text-slate-400 uppercase px-5 pt-5 pb-2">
+        <p className="text-[9px] font-semibold tracking-[0.2em] text-slate-500 uppercase px-5 pt-5 pb-2">
           Main Menu
         </p>
       )}
@@ -219,8 +221,10 @@ const SidebarInner = ({
         {!isMobile && (
           <button
             onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
             className={`flex items-center gap-3 rounded-xl transition-all duration-150
-              text-slate-400 hover:bg-slate-50 hover:text-slate-700
+              text-slate-500 hover:bg-slate-50 hover:text-slate-700
               ${collapsed ? "justify-center w-10 h-10 mx-auto" : "w-[calc(100%-16px)] mx-2 px-3 py-2.5"}`}
           >
             <ChevronLeft
@@ -233,8 +237,9 @@ const SidebarInner = ({
         )}
         <button
           onClick={() => setShowLogout(true)}
+          aria-label="Log out"
           className={`flex items-center gap-3 rounded-xl transition-all duration-150
-            text-slate-400 hover:bg-red-50 hover:text-[#b50002]
+            text-slate-500 hover:bg-red-50 hover:text-[#b50002]
             ${collapsed && !isMobile ? "justify-center w-10 h-10 mx-auto" : "w-[calc(100%-16px)] mx-2 px-3 py-2.5"}`}
         >
           <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
@@ -394,6 +399,7 @@ const Sidebar = ({
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-white border-b border-slate-100 flex items-center px-4 gap-3">
         <button
           onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
           className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-slate-100 text-slate-600 transition-colors"
         >
           <Menu className="w-5 h-5" />

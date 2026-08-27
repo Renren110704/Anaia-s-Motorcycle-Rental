@@ -612,7 +612,7 @@ const ForgotPassword = () => {
         }
       `}</style>
 
-      <div className="fp-root">
+      <main className="fp-root">
         <div className="fp-card">
           {/* LEFT */}
           <div className="fp-left">
@@ -1002,7 +1002,7 @@ const ForgotPassword = () => {
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       <ToastContainer
         position="top-right"

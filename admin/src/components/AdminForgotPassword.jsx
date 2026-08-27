@@ -11,12 +11,9 @@ const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
 const CARD_CLASSES =
   "relative z-10 w-full max-w-sm bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden";
 const INPUT_CLASSES =
-  "w-full px-3 py-2.5 rounded-xl border text-[#171717] text-sm placeholder-slate-300 focus:outline-none transition-colors border-slate-200 bg-white focus:border-[#b50002]/30";
+  "w-full px-3 py-2.5 rounded-xl border text-[#171717] text-sm placeholder-slate-500 focus:outline-none transition-colors border-slate-200 bg-white focus:border-[#b50002]/30";
 
 const AdminForgotPassword = () => {
-  // "request" -> enter email and ask for a code
-  // "reset"   -> enter the code + new password
-  // "done"    -> success, link back to login
   const [step, setStep] = useState("request");
 
   const [email, setEmail] = useState("");
@@ -29,9 +26,6 @@ const AdminForgotPassword = () => {
   const [info, setInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
-  // Set once the backend reports the 3-resend cap has been hit for this
-  // pending reset OTP; disables further resend attempts until the OTP
-  // naturally expires (or the user requests a fresh reset).
   const [resendLimitReached, setResendLimitReached] = useState(false);
 
   const resendCooldown = useResendCooldown({
@@ -191,7 +185,7 @@ const AdminForgotPassword = () => {
               <p className="text-[#171717] font-black text-lg leading-tight">
                 Admin Portal
               </p>
-              <p className="text-[#171717]/55 text-xs">
+              <p className="text-slate-600 text-xs">
                 Anaia's Motorcycle Rental
               </p>
             </div>
@@ -202,7 +196,7 @@ const AdminForgotPassword = () => {
               <h1 className="text-2xl font-black text-[#171717] tracking-tight mb-1">
                 Forgot Password
               </h1>
-              <p className="text-slate-400 text-sm mb-6">
+              <p className="text-slate-600 text-sm mb-6">
                 Enter your admin email and we'll send you a reset code.
               </p>
 
@@ -212,10 +206,14 @@ const AdminForgotPassword = () => {
                 noValidate
               >
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                  <label
+                    htmlFor="email"
+                    className="block text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase mb-1.5"
+                  >
                     Admin Email
                   </label>
                   <input
+                    id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -241,7 +239,7 @@ const AdminForgotPassword = () => {
 
                 <Link
                   to="/login"
-                  className="block text-center text-xs font-semibold text-slate-400 hover:text-[#b50002] transition-colors"
+                  className="block text-center text-xs font-semibold text-slate-600 hover:text-[#b50002] transition-colors"
                 >
                   Back to Sign In
                 </Link>
@@ -254,7 +252,7 @@ const AdminForgotPassword = () => {
               <h1 className="text-2xl font-black text-[#171717] tracking-tight mb-1">
                 Enter Reset Code
               </h1>
-              <p className="text-slate-400 text-sm mb-6">
+              <p className="text-slate-600 text-sm mb-6">
                 {info ||
                   `Enter the code sent to ${email} and choose a new password.`}
               </p>
@@ -265,10 +263,14 @@ const AdminForgotPassword = () => {
                 noValidate
               >
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                  <label
+                    htmlFor="otp"
+                    className="block text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase mb-1.5"
+                  >
                     Reset Code
                   </label>
                   <input
+                    id="otp"
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
@@ -279,60 +281,68 @@ const AdminForgotPassword = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                  <label
+                    htmlFor="newPassword"
+                    className="block text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase mb-1.5"
+                  >
                     New Password
                   </label>
                   <div className="relative">
                     <input
+                      id="newPassword"
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className={`${INPUT_CLASSES} pr-10`}
+                      className={`${INPUT_CLASSES} pr-12`}
                       autoComplete="new-password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
                     >
                       {showPassword ? (
-                        <FaEyeSlash className="text-sm" />
+                        <FaEyeSlash className="text-lg" />
                       ) : (
-                        <FaEye className="text-sm" />
+                        <FaEye className="text-lg" />
                       )}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5">
+                  <label
+                    htmlFor="confirmPassword"
+                    className="block text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase mb-1.5"
+                  >
                     Confirm Password
                   </label>
                   <div className="relative">
                     <input
+                      id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className={`${INPUT_CLASSES} pr-10`}
+                      className={`${INPUT_CLASSES} pr-12`}
                       autoComplete="new-password"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
                       aria-label={
                         showConfirmPassword ? "Hide password" : "Show password"
                       }
                     >
                       {showConfirmPassword ? (
-                        <FaEyeSlash className="text-sm" />
+                        <FaEyeSlash className="text-lg" />
                       ) : (
-                        <FaEye className="text-sm" />
+                        <FaEye className="text-lg" />
                       )}
                     </button>
                   </div>
@@ -350,7 +360,7 @@ const AdminForgotPassword = () => {
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                  <p className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2.5">
+                  <p className="text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase mb-2.5">
                     Password Rules
                   </p>
                   <div className="space-y-1.5">
@@ -360,12 +370,12 @@ const AdminForgotPassword = () => {
                         <p
                           key={rule}
                           className={`text-xs flex items-center gap-2 font-medium ${
-                            met ? "text-emerald-600" : "text-slate-400"
+                            met ? "text-emerald-600" : "text-slate-600"
                           }`}
                         >
                           <span
                             className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[9px]
-                              ${met ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-300"}`}
+                              ${met ? "bg-emerald-50 text-emerald-600" : "bg-slate-200 text-slate-500"}`}
                           >
                             {met ? <FaCheck /> : <FaTimes />}
                           </span>
@@ -392,7 +402,7 @@ const AdminForgotPassword = () => {
                       !isSubmitting &&
                       !resendLimitReached
                         ? "text-[#b50002] hover:brightness-110"
-                        : "text-slate-300 cursor-not-allowed"
+                        : "text-slate-500 cursor-not-allowed"
                     }`}
                   >
                     {resendLimitReached
@@ -434,7 +444,7 @@ const AdminForgotPassword = () => {
                     setInfo("");
                     setResendLimitReached(false);
                   }}
-                  className="block w-full text-center text-xs font-semibold text-slate-400 hover:text-[#b50002] transition-colors"
+                  className="block w-full text-center text-xs font-semibold text-slate-600 hover:text-[#b50002] transition-colors"
                 >
                   Back
                 </button>
@@ -447,7 +457,7 @@ const AdminForgotPassword = () => {
               <h1 className="text-2xl font-black text-[#171717] tracking-tight mb-1">
                 Password Reset
               </h1>
-              <p className="text-slate-400 text-sm mb-6">
+              <p className="text-slate-600 text-sm mb-6">
                 Your admin password has been updated. You can sign in with it
                 now.
               </p>

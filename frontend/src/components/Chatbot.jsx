@@ -109,6 +109,7 @@ export default function Chatbot() {
           for instant assistance.
           <button
             onClick={() => setShowTooltip(false)}
+            aria-label="Dismiss chatbot tooltip"
             className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X size={16} />
@@ -140,6 +141,7 @@ export default function Chatbot() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
+              aria-label="Close chatbot"
               className="p-1.5 rounded-lg transition-colors"
               style={{ color: themeGray }}
             >
@@ -201,6 +203,7 @@ export default function Chatbot() {
                 disabled={
                   !input.trim() || isTyping || input.trim().length > MAX_CHARS
                 }
+                aria-label="Send message"
                 className="bg-gray-100 text-gray-400 p-2.5 rounded-xl hover:text-white disabled:opacity-50 disabled:hover:bg-gray-100 disabled:hover:text-gray-400 transition-colors"
                 style={
                   input.trim() && !isTyping

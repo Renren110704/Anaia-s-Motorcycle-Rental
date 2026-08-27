@@ -161,6 +161,7 @@ export default function UserLiveChat() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
+              aria-label="Close live chat"
               className="p-1.5 rounded-lg text-white transition-colors"
             >
               <X size={20} />
@@ -234,6 +235,7 @@ export default function UserLiveChat() {
             <button
               onClick={handleSend}
               disabled={!input.trim()}
+              aria-label="Send message"
               className="bg-[#b50002] text-white p-2.5 rounded-xl disabled:opacity-50 transition-colors"
             >
               <Send size={18} />
@@ -244,6 +246,7 @@ export default function UserLiveChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          aria-label="Open live chat"
           className="w-14 h-14 rounded-full shadow-xl bg-[#b50002] text-white hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
         >
           <MessageCircle size={24} />

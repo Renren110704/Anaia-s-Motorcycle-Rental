@@ -54,7 +54,7 @@ const ITEMS_PER_PAGE = 10;
 
 // ── Shared styles (matching ManageMotorcycle) ─────────────────────────────────
 const labelCls =
-  "block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-1.5";
+  "block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-1.5";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const nextSortState = (cur) =>
@@ -325,7 +325,7 @@ const FullPaymentConfirmModal = ({
         </p>
 
         <div className="mb-6">
-          <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2">
+          <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-2">
             Payment Method (Full)
           </label>
           <select
@@ -362,7 +362,7 @@ const FullPaymentConfirmModal = ({
 
           {depositCollected && (
             <div className="mt-3">
-              <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase mb-2">
+              <label className="block text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase mb-2">
                 Deposit Collection Method
               </label>
               <select
@@ -392,7 +392,7 @@ const FullPaymentConfirmModal = ({
             className={`flex-1 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
               depositCollected
                 ? "bg-emerald-600 text-white shadow-emerald-600/30 hover:brightness-110"
-                : "bg-slate-200 text-slate-400 shadow-none cursor-not-allowed"
+                : "bg-slate-200 text-slate-500 shadow-none cursor-not-allowed"
             }`}
           >
             Confirm
@@ -459,7 +459,7 @@ const ReuploadCommentModal = ({
         <h3 className="text-lg font-black text-[#171717] mb-1">
           Request Re-upload
         </h3>
-        <p className="text-slate-400 text-sm mb-4">
+        <p className="text-slate-500 text-sm mb-4">
           Enter a clear reason so the renter knows what to fix.
         </p>
         <textarea
@@ -547,7 +547,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -618,13 +618,13 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronLeft className="text-xs" />
       </button>
       {withEllipsis.map((item, idx) =>
         item === "..." ? (
-          <span key={`e-${idx}`} className="px-2 text-slate-400 text-sm">
+          <span key={`e-${idx}`} className="px-2 text-slate-500 text-sm">
             …
           </span>
         ) : (
@@ -641,7 +641,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-400 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
+        className="p-2 rounded-xl border border-slate-100 bg-white text-slate-500 disabled:opacity-30 hover:border-[#b50002]/20 hover:text-[#b50002] transition-all shadow-sm"
       >
         <FaChevronRight className="text-xs" />
       </button>
@@ -651,13 +651,13 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  pending_reservation: "bg-amber-50 text-amber-600 border-amber-200",
-  pending_full_payment: "bg-orange-50 text-orange-600 border-orange-200",
-  pending: "bg-amber-50 text-amber-600 border-amber-200",
-  active: "bg-blue-50 text-blue-600 border-blue-200",
-  inspection: "bg-violet-50 text-violet-600 border-violet-200",
-  completed: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  cancelled: "bg-slate-50 text-slate-500 border-slate-200",
+  pending_reservation: "bg-amber-50 text-amber-700 border-amber-200",
+  pending_full_payment: "bg-orange-50 text-orange-700 border-orange-200",
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  active: "bg-blue-50 text-blue-700 border-blue-200",
+  inspection: "bg-violet-50 text-violet-700 border-violet-200",
+  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  cancelled: "bg-slate-50 text-slate-600 border-slate-200",
   rejected: "bg-red-50 text-[#b50002] border-red-200",
 };
 
@@ -690,10 +690,10 @@ const StatusBadge = ({ status, isDeleted }) => {
 
 // ── Payment Badge ─────────────────────────────────────────────────────────────
 const PAYMENT_STYLE = {
-  fully_paid: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  reservation_paid: "bg-orange-50 text-orange-600 border-orange-200",
-  pending_verification: "bg-amber-50 text-amber-600 border-amber-200",
-  pending: "bg-slate-50 text-slate-500 border-slate-200",
+  fully_paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  reservation_paid: "bg-orange-50 text-orange-700 border-orange-200",
+  pending_verification: "bg-amber-50 text-amber-700 border-amber-200",
+  pending: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
 const PaymentBadge = ({ paymentStatus }) => {
@@ -716,7 +716,7 @@ const EmptyState = ({ onReset }) => (
     <h3 className="font-black text-[#171717] text-lg mb-1">
       No bookings found
     </h3>
-    <p className="text-slate-400 text-sm mb-4">
+    <p className="text-slate-500 text-sm mb-4">
       Try adjusting your filters or search term
     </p>
     <button
@@ -827,7 +827,7 @@ const DetailDrawer = ({
   const Section = ({ title, children }) => (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-50">
-        <h3 className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+        <h3 className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
           {title}
         </h3>
       </div>
@@ -838,7 +838,7 @@ const DetailDrawer = ({
   const Row = ({ icon: Icon, label, value, valueClass = "" }) => (
     <div className="flex items-start gap-3">
       <Icon className="text-[#b50002] text-sm flex-shrink-0 mt-0.5" />
-      <span className="text-slate-400 text-xs w-28 flex-shrink-0 font-medium pt-0.5">
+      <span className="text-slate-500 text-xs w-28 flex-shrink-0 font-medium pt-0.5">
         {label}
       </span>
       <span
@@ -868,7 +868,7 @@ const DetailDrawer = ({
             <h2 className="font-black text-[#171717] text-lg leading-tight">
               {booking.customer}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {booking.motorcycle}
               {booking.unitId ? ` · ${booking.unitId}` : ""}
             </p>
@@ -877,7 +877,7 @@ const DetailDrawer = ({
             {/* ... existing action buttons ... */}
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors"
             >
               <FaTimes />
             </button>
@@ -941,7 +941,7 @@ const DetailDrawer = ({
                 )}
             </div>
             <div className="bg-[#171717] rounded-2xl p-4 flex flex-col justify-between">
-              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-1">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase mb-1">
                 Total Amount
               </p>
               <p className="text-3xl font-black text-white">
@@ -1005,7 +1005,7 @@ const DetailDrawer = ({
                     <FaMapMarkerAlt className="text-orange-400 text-xs" />
                     Distance Fee
                     {details.distanceTierLabel && (
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-slate-500">
                         ({details.distanceTierLabel})
                       </span>
                     )}
@@ -1060,7 +1060,7 @@ const DetailDrawer = ({
                     key={ext._id || idx}
                     className="flex items-center justify-between pl-4"
                   >
-                    <span className="text-slate-400 text-[11px]">
+                    <span className="text-slate-500 text-[11px]">
                       ↳ Promo ({ext.appliedDiscount.code}) on extension
                     </span>
                     <span className="font-semibold text-emerald-600 text-[11px]">
@@ -1139,7 +1139,7 @@ const DetailDrawer = ({
                 booking.status,
               ) &&
                 !booking.securityDeposit?.collected && (
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-slate-500 mt-1">
                     Plus a ₱1,000 refundable security deposit collected at
                     pickup.
                   </p>
@@ -1215,7 +1215,7 @@ const DetailDrawer = ({
                   </span>
                 )}
                 {booking.dailyRate > 0 && (
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     ₱{booking.dailyRate.toLocaleString()}/day
                   </p>
                 )}
@@ -1499,7 +1499,7 @@ const DetailDrawer = ({
                       </div>
                     )}
                     {booking.securityDeposit.refundReason && (
-                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                         {booking.securityDeposit.refundReason}
                       </p>
                     )}
@@ -1515,7 +1515,7 @@ const DetailDrawer = ({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaRoad className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">
+                  <span className="text-slate-500 text-xs font-medium">
                     Total Distance
                   </span>
                 </div>
@@ -1528,7 +1528,7 @@ const DetailDrawer = ({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">
+                  <span className="text-slate-500 text-xs font-medium">
                     Avg Speed
                   </span>
                 </div>
@@ -1541,7 +1541,7 @@ const DetailDrawer = ({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaTachometerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">
+                  <span className="text-slate-500 text-xs font-medium">
                     Max Speed
                   </span>
                 </div>
@@ -1554,7 +1554,7 @@ const DetailDrawer = ({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <FaMapMarkerAlt className="text-[#b50002] text-sm flex-shrink-0" />
-                  <span className="text-slate-400 text-xs font-medium">
+                  <span className="text-slate-500 text-xs font-medium">
                     Stops Made
                   </span>
                 </div>
@@ -1566,13 +1566,13 @@ const DetailDrawer = ({
               </div>
             </div>
             {booking.trackingSummary?.lastUpdatedAt && (
-              <p className="text-[10px] text-slate-400 mt-3 text-right">
+              <p className="text-[10px] text-slate-500 mt-3 text-right">
                 Last updated:{" "}
                 {formatDateTime(booking.trackingSummary.lastUpdatedAt)}
               </p>
             )}
             {!booking.trackingSummary && (
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1">
                 No tracking data recorded for this booking.
               </p>
             )}
@@ -1665,7 +1665,7 @@ const BookingTable = ({
                 <th
                   key={col.label}
                   onClick={col.sortable ? () => onColSort(col.key) : undefined}
-                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap
+                  className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap
                     ${col.sortable ? "cursor-pointer hover:text-slate-500 transition-colors select-none" : ""}`}
                 >
                   <span className="inline-flex items-center">
@@ -1709,7 +1709,7 @@ const BookingTable = ({
                   <p className="font-black text-[13px] text-[#171717] leading-tight">
                     {booking.customer}
                   </p>
-                  <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                  <p className="text-[11px] text-slate-500 truncate max-w-[140px]">
                     {booking.email}
                   </p>
                 </td>
@@ -1899,7 +1899,7 @@ const EditStatusModal = ({
         <h3 className="text-lg font-black text-[#171717] mb-1">
           Edit Booking Status
         </h3>
-        <p className="text-slate-400 text-sm mb-4">
+        <p className="text-slate-500 text-sm mb-4">
           Select the new status for this booking.
         </p>
         <select
@@ -2533,7 +2533,7 @@ const MotorcycleBooking = () => {
       label: "Pending Reservation",
       value: counts.pendingReservation,
       sub: "Awaiting confirmation",
-      subColor: "text-amber-500",
+      subColor: "text-amber-700",
       icon: Clock,
       accent: "bg-amber-500",
       status: "pending_reservation",
@@ -2542,7 +2542,7 @@ const MotorcycleBooking = () => {
       label: "Pending Full Payment",
       value: counts.pendingFullPayment,
       sub: "Awaiting full payment",
-      subColor: "text-orange-500",
+      subColor: "text-orange-700",
       icon: CreditCard,
       accent: "bg-orange-500",
       status: "pending_full_payment",
@@ -2551,7 +2551,7 @@ const MotorcycleBooking = () => {
       label: "Active",
       value: counts.active,
       sub: "Currently rented",
-      subColor: "text-blue-500",
+      subColor: "text-blue-700",
       icon: CheckCircle2,
       accent: "bg-blue-500",
       status: "active",
@@ -2560,7 +2560,7 @@ const MotorcycleBooking = () => {
       label: "Inspection",
       value: counts.inspection,
       sub: "Under review",
-      subColor: "text-violet-500",
+      subColor: "text-violet-700",
       icon: ClipboardList,
       accent: "bg-violet-500",
       status: "inspection",
@@ -2569,7 +2569,7 @@ const MotorcycleBooking = () => {
       label: "Completed",
       value: counts.completed,
       sub: "Successfully closed",
-      subColor: "text-emerald-500",
+      subColor: "text-emerald-700",
       icon: CheckCircle2,
       accent: "bg-emerald-500",
       status: "completed",
@@ -2578,7 +2578,7 @@ const MotorcycleBooking = () => {
       label: "Cancelled",
       value: counts.cancelled,
       sub: "Cancelled by user",
-      subColor: "text-slate-400",
+      subColor: "text-slate-700",
       icon: XCircle,
       accent: "bg-slate-400",
       status: "cancelled",
@@ -2587,7 +2587,7 @@ const MotorcycleBooking = () => {
       label: "Rejected",
       value: counts.rejected,
       sub: "Soft rejected",
-      subColor: "text-slate-400",
+      subColor: "text-slate-700",
       icon: Trash2,
       accent: "bg-slate-400",
       status: "rejected",
@@ -2598,14 +2598,14 @@ const MotorcycleBooking = () => {
     statCards.find((s) => s.status === selectedStatus)?.label ?? selectedStatus;
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Booking Dashboard
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             Monitor payment flow, verify receipts, and manage booking lifecycle.
           </p>
         </div>
@@ -2676,7 +2676,7 @@ const MotorcycleBooking = () => {
 
               {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400">
+                  <span className="text-xs font-bold text-slate-500">
                     {selectedIds.size} selected
                   </span>
                   {getBulkActionsForStatus(selectedStatus).map((actionKey) => {
@@ -2703,7 +2703,7 @@ const MotorcycleBooking = () => {
 
         {/* Result count */}
         <div className="flex items-center justify-between px-1 mb-4">
-          <p className="text-[11px] text-slate-400 font-semibold">
+          <p className="text-[11px] text-slate-700 font-semibold">
             Showing{" "}
             {filteredBookings.length === 0
               ? 0
@@ -2809,7 +2809,7 @@ const MotorcycleBooking = () => {
           onConfirm={submitFullPayment}
         />
       )}
-    </div>
+    </main>
   );
 };
 

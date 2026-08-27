@@ -70,7 +70,7 @@ const Footer = () => {
           display: block;
         }
           .ft-desc {
-          font-size: 13px; color: rgba(0,0,0,0.5);
+          font-size: 13px; color: rgba(0,0,0,0.65);
           line-height: 1.75; font-family: 'Space Grotesk', sans-serif;
         }
         .ft-socials {
@@ -106,7 +106,7 @@ const Footer = () => {
         /* ── quick links ── */
         .ft-links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; }
         .ft-link {
-          font-size: 13.5px; color: rgba(0,0,0,0.55);
+          font-size: 13.5px; color: rgba(0,0,0,0.65);
           text-decoration: none; display: flex; align-items: center; gap: 9px;
           font-family: 'Space Grotesk', sans-serif;
           transition: color 0.18s;
@@ -123,7 +123,7 @@ const Footer = () => {
         .ft-contact-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 13px; }
         .ft-contact-item {
           display: flex; align-items: flex-start; gap: 10px;
-          font-size: 13px; color: rgba(0,0,0,0.55); line-height: 1.55;
+          font-size: 13px; color: rgba(0,0,0,0.65); line-height: 1.55;
           font-family: 'Space Grotesk', sans-serif;
         }
         .ft-contact-icon { color: #b50002; font-size: 14px; margin-top: 2px; flex-shrink: 0; }
@@ -138,18 +138,18 @@ const Footer = () => {
         .ft-hours-title {
           font-size: 10px; font-weight: 700;
           letter-spacing: 1.5px; text-transform: uppercase;
-          color: rgba(0,0,0,0.3); margin-bottom: 8px;
+          color: rgba(0,0,0,0.62); margin-bottom: 8px;
           font-family: 'Space Grotesk', sans-serif;
         }
         .ft-hours p {
-          font-size: 12.5px; color: rgba(0,0,0,0.5);
+          font-size: 12.5px; color: rgba(0,0,0,0.65);
           line-height: 1.75; margin: 0;
           font-family: 'Space Grotesk', sans-serif;
         }
 
         /* ── newsletter ── */
         .ft-nl-desc {
-          font-size: 13px; color: rgba(0,0,0,0.5);
+          font-size: 13px; color: rgba(0,0,0,0.65);
           line-height: 1.7; margin-bottom: 16px;
           font-family: 'Space Grotesk', sans-serif;
         }
@@ -183,7 +183,7 @@ const Footer = () => {
           padding-top: 24px;
           display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 8px;
-          font-size: 12px; color: rgba(0,0,0,0.35);
+          font-size: 12px; color: rgba(0,0,0,0.6);
           font-family: 'Space Grotesk', sans-serif;
         }
         .ft-designer {
@@ -210,18 +210,21 @@ const Footer = () => {
                   {
                     Icon: FaFacebookF,
                     href: "https://www.facebook.com/anaiasmotorcyclerental",
+                    label: "Visit Anaia's Motorcycle Rental on Facebook",
                   },
                   {
                     Icon: FaTiktok,
                     href: "https://www.tiktok.com/@anaiasmotorcyclerental",
+                    label: "Visit Anaia's Motorcycle Rental on TikTok",
                   },
-                ].map(({ Icon, href }, i) => (
+                ].map(({ Icon, href, label }, i) => (
                   <a
                     key={i}
                     href={href}
                     className="ft-social"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={label}
                   >
                     <Icon />
                   </a>

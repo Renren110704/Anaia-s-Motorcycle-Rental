@@ -62,7 +62,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -86,39 +86,39 @@ const StatCard = ({
 const STATUS_MAP = {
   pending_reservation: {
     label: "Pending",
-    cls: "bg-amber-50  text-amber-600  border-amber-200",
+    cls: "bg-amber-50  text-amber-800  border-amber-200", // Updated text
   },
   pending_full_payment: {
     label: "Pending Payment",
-    cls: "bg-orange-50 text-orange-600 border-orange-200",
+    cls: "bg-orange-50 text-orange-800 border-orange-200", // Updated text
   },
   active: {
     label: "On Rent",
-    cls: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    cls: "bg-emerald-50 text-emerald-800 border-emerald-200", // Updated text
   },
   on_rent: {
     label: "On Rent",
-    cls: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    cls: "bg-emerald-50 text-emerald-800 border-emerald-200", // Updated text
   },
   inspection: {
     label: "Inspection",
-    cls: "bg-violet-50 text-violet-600 border-violet-200",
+    cls: "bg-violet-50 text-violet-800 border-violet-200", // Updated text
   },
   returned: {
     label: "Returned",
-    cls: "bg-orange-50 text-orange-600 border-orange-200",
+    cls: "bg-orange-50 text-orange-800 border-orange-200", // Updated text
   },
   completed: {
     label: "Completed",
-    cls: "bg-slate-50  text-slate-500  border-slate-200",
+    cls: "bg-slate-50  text-slate-700  border-slate-200", // Updated text
   },
   reserved: {
     label: "Reserved",
-    cls: "bg-blue-50   text-blue-600   border-blue-200",
+    cls: "bg-blue-50   text-blue-800   border-blue-200", // Updated text
   },
   cancelled: {
     label: "Cancelled",
-    cls: "bg-red-50    text-[#b50002]  border-red-200",
+    cls: "bg-red-50    text-[#b50002]  border-red-200", // Already high contrast
   },
 };
 
@@ -150,7 +150,7 @@ const QuickAction = ({ to, icon: Icon, title, desc, accent }) => (
     </div>
     <div className="flex-1 min-w-0">
       <p className="font-bold text-[#171717] text-sm leading-tight">{title}</p>
-      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{desc}</p>
+      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{desc}</p>
     </div>
     <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-[#b50002] group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
   </Link>
@@ -236,7 +236,7 @@ const Dashboard = () => {
       label: "Total Bookings",
       value: bookings.length,
       sub: "All records",
-      subColor: "text-slate-400",
+      subColor: "text-slate-600",
       icon: Activity,
       accent: "bg-violet-500",
     },
@@ -244,7 +244,7 @@ const Dashboard = () => {
       label: "Active Rentals",
       value: active,
       sub: `${bookings.length ? Math.round((active / bookings.length) * 100) : 0}% fleet utilization`,
-      subColor: "text-emerald-500",
+      subColor: "text-emerald-700",
       icon: TrendingUp,
       accent: "bg-emerald-500",
     },
@@ -252,7 +252,7 @@ const Dashboard = () => {
       label: "Pending Reservations",
       value: pending,
       sub: pending > 0 ? "Awaiting confirmation" : "All confirmed",
-      subColor: pending > 0 ? "text-amber-500" : "text-slate-400",
+      subColor: pending > 0 ? "text-amber-700" : "text-slate-600",
       icon: Clock,
       accent: "bg-amber-500",
     },
@@ -260,7 +260,7 @@ const Dashboard = () => {
       label: "Need Inspection",
       value: returned,
       sub: returned > 0 ? "Needs attention" : "All clear",
-      subColor: returned > 0 ? "text-orange-500" : "text-emerald-500",
+      subColor: returned > 0 ? "text-orange-700" : "text-emerald-700",
       icon: AlertTriangle,
       accent: "bg-orange-500",
     },
@@ -268,14 +268,14 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Dashboard
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Here's what's happening with your fleet today.
             </p>
           </div>
@@ -309,7 +309,7 @@ const Dashboard = () => {
                 <h2 className="font-black text-[#171717] text-[15px]">
                   Recent Activity
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Latest bookings & transactions
                 </p>
               </div>
@@ -327,7 +327,7 @@ const Dashboard = () => {
                     {["Unit", "Customer", "Status", "Date"].map((h, i) => (
                       <th
                         key={h}
-                        className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3${i === 3 ? " hidden sm:table-cell" : ""}`}
+                        className={`text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3${i === 3 ? " hidden sm:table-cell" : ""}`}
                       >
                         {h}
                       </th>
@@ -341,7 +341,7 @@ const Dashboard = () => {
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-5 py-10 text-center text-slate-300 text-sm"
+                        className="px-5 py-10 text-center text-slate-500 text-sm"
                       >
                         No bookings yet.
                       </td>
@@ -362,7 +362,7 @@ const Dashboard = () => {
                                   {unitId}
                                 </p>
                                 {title && (
-                                  <p className="text-[11px] text-slate-400">
+                                  <p className="text-[11px] text-slate-500">
                                     {title}
                                   </p>
                                 )}
@@ -372,7 +372,7 @@ const Dashboard = () => {
                                 {title}
                               </p>
                             ) : (
-                              <span className="text-slate-300 text-sm">—</span>
+                              <span className="text-slate-500 text-sm">—</span>
                             )}
                           </td>
                           <td className="px-5 py-3.5 text-[13px] text-slate-600 whitespace-nowrap font-medium">
@@ -381,7 +381,7 @@ const Dashboard = () => {
                           <td className="px-5 py-3.5">
                             <StatusBadge status={b.status} />
                           </td>
-                          <td className="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap hidden sm:table-cell">
+                          <td className="px-5 py-3.5 text-xs text-slate-500 whitespace-nowrap hidden sm:table-cell">
                             {fmtDate(b.createdAt || b.bookingDate)}
                           </td>
                         </tr>
@@ -475,7 +475,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

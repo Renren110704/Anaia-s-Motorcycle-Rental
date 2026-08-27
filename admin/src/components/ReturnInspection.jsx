@@ -135,9 +135,9 @@ const confirmModal = (message, { isPermanent = false, confirmLabel } = {}) =>
 
 // ── Clearance badge ────────────────────────────────────────────────────────
 const CLEARANCE_STYLE = {
-  cleared: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  cleared: "bg-emerald-50 text-emerald-700 border-emerald-200",
   penalty_required: "bg-red-50 text-[#b50002] border-red-200",
-  pending_inspection: "bg-violet-50 text-violet-600 border-violet-200",
+  pending_inspection: "bg-violet-50 text-violet-700 border-violet-200",
 };
 
 const ClearanceBadge = ({ status }) => {
@@ -173,7 +173,7 @@ const StatCard = ({
       className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
     />
     <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+      <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
         {label}
       </p>
       <div
@@ -219,7 +219,7 @@ const PanelSection = ({
     <div className="flex items-center justify-between gap-2 mb-3">
       <div className="flex items-center gap-2">
         <Icon className={`w-3.5 h-3.5 ${accent}`} />
-        <p className="text-[10px] font-black tracking-[0.15em] text-slate-400 uppercase">
+        <p className="text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase">
           {title}
         </p>
       </div>
@@ -774,7 +774,7 @@ const ReturnInspection = () => {
       label: "In Inspection",
       value: counts.inspection,
       sub: "Awaiting clearance",
-      subColor: "text-amber-500",
+      subColor: "text-amber-700",
       icon: Wrench,
       accent: "bg-amber-500",
       status: "inspection",
@@ -783,7 +783,7 @@ const ReturnInspection = () => {
       label: "Active Rentals",
       value: counts.active,
       sub: "Can start inspection",
-      subColor: "text-blue-500",
+      subColor: "text-blue-700",
       icon: FaMotorcycle,
       accent: "bg-blue-500",
       status: "active",
@@ -791,14 +791,14 @@ const ReturnInspection = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
             Return Inspection
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-700 text-sm mt-1">
             Move active rentals into inspection and record clearance outcomes.
           </p>
         </div>
@@ -818,7 +818,7 @@ const ReturnInspection = () => {
           <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 overflow-hidden">
             <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl bg-emerald-500" />
             <div className="flex items-start justify-between mb-3">
-              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
                 Cleared
               </p>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500 bg-opacity-10">
@@ -828,14 +828,14 @@ const ReturnInspection = () => {
             <p className="text-[2.2rem] font-black text-[#171717] leading-none mb-2">
               {counts.cleared}
             </p>
-            <p className="text-[11px] font-semibold text-emerald-500">
+            <p className="text-[11px] font-semibold text-emerald-700">
               Released units
             </p>
           </div>
           <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 overflow-hidden">
             <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl bg-violet-500" />
             <div className="flex items-start justify-between mb-3">
-              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
                 Pending
               </p>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-500 bg-opacity-10">
@@ -845,7 +845,7 @@ const ReturnInspection = () => {
             <p className="text-[2.2rem] font-black text-[#171717] leading-none mb-2">
               {counts.pending}
             </p>
-            <p className="text-[11px] font-semibold text-violet-500">
+            <p className="text-[11px] font-semibold text-violet-700">
               Needs review
             </p>
           </div>
@@ -879,7 +879,7 @@ const ReturnInspection = () => {
 
             {/* Result count */}
             <div className="flex items-center px-1">
-              <p className="text-[11px] text-slate-400 font-semibold">
+              <p className="text-[11px] text-slate-600 font-semibold">
                 Showing{" "}
                 <span className="text-[#171717] font-black">
                   {filteredBookings.length}
@@ -904,7 +904,7 @@ const ReturnInspection = () => {
                       ].map((col) => (
                         <th
                           key={col}
-                          className="text-left text-[10px] font-black tracking-[0.15em] text-slate-300 uppercase px-5 py-3 whitespace-nowrap"
+                          className="text-left text-[10px] font-black tracking-[0.15em] text-slate-500 uppercase px-5 py-3 whitespace-nowrap"
                         >
                           {col}
                         </th>
@@ -923,7 +923,7 @@ const ReturnInspection = () => {
                           <p className="font-black text-[#171717] text-sm mb-1">
                             No bookings found
                           </p>
-                          <p className="text-slate-400 text-xs">
+                          <p className="text-slate-500 text-xs">
                             Try adjusting your search or status filter
                           </p>
                         </td>
@@ -940,7 +940,7 @@ const ReturnInspection = () => {
                             <p className="font-black text-[13px] text-[#171717] leading-tight">
                               {booking.customer}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate max-w-[160px]">
+                            <p className="text-[11px] text-slate-500 truncate max-w-[160px]">
                               {booking.email}
                             </p>
                           </td>
@@ -1051,7 +1051,7 @@ const ReturnInspection = () => {
                           <h3 className="font-black text-[#171717] text-[14px] leading-tight truncate">
                             {selectedBooking.customer}
                           </h3>
-                          <p className="text-[11px] text-slate-400 truncate">
+                          <p className="text-[11px] text-slate-500 truncate">
                             {selectedBooking.motorcycleName}
                             {selectedBooking.unitId
                               ? ` · ${selectedBooking.unitId}`
@@ -1062,7 +1062,7 @@ const ReturnInspection = () => {
 
                       <button
                         onClick={() => setSelectedId(null)}
-                        className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors flex-shrink-0"
+                        className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors flex-shrink-0"
                       >
                         <FaTimes />
                       </button>
@@ -1153,7 +1153,7 @@ const ReturnInspection = () => {
                               </p>
                             )}
                             {selectedBooking.securityDeposit.refundReason && (
-                              <p className="text-[11px] text-slate-400 px-1">
+                              <p className="text-[11px] text-slate-500 px-1">
                                 {selectedBooking.securityDeposit.refundReason}
                               </p>
                             )}
@@ -1203,7 +1203,7 @@ const ReturnInspection = () => {
                             )}
 
                             {clearanceStatus === "pending_inspection" && (
-                              <p className="text-[11px] text-slate-400 px-1">
+                              <p className="text-[11px] text-slate-500 px-1">
                                 Refund is determined automatically once the
                                 booking is cleared or a penalty is settled.
                               </p>
@@ -1254,7 +1254,7 @@ const ReturnInspection = () => {
                                         {item.label}
                                       </span>
                                     </span>
-                                    <span className="text-xs font-bold text-slate-400 flex-shrink-0">
+                                    <span className="text-xs font-bold text-slate-500 flex-shrink-0">
                                       {item.kind === "flat" && peso(item.rate)}
                                       {item.kind === "per_unit" &&
                                         `${peso(item.rate)}/${item.unitLabel}`}
@@ -1268,7 +1268,7 @@ const ReturnInspection = () => {
                                     (item.kind === "per_unit" ||
                                       item.kind === "per_hour") && (
                                       <div className="flex items-center justify-between gap-3 mt-2 pl-6.5">
-                                        <span className="text-[11px] text-slate-400 font-semibold">
+                                        <span className="text-[11px] text-slate-500 font-semibold">
                                           {item.kind === "per_unit"
                                             ? `Number of ${item.unitLabel}s`
                                             : `Hours late`}
@@ -1291,7 +1291,7 @@ const ReturnInspection = () => {
 
                                   {checked && item.kind === "custom" && (
                                     <div className="flex items-center justify-between gap-3 mt-2 pl-6.5">
-                                      <span className="text-[11px] text-slate-400 font-semibold">
+                                      <span className="text-[11px] text-slate-500 font-semibold">
                                         {item.hint}
                                       </span>
                                       <div className="relative">
@@ -1383,7 +1383,7 @@ const ReturnInspection = () => {
                           <label className="block cursor-pointer">
                             <div className="w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-[#b50002]/30 transition-colors p-4 text-center">
                               <FaImages className="text-slate-300 text-xl mx-auto mb-1.5" />
-                              <p className="text-xs text-slate-400 font-semibold">
+                              <p className="text-xs text-slate-500 font-semibold">
                                 {penaltyFiles.length > 0
                                   ? "Click to add more photos"
                                   : "Click to upload photos"}
@@ -1404,7 +1404,7 @@ const ReturnInspection = () => {
                           {/* Already-uploaded photos (saved on the booking) */}
                           {visiblePenaltyPhotos.length > 0 && (
                             <div className="mt-3">
-                              <p className="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase mb-1.5">
+                              <p className="text-[10px] font-bold tracking-[0.1em] text-slate-500 uppercase mb-1.5">
                                 Uploaded
                               </p>
                               <div className="grid grid-cols-3 gap-2">
@@ -1441,7 +1441,7 @@ const ReturnInspection = () => {
                           {/* Newly picked photos, pending upload */}
                           {penaltyFilePreviews.length > 0 && (
                             <div className="mt-3">
-                              <p className="text-[10px] font-bold tracking-[0.1em] text-slate-400 uppercase mb-1.5">
+                              <p className="text-[10px] font-bold tracking-[0.1em] text-slate-500 uppercase mb-1.5">
                                 {penaltyFilePreviews.length} new photo
                                 {penaltyFilePreviews.length > 1 ? "s" : ""}{" "}
                                 pending upload
@@ -1528,13 +1528,13 @@ const ReturnInspection = () => {
             {/* Matrix Rates Card */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-[#171717] text-[14px]">
+                <h2 className="font-black text-[#171717] text-[14px]">
                   Inspection Rates
-                </h3>
+                </h2>
                 <button
                   type="button"
                   onClick={openRateEditor}
-                  className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-[#b50002] transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-[#b50002] transition-colors"
                   title="Customize rates"
                 >
                   <Settings className="w-3 h-3" />
@@ -1564,9 +1564,9 @@ const ReturnInspection = () => {
 
             {/* Legend / info card */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-black text-[#171717] text-[14px] mb-3">
+              <h2 className="font-black text-[#171717] text-[14px] mb-3">
                 Clearance Guide
-              </h3>
+              </h2>
               <div className="space-y-2.5">
                 {[
                   {
@@ -1584,7 +1584,7 @@ const ReturnInspection = () => {
                 ].map(({ status, desc }) => (
                   <div key={status} className="flex items-start gap-2.5">
                     <ClearanceBadge status={status} />
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">
                       {desc}
                     </p>
                   </div>
@@ -1634,7 +1634,7 @@ const ReturnInspection = () => {
                 <h3 className="text-sm font-black text-[#171717]">
                   Customize Inspection Matrix Rates
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Applies to all future inspections
                 </p>
               </div>
@@ -1650,13 +1650,13 @@ const ReturnInspection = () => {
                     <span className="text-sm font-semibold text-[#171717]">
                       {item.label}
                       {item.kind === "per_unit" && (
-                        <span className="text-slate-400 font-normal">
+                        <span className="text-slate-500 font-normal">
                           {" "}
                           / {item.unitLabel}
                         </span>
                       )}
                       {item.kind === "per_hour" && (
-                        <span className="text-slate-400 font-normal">
+                        <span className="text-slate-500 font-normal">
                           {" "}
                           / hour
                         </span>
@@ -1722,7 +1722,7 @@ const ReturnInspection = () => {
         theme="light"
         icon={false}
       />
-    </div>
+    </main>
   );
 };
 

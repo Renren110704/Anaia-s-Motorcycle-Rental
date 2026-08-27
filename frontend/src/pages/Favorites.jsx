@@ -192,7 +192,7 @@ const Favorites = () => {
         }
       `}</style>
 
-      <div className="fav-page">
+      <main className="fav-page">
         <div className="fav-inner">
           <button onClick={() => navigate(-1)} className="fav-back-btn">
             <FaArrowLeft style={{ fontSize: 11 }} /> Back
@@ -312,7 +312,7 @@ const Favorites = () => {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </>
   );
 };

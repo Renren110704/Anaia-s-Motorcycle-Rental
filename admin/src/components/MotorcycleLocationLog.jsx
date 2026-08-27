@@ -194,10 +194,10 @@ const EmptyState = ({ onRefresh }) => (
     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
       <FaMotorcycle className="text-slate-200 text-3xl" />
     </div>
-    <h3 className="font-black text-[#171717] text-lg mb-1">
+    <h2 className="font-black text-[#171717] text-lg mb-1">
       No location history yet
-    </h3>
-    <p className="text-slate-400 text-sm mb-4">
+    </h2>
+    <p className="text-slate-500 text-sm mb-4">
       Start GPS tracking or refresh after active booking updates.
     </p>
     <button
@@ -321,7 +321,7 @@ const MotorcycleLocationLog = () => {
   }).length;
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header — matches ManageMotorcycle */}
         <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
@@ -329,7 +329,7 @@ const MotorcycleLocationLog = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Location Log
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Last known location snapshots per unit · refreshes every 10
               seconds
             </p>
@@ -363,7 +363,7 @@ const MotorcycleLocationLog = () => {
               label: "Total Entries",
               value: loading ? null : sortedLogs.length,
               sub: "Unique units logged",
-              subColor: "text-slate-400",
+              subColor: "text-slate-600",
               accent: "bg-blue-500",
               icon: FaMotorcycle,
             },
@@ -371,7 +371,7 @@ const MotorcycleLocationLog = () => {
               label: "Live GPS",
               value: loading ? null : liveCount,
               sub: "Traccar transmitting",
-              subColor: "text-violet-500",
+              subColor: "text-violet-700",
               accent: "bg-violet-500",
               icon: FaSatelliteDish,
             },
@@ -379,7 +379,7 @@ const MotorcycleLocationLog = () => {
               label: "GPS Snapshots",
               value: loading ? null : gpsCount,
               sub: "Last known position",
-              subColor: "text-blue-500",
+              subColor: "text-blue-700",
               accent: "bg-emerald-500",
               icon: MapPin,
             },
@@ -392,7 +392,7 @@ const MotorcycleLocationLog = () => {
                 className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10 blur-xl ${accent}`}
               />
               <div className="flex items-start justify-between mb-3">
-                <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+                <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
                   {label}
                 </p>
                 <div
@@ -493,7 +493,7 @@ const MotorcycleLocationLog = () => {
                         <p className="font-black text-[13px] text-[#171717] leading-tight">
                           {log.motorcycleName}
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-slate-500 mt-0.5">
                           {log.customer || "No rider info"}
                         </p>
                       </td>
@@ -546,7 +546,7 @@ const MotorcycleLocationLog = () => {
 
             {/* Footer count */}
             <div className="px-5 py-3 border-t border-slate-50 flex items-center justify-between">
-              <p className="text-[11px] text-slate-400 font-semibold">
+              <p className="text-[11px] text-slate-500 font-semibold">
                 Showing{" "}
                 <span className="text-[#171717] font-black">
                   {sortedLogs.length}
@@ -555,7 +555,7 @@ const MotorcycleLocationLog = () => {
               </p>
               <button
                 onClick={loadLogs}
-                className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-[#b50002] transition-colors"
+                className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-[#b50002] transition-colors"
               >
                 <FaSync className="text-[10px]" /> Refresh
               </button>
@@ -563,7 +563,7 @@ const MotorcycleLocationLog = () => {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 };
 

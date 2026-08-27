@@ -44,17 +44,17 @@ const TONES = {
     badgeBg: "bg-red-50 border-red-100",
   },
   success: {
-    dot: "bg-emerald-600",
-    icon: "text-emerald-600",
+    dot: "bg-emerald-600", // Keep dot bright for visual pop
+    icon: "text-emerald-700", // Darkened
     iconBg: "bg-emerald-50",
-    text: "text-emerald-600",
+    text: "text-emerald-700", // Darkened
     badgeBg: "bg-emerald-50 border-emerald-100",
   },
   warning: {
-    dot: "bg-amber-600",
-    icon: "text-amber-600",
+    dot: "bg-amber-600", // Keep dot bright
+    icon: "text-amber-800", // Darkened for contrast
     iconBg: "bg-amber-50",
-    text: "text-amber-600",
+    text: "text-amber-800", // Darkened for contrast
     badgeBg: "bg-amber-50 border-amber-100",
   },
   info: {
@@ -144,7 +144,7 @@ const StatCard = ({
         className={`absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-[0.07] blur-xl ${t.dot}`}
       />
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase">
+        <p className="text-[10px] font-bold tracking-[0.15em] text-slate-500 uppercase">
           {label}
         </p>
         <div
@@ -199,7 +199,7 @@ const UnitRankRow = ({ rank, label, count, share }) => (
         </span>
         <span className="text-[12px] font-black text-slate-600 whitespace-nowrap">
           {count.toLocaleString()}{" "}
-          <span className="text-slate-400 font-semibold">({share}%)</span>
+          <span className="text-slate-500 font-semibold">({share}%)</span>
         </span>
       </div>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -233,7 +233,7 @@ const DonutChart = ({ items }) => {
   const total = items.reduce((s, x) => s + Number(x.count || 0), 0);
   if (!total)
     return (
-      <p className="text-sm text-slate-400 py-4 text-center">
+      <p className="text-sm text-slate-500 py-4 text-center">
         No data available
       </p>
     );
@@ -257,7 +257,7 @@ const DonutChart = ({ items }) => {
         >
           <div className="absolute inset-[14px] rounded-full bg-white border border-slate-100 flex items-center justify-center text-center">
             <div>
-              <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+              <p className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
                 Total
               </p>
               <p className="text-2xl font-black text-[#171717] leading-none">
@@ -289,7 +289,7 @@ const DonutChart = ({ items }) => {
               </div>
               <span className="text-[#171717] font-black whitespace-nowrap">
                 {count}{" "}
-                <span className="text-slate-400 font-semibold">({pct}%)</span>
+                <span className="text-slate-500 font-semibold">({pct}%)</span>
               </span>
             </div>
           );
@@ -303,7 +303,7 @@ const DonutChart = ({ items }) => {
 const Sparkline = ({ items }) => {
   if (!items.length)
     return (
-      <p className="text-sm text-slate-400 py-4 text-center">
+      <p className="text-sm text-slate-500 py-4 text-center">
         No data available
       </p>
     );
@@ -356,7 +356,7 @@ const Sparkline = ({ items }) => {
           );
         })}
       </svg>
-      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
         {visibleLabels.map((item) => (
           <span key={item.label}>{item.label}</span>
         ))}
@@ -886,7 +886,7 @@ const AdminAnalytics = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa]">
+    <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* ── Header ── */}
         <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
@@ -894,7 +894,7 @@ const AdminAnalytics = () => {
             <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
               Data Analytics
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-700 text-sm mt-1">
               Monitor booking demand, payment health, and fleet movement.
             </p>
           </div>
@@ -902,7 +902,7 @@ const AdminAnalytics = () => {
             {/* ── Export CSV → opens modal ── */}
             <button
               onClick={() => setCsvModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
             >
               <FaFileExport className="text-[10px]" /> Export CSV
             </button>
@@ -910,7 +910,7 @@ const AdminAnalytics = () => {
             {/* ── Print Report → opens modal ── */}
             <button
               onClick={() => setPrintModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:border-[#b50002]/20 hover:text-[#b50002] transition-all"
             >
               <FaPrint className="text-[10px]" /> Print Report
             </button>
@@ -932,13 +932,14 @@ const AdminAnalytics = () => {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5">
               <FaFilter className="text-slate-300 text-[10px]" />
-              <span className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase">
+              <span className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase">
                 Filter Period
               </span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div>
                 <select
+                  aria-label="Select Year"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
                   className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
@@ -953,6 +954,7 @@ const AdminAnalytics = () => {
               </div>
               <div>
                 <select
+                  aria-label="Select Month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
@@ -983,7 +985,7 @@ const AdminAnalytics = () => {
           {/* Active period indicator */}
           {(selectedYear !== "all" || selectedMonth !== "all") && (
             <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
-              <p className="text-[11px] text-slate-400 font-semibold">
+              <p className="text-[11px] text-slate-500 font-semibold">
                 Showing data for:{" "}
                 <span className="text-[#171717] font-black">
                   {selectedPeriodLabel}
@@ -1023,9 +1025,9 @@ const AdminAnalytics = () => {
           {/* Left: charts — 3/4 */}
           <div className="xl:col-span-3 space-y-4">
             {/* Revenue trend */}
-            <SectionCard title="Revenue Trend" icon={TrendingUp}>
+            <h2 title="Revenue Trend" icon={TrendingUp}>
               <Sparkline items={revenueByMonth} />
-            </SectionCard>
+            </h2>
 
             {/* Donut grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1043,7 +1045,7 @@ const AdminAnalytics = () => {
             {/* Top motorcycles */}
             <SectionCard title="Top Requested Units" icon={FaMotorcycle}>
               {topMotorcycles.length === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center">
+                <p className="text-sm text-slate-500 py-4 text-center">
                   No bookings yet
                 </p>
               ) : (
@@ -1122,7 +1124,7 @@ const AdminAnalytics = () => {
                   {
                     label: "Unit Rental",
                     value: earningsAndExpenses.unitRental,
-                    color: "text-emerald-600",
+                    color: "text-emerald-700",
                   },
                   {
                     label: "Reservation Fees",
@@ -1137,7 +1139,7 @@ const AdminAnalytics = () => {
                   {
                     label: "Penalties",
                     value: earningsAndExpenses.penalties,
-                    color: "text-amber-600",
+                    color: "text-amber-800",
                   },
                   {
                     label: "Helmet Fees",
@@ -1176,10 +1178,10 @@ const AdminAnalytics = () => {
                 )}
                 {earningsAndExpenses.pendingExtensions > 0 && (
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] font-semibold text-slate-400">
+                    <span className="text-[11px] font-semibold text-slate-500">
                       Pending Extensions
                     </span>
-                    <span className="text-[12px] font-black text-slate-400">
+                    <span className="text-[12px] font-black text-slate-500">
                       {formatMoney(earningsAndExpenses.pendingExtensions)}
                     </span>
                   </div>
@@ -1213,7 +1215,7 @@ const AdminAnalytics = () => {
                   <span className="text-[11px] font-semibold text-slate-500">
                     Fully Refunded
                   </span>
-                  <span className="text-[12px] font-black text-emerald-600">
+                  <span className="text-[12px] font-black text-emerald-700">
                     {metrics.securityDepositsFullyRefundedCount}
                   </span>
                 </div>
@@ -1221,16 +1223,16 @@ const AdminAnalytics = () => {
                   <span className="text-[11px] font-semibold text-slate-500">
                     Partially Refunded
                   </span>
-                  <span className="text-[12px] font-black text-amber-600">
+                  <span className="text-[12px] font-black text-amber-800">
                     {metrics.securityDepositsPartiallyRefundedCount}
                   </span>
                 </div>
                 {metrics.securityDepositsDeductedAmount > 0 && (
                   <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                    <span className="text-[11px] font-semibold text-amber-600">
+                    <span className="text-[11px] font-semibold text-amber-800">
                       Total Deducted
                     </span>
-                    <span className="text-[12px] font-black text-amber-600">
+                    <span className="text-[12px] font-black text-amber-800">
                       {formatMoney(metrics.securityDepositsDeductedAmount)}
                     </span>
                   </div>
@@ -1298,7 +1300,7 @@ const AdminAnalytics = () => {
         fleetStats={fleetStats}
         earningsAndExpenses={earningsAndExpenses}
       />
-    </div>
+    </main>
   );
 };
 

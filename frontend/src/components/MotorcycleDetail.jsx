@@ -2016,6 +2016,7 @@ const DestinationSelect = ({ value, onChange }) => {
               onChange={item.handler}
               disabled={item.disabled}
               required={i === 0}
+              aria-label={item.placeholder}
             >
               <option value="">{item.placeholder}</option>
               {item.options.map((o) => (
@@ -4573,7 +4574,7 @@ const MotorcycleDetail = () => {
         </div>
       )}
 
-      <div className="md-page">
+      <main className="md-page">
         <div style={{ maxWidth: 1200, margin: "0 auto 20px" }}>
           <button
             onClick={() => navigate(-1)}
@@ -4592,7 +4593,7 @@ const MotorcycleDetail = () => {
                 src={buildImageSrc(
                   motorcycleImages[currentImage] ?? motorcycle.image,
                 )}
-                alt={motorcycle.name}
+                alt={motorcycle.name || "Motorcycle preview"}
                 onError={handleImageError}
               />
               {motorcycleImages.length > 1 && (
@@ -5454,6 +5455,7 @@ const MotorcycleDetail = () => {
                             }}
                           />
                           <select
+                            aria-label="Pickup Time"
                             name="pickupTime"
                             value={formData.pickupTime}
                             onChange={handleInputChange}
@@ -5547,6 +5549,7 @@ const MotorcycleDetail = () => {
                             }}
                           />
                           <select
+                            aria-label="Return Time"
                             name="returnTime"
                             value={formData.returnTime}
                             onChange={handleInputChange}
@@ -5652,6 +5655,7 @@ const MotorcycleDetail = () => {
                       <input
                         type="text"
                         value={formData.pickupLocation}
+                        aria-label="Pickup Location"
                         readOnly
                         style={{ ...S.input, opacity: 0.55 }}
                       />
@@ -6832,7 +6836,7 @@ const MotorcycleDetail = () => {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </>
   );
 };

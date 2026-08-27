@@ -801,7 +801,7 @@ const Login = () => {
         .lg-forgot:hover { text-decoration: underline; }
       `}</style>
 
-      <div className="lg-root">
+      <main className="lg-root">
         <div className="lg-card">
           {/* LEFT — brand panel */}
           <div className="lg-left">
@@ -895,6 +895,9 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                       style={{
                         position: "absolute",
                         right: 12,
@@ -905,6 +908,8 @@ const Login = () => {
                         display: "flex",
                         alignItems: "center",
                         fontSize: 13,
+                        minWidth: "44px",
+                        minHeight: "44px",
                       }}
                     >
                       {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -1252,7 +1257,7 @@ const Login = () => {
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       <ToastContainer
         position="top-right"

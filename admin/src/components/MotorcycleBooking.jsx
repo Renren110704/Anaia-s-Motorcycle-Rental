@@ -201,9 +201,9 @@ const getAllowedNextStatuses = (currentStatus) => {
 const getBulkActionsForStatus = (statusTab) => {
   switch (statusTab) {
     case "pending_reservation":
-      return ["confirm", "cancel", "reject"];
+      return ["confirm", "cancel"];
     case "pending_full_payment":
-      return ["cancel", "reject"];
+      return ["cancel"];
     case "active":
       return ["inspection"];
     case "cancelled":
@@ -1847,9 +1847,14 @@ const BookingTable = ({
                             <FaEdit className="text-sm" />
                           </button>
                         )}
-                        {!["active", "completed", "inspection"].includes(
-                          booking.status,
-                        ) && (
+                        {![
+                          "active",
+                          "completed",
+                          "inspection",
+                          "pending_reservation",
+                          "pending_full_payment",
+                          "pending",
+                        ].includes(booking.status) && (
                           <button
                             onClick={(e) => onDelete(e, booking.id, false)}
                             title="Reject"

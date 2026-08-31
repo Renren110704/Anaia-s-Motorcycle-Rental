@@ -8,7 +8,7 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "geolocation=(), camera=(), microphone=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://anaias-motorcycle-rental.onrender.com https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src 'self' https://anaias-motorcycle-rental.onrender.com wss://anaias-motorcycle-rental.onrender.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://anaias-motorcycle-rental.onrender.com https://res.cloudinary.com https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src 'self' https://anaias-motorcycle-rental.onrender.com wss://anaias-motorcycle-rental.onrender.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" }
       ]
     }
   ]

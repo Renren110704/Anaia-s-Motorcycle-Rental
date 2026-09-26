@@ -380,6 +380,8 @@ const AdminAnalytics = () => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [selectedYear, setSelectedYear] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -430,6 +432,10 @@ const AdminAnalytics = () => {
   }, [bookings]);
 
   const filteredBookings = useMemo(() => {
+    // Inclusive range: fromDate at 00:00:00, toDate at 23:59:59.999
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59.999`) : null;
+
     return bookings
       .filter((b) => !b?.isDeleted)
       .filter((b) => {
@@ -442,11 +448,26 @@ const AdminAnalytics = () => {
           String(d.getMonth() + 1) !== selectedMonth
         )
           return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
         return true;
       });
-  }, [bookings, selectedYear, selectedMonth]);
+  }, [bookings, selectedYear, selectedMonth, fromDate, toDate]);
 
   const selectedPeriodLabel = useMemo(() => {
+    const fmt = (s) =>
+      new Date(`${s}T00:00:00`).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+
+    if (fromDate || toDate) {
+      if (fromDate && toDate) return `${fmt(fromDate)} – ${fmt(toDate)}`;
+      if (fromDate) return `From ${fmt(fromDate)}`;
+      return `Through ${fmt(toDate)}`;
+    }
+
     if (selectedYear === "all" && selectedMonth === "all") return "All Time";
     const monthName =
       selectedMonth === "all"
@@ -458,7 +479,7 @@ const AdminAnalytics = () => {
     if (selectedYear === "all") return `${monthName} (All Years)`;
     if (selectedMonth === "all") return `All of ${selectedYear}`;
     return `${monthName} ${selectedYear}`;
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, fromDate, toDate]);
 
   const metrics = useMemo(() => {
     const totalBookings = filteredBookings.length;
@@ -969,6 +990,53 @@ const AdminAnalytics = () => {
                   ))}
                 </select>
               </div>
+              <div className="h-6 w-px bg-slate-200 mx-1" />
+              <div className="flex items-center gap-1.5">
+                <label
+                  htmlFor="analytics-from-date"
+                  className="text-[11px] font-bold text-slate-500"
+                >
+                  From
+                </label>
+                <input
+                  id="analytics-from-date"
+                  type="date"
+                  aria-label="From Date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label
+                  htmlFor="analytics-to-date"
+                  className="text-[11px] font-bold text-slate-500"
+                >
+                  To
+                </label>
+                <input
+                  id="analytics-to-date"
+                  type="date"
+                  aria-label="To Date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+                />
+              </div>
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="text-[11px] text-[#b50002] font-bold hover:underline"
+                >
+                  Clear dates
+                </button>
+              )}
             </div>
             <div className="ml-auto flex items-center gap-1.5 flex-wrap">
               {fleetStatCards.map(({ label, value, text, bg }) => (
@@ -983,7 +1051,10 @@ const AdminAnalytics = () => {
           </div>
 
           {/* Active period indicator */}
-          {(selectedYear !== "all" || selectedMonth !== "all") && (
+          {(selectedYear !== "all" ||
+            selectedMonth !== "all" ||
+            fromDate ||
+            toDate) && (
             <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
               <p className="text-[11px] text-slate-500 font-semibold">
                 Showing data for:{" "}
@@ -995,6 +1066,8 @@ const AdminAnalytics = () => {
                 onClick={() => {
                   setSelectedYear("all");
                   setSelectedMonth("all");
+                  setFromDate("");
+                  setToDate("");
                 }}
                 className="text-[11px] text-[#b50002] font-bold hover:underline"
               >

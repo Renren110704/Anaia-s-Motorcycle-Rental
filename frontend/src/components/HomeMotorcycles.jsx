@@ -331,13 +331,24 @@ const HomeMotorcycles = () => {
     return eff?.state === "booked";
   };
 
+  //uncomment this if you want to redirect to a separate "view availability" screen when the motorcycle is booked
+
+  // const handleBook = (motorcycle) => {
+  //   const disabled = isBookDisabled(motorcycle);
+  //   navigate(`/motorcycles/${motorcycle._id || motorcycle.id}`, {
+  //     state: {
+  //       motorcycle,
+  //       showCalendar: disabled,
+  //     },
+  //   });
+  // };
+
   const handleBook = (motorcycle) => {
-    const disabled = isBookDisabled(motorcycle);
+    // Same reasoning as Motorcycles.jsx: always go straight into the
+    // normal booking flow; the calendar itself now blocks unavailable
+    // dates for this vehicle.
     navigate(`/motorcycles/${motorcycle._id || motorcycle.id}`, {
-      state: {
-        motorcycle,
-        showCalendar: disabled,
-      },
+      state: { motorcycle },
     });
   };
 
@@ -938,15 +949,7 @@ const HomeMotorcycles = () => {
                         handleBook(m);
                       }}
                     >
-                      {disabled ? (
-                        <>
-                          View Availability <ArrowRight size={13} />
-                        </>
-                      ) : (
-                        <>
-                          Rent Now <ArrowRight size={13} />
-                        </>
-                      )}
+                      Rent Now <ArrowRight size={13} />
                     </button>
                   </div>
                 </div>

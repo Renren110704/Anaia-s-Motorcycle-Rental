@@ -27,6 +27,8 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
@@ -1293,6 +1295,35 @@ const MaintenancePage = () => {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  const maintenanceFormatDate = (s) => {
+    if (!s) return "";
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-PH", { dateStyle: "medium" });
+  };
+
+  const maintenanceReportColumns = [
+    { key: "unitId", label: "Unit ID" },
+    { key: "make", label: "Vehicle", value: (m) => `${m.make || ""} ${m.model || ""}`.trim() },
+    { key: "category", label: "Category" },
+    { key: "status", label: "Status" },
+    { key: "maintenanceScheduleStartAt", label: "Scheduled Start", value: (m) => maintenanceFormatDate(m.maintenanceScheduleStartAt) },
+    { key: "maintenanceScheduleEndAt", label: "Scheduled End", value: (m) => maintenanceFormatDate(m.maintenanceScheduleEndAt) },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Maintenance Management Report",
+      subtitle: selectedStatus === "all" ? "All units" : `Status: ${selectedStatus}`,
+      columns: maintenanceReportColumns,
+      rows: filteredMotorcycles,
+      emptyMessage: "No units match the current filters.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("maintenance-management-report", maintenanceReportColumns, filteredMotorcycles);
+  };
+
   const hasActiveFilters =
     searchTerm || selectedCategory !== "all" || colSort.key;
   const clearFilters = () => {
@@ -1440,13 +1471,16 @@ const MaintenancePage = () => {
       `}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-            Maintenance Management
-          </h1>
-          <p className="text-slate-700 text-sm mt-1">
-            Set units to maintenance mode or return them to the active fleet.
-          </p>
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              Maintenance Management
+            </h1>
+            <p className="text-slate-700 text-sm mt-1">
+              Set units to maintenance mode or return them to the active fleet.
+            </p>
+          </div>
+          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
         </div>
 
         {/* Stat Cards */}

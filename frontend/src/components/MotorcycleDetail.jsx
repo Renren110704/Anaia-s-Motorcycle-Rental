@@ -344,6 +344,13 @@ const addDaysHelper = (date, n) => {
   return d;
 };
 
+// Number of days of "cushion" required immediately before and after every
+// existing booking or maintenance period for a vehicle, during which that
+// vehicle cannot be picked up or returned (e.g. for cleaning/prep/buffer
+// travel time). Applies uniformly to bookings and maintenance, and to
+// both the pickup and return calendars.
+const UNAVAILABILITY_BUFFER_DAYS = 2;
+
 /* ── Shared styles ─────────────────────────────────────────────── */
 const S = {
   card: {
@@ -610,17 +617,30 @@ const InlineDatePicker = ({
       (s) => dk >= toDateKey(s.startDate) && dk <= toDateKey(s.endDate),
     );
   };
-  const isBufferDay = (date) => {
-    const dk = toDateKey(date);
-    return maintenanceRanges.some((s) => {
-      const buf = addDaysHelper(s.startDate, -1);
-      return dk === toDateKey(buf);
-    });
-  };
   const isBookedDay = (date) => {
     const dk = toDateKey(date);
     return bookingRanges.some(
       (b) => dk >= toDateKey(b.pickupDate) && dk <= toDateKey(b.returnDate),
+    );
+  };
+  // True when `date` falls within the buffer window immediately before or
+  // after ANY booking or maintenance period (but not inside the period
+  // itself — that's isMaintenanceDay/isBookedDay above). Checked against
+  // every range independently, so overlapping or back-to-back unavailable
+  // periods each still contribute their own buffer correctly. Applies on
+  // both the pickup and return calendars.
+  const isBufferDay = (date) => {
+    const dk = toDateKey(date);
+    const fallsInBufferOf = (startDate, endDate) => {
+      for (let i = 1; i <= UNAVAILABILITY_BUFFER_DAYS; i += 1) {
+        if (dk === toDateKey(addDaysHelper(startDate, -i))) return true;
+        if (dk === toDateKey(addDaysHelper(endDate, i))) return true;
+      }
+      return false;
+    };
+    return (
+      maintenanceRanges.some((s) => fallsInBufferOf(s.startDate, s.endDate)) ||
+      bookingRanges.some((b) => fallsInBufferOf(b.pickupDate, b.returnDate))
     );
   };
 
@@ -629,7 +649,8 @@ const InlineDatePicker = ({
     if (minD && d < minD) return;
     if (maxD && d > maxD) return;
     if (isMaintenanceDay(date)) return;
-    if (mode === "return" && isBufferDay(date)) return;
+    if (isBookedDay(date)) return;
+    if (isBufferDay(date)) return;
     onChange(formatLocalDate(d));
     setOpen(false);
   };
@@ -806,14 +827,10 @@ const InlineDatePicker = ({
               const tooEarly = minD && d < minD;
               const tooLate = maxD && d > maxD;
               const isMaint = isMaintenanceDay(date);
-              const isBuf = isBufferDay(date);
               const isBooked = isBookedDay(date);
+              const isBuf = isBufferDay(date);
               const isDisabled =
-                tooEarly ||
-                tooLate ||
-                isMaint ||
-                (mode === "return" && isBuf) ||
-                isBooked;
+                tooEarly || tooLate || isMaint || isBooked || isBuf;
               const isToday = dk === todayISO();
 
               // Pickup range highlight (show range between pickup and return)
@@ -829,11 +846,7 @@ const InlineDatePicker = ({
               let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
               let border = "1.5px solid transparent";
               let cursor = isDisabled ? "not-allowed" : "pointer";
-              let opacity = isDisabled
-                ? isMaint || (mode === "return" && isBuf)
-                  ? 1
-                  : 0.3
-                : 1;
+              let opacity = isDisabled ? (isMaint || isBuf ? 1 : 0.3) : 1;
 
               if (isSelected) {
                 bg = "#0E0E0E";
@@ -850,7 +863,7 @@ const InlineDatePicker = ({
                 bg = "rgba(124,58,237,0.08)";
                 color = "#7c3aed";
                 border = "1.5px solid rgba(124,58,237,0.2)";
-              } else if (isBuf && mode === "return") {
+              } else if (isBuf) {
                 bg = "rgba(245,158,11,0.08)";
                 color = "#b45309";
                 border = "1.5px solid rgba(245,158,11,0.25)";
@@ -870,9 +883,11 @@ const InlineDatePicker = ({
                   title={
                     isMaint
                       ? "Under maintenance"
-                      : isBuf && mode === "return"
-                        ? "Buffer day — maintenance starts tomorrow"
-                        : undefined
+                      : isBooked
+                        ? "Already booked"
+                        : isBuf
+                          ? "Buffer day — too close to a booking or maintenance period"
+                          : undefined
                   }
                   style={{
                     background: bg,
@@ -3327,7 +3342,12 @@ const MotorcycleDetail = () => {
     currentMaintenanceRanges.forEach((m) => checkDate(m.startDate));
 
     if (earliest) {
-      return formatDate(earliest);
+      // Pull the cap back by the buffer too, so the return date can't be
+      // set inside the buffer zone right before the next unavailable
+      // period starts — the per-day disabling below enforces the same
+      // thing, this just keeps maxDate consistent with it.
+      const buffered = addDaysHelper(earliest, -UNAVAILABILITY_BUFFER_DAYS);
+      return formatDate(buffered);
     }
     return null;
   };
@@ -5413,7 +5433,7 @@ const MotorcycleDetail = () => {
                             fontFamily: "'Space Grotesk',sans-serif",
                           }}
                         >
-                          Select available dates
+                          Select available dates (up to 7 days from today)
                         </p>
                         <div style={{ marginTop: "auto" }}>
                           <InlineDatePicker

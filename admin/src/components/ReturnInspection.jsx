@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -463,6 +465,31 @@ const ReturnInspection = () => {
     [bookings, selectedId],
   );
 
+  const inspectionReportColumns = [
+    { key: "customer", label: "Customer" },
+    { key: "email", label: "Email" },
+    { key: "motorcycleName", label: "Motorcycle" },
+    { key: "unitId", label: "Unit" },
+    { key: "returnDate", label: "Return Date", value: (b) => formatDate(b.returnDate) },
+    { key: "inspectionDate", label: "Inspection Date", value: (b) => formatDate(b.returnInspection?.inspectionDate) },
+    { key: "clearanceStatus", label: "Clearance", value: (b) => (b.returnInspection?.clearanceStatus || "pending_inspection").replace(/_/g, " ") },
+    { key: "status", label: "Booking Status" },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Return Inspection Report",
+      subtitle: `Status: ${selectedStatus}`,
+      columns: inspectionReportColumns,
+      rows: filteredBookings,
+      emptyMessage: "No bookings match the current search or status filter.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("return-inspection-report", inspectionReportColumns, filteredBookings);
+  };
+
   // Sync form when booking changes
   useEffect(() => {
     if (!selectedBooking) return;
@@ -794,13 +821,16 @@ const ReturnInspection = () => {
     <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-            Return Inspection
-          </h1>
-          <p className="text-slate-700 text-sm mt-1">
-            Move active rentals into inspection and record clearance outcomes.
-          </p>
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              Return Inspection
+            </h1>
+            <p className="text-slate-700 text-sm mt-1">
+              Move active rentals into inspection and record clearance outcomes.
+            </p>
+          </div>
+          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
         </div>
 
         {/* Stat Cards */}

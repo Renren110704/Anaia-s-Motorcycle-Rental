@@ -851,11 +851,20 @@ const SignUp = () => {
     });
   };
 
+  // Letters and spaces only — used to keep name fields free of numbers
+  // and other non-alphabetic characters as the user types.
+  const ALPHA_ONLY_FIELDS = ["firstName", "middleName", "lastName"];
+  const stripNonAlpha = (value) => value.replace(/[^A-Za-z\s]/g, "");
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     clearError(name);
     if (name === "phone") {
       setFormData((p) => ({ ...p, phone: value.replace(/\D/g, "") }));
+      return;
+    }
+    if (ALPHA_ONLY_FIELDS.includes(name)) {
+      setFormData((p) => ({ ...p, [name]: stripNonAlpha(value) }));
       return;
     }
     setFormData((p) => ({ ...p, [name]: value }));
@@ -1397,7 +1406,9 @@ const SignUp = () => {
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={
+                              showPassword ? "Hide password" : "Show password"
+                            }
                             style={{
                               position: "absolute",
                               right: 4,
@@ -1470,7 +1481,9 @@ const SignUp = () => {
                             onClick={() =>
                               setShowConfirmPassword(!showConfirmPassword)
                             }
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={
+                              showPassword ? "Hide password" : "Show password"
+                            }
                             style={{
                               position: "absolute",
                               right: 4,

@@ -21,6 +21,8 @@ import {
 } from "react-icons/fa";
 import { AlertTriangle, CheckCircle2, Mail, MessageSquare } from "lucide-react";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -544,6 +546,29 @@ const AdminContact = () => {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  const contactReportColumns = [
+    { key: "name", label: "Name" },
+    { key: "email", label: "Email" },
+    { key: "message", label: "Message" },
+    { key: "status", label: "Status", value: (m) => (m.adminReplyMessage ? "Replied" : "Pending") },
+    { key: "adminReplyMessage", label: "Admin Reply" },
+    { key: "createdAt", label: "Received", value: (m) => formatDateTime(m.createdAt) },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Contact Messages Report",
+      subtitle: filterStatus === "all" ? "All messages" : `Status: ${filterStatus}`,
+      columns: contactReportColumns,
+      rows: filteredMessages,
+      emptyMessage: "No messages match the current search or status filter.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("contact-messages-report", contactReportColumns, filteredMessages);
+  };
+
   const handleReplySent = (msgId, replyText) => {
     setMessages((prev) =>
       prev.map((m) =>
@@ -608,13 +633,16 @@ const AdminContact = () => {
     <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-            Contact Messages
-          </h1>
-          <p className="text-slate-700 text-sm mt-1">
-            View customer inquiries and send email replies directly from here.
-          </p>
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              Contact Messages
+            </h1>
+            <p className="text-slate-700 text-sm mt-1">
+              View customer inquiries and send email replies directly from here.
+            </p>
+          </div>
+          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
         </div>
 
         {/* Stat Cards */}

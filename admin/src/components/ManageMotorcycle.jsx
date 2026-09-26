@@ -50,6 +50,8 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
@@ -2113,6 +2115,32 @@ const ManageMotorcycle = () => {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  const motorcycleReportColumns = [
+    { key: "unitId", label: "Unit ID" },
+    { key: "make", label: "Vehicle", value: (m) => `${m.make || ""} ${m.model || ""}`.trim() },
+    { key: "category", label: "Category" },
+    { key: "year", label: "Year" },
+    { key: "engineSize", label: "Engine" },
+    { key: "fuelType", label: "Fuel Type" },
+    { key: "transmission", label: "Transmission" },
+    { key: "dailyRate", label: "Rate/Day", value: (m) => `PHP ${Number(m.dailyRate || 0).toLocaleString()}` },
+    { key: "status", label: "Status", value: (m) => (m.isDeleted ? "Deleted" : m.status) },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Vehicle Management Report",
+      subtitle: selectedStatus === "deleted" ? "Deleted units" : `Status: ${selectedStatus}`,
+      columns: motorcycleReportColumns,
+      rows: filteredMotorcycles,
+      emptyMessage: "No motorcycles match the current filters.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("vehicle-management-report", motorcycleReportColumns, filteredMotorcycles);
+  };
+
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedCategory("all");
@@ -2292,12 +2320,15 @@ const ManageMotorcycle = () => {
               accurate.
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
-          >
-            <PlusCircle className="w-4 h-4" /> Add Unit
-          </button>
+          <div className="flex items-center gap-2">
+            <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"
+            >
+              <PlusCircle className="w-4 h-4" /> Add Unit
+            </button>
+          </div>
         </div>
 
         {/* Stat cards */}

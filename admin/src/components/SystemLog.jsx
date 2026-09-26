@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({
@@ -310,6 +312,7 @@ const SystemLog = () => {
   const [action, setAction] = useState("");
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -355,6 +358,62 @@ const SystemLog = () => {
     });
     return result;
   }, [logs]);
+
+  const systemLogReportColumns = [
+    { key: "createdAt", label: "Date/Time", value: (l) => formatDateTime(l.createdAt) },
+    { key: "actorType", label: "Actor Type" },
+    { key: "actorName", label: "Actor", value: (l) => l.actorName || l.actorEmail || "Unknown" },
+    { key: "action", label: "Action" },
+    { key: "summary", label: "Summary" },
+    { key: "targetType", label: "Target Type" },
+    { key: "targetId", label: "Target ID" },
+  ];
+
+  // System logs are paginated server-side, so "the current page" isn't the
+  // full filtered dataset. Pull every matching log (respecting the active
+  // search/actorType/action filters) before printing or exporting.
+  const fetchAllFilteredLogs = async () => {
+    const res = await api.get("/api/system-logs", {
+      params: {
+        page: 1,
+        limit: Math.max(total || 0, PAGE_SIZE, 1000),
+        search: search || undefined,
+        actorType: actorType || undefined,
+        action: action || undefined,
+      },
+    });
+    return res.data?.data || [];
+  };
+
+  const handlePrintReport = async () => {
+    setReportBusy(true);
+    try {
+      const rows = await fetchAllFilteredLogs();
+      printReport({
+        title: "System Log Report",
+        subtitle: hasFilters ? "Filtered results" : "All logs",
+        columns: systemLogReportColumns,
+        rows,
+        emptyMessage: "No logs match the current filters.",
+      });
+    } catch (err) {
+      toast.error("Failed to prepare the report. Please try again.");
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    setReportBusy(true);
+    try {
+      const rows = await fetchAllFilteredLogs();
+      downloadCSV("system-log-report", systemLogReportColumns, rows);
+    } catch (err) {
+      toast.error("Failed to export CSV. Please try again.");
+    } finally {
+      setReportBusy(false);
+    }
+  };
 
   const hasFilters = search || actorType || action;
 
@@ -441,6 +500,11 @@ const SystemLog = () => {
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-2">
+            <ReportActionButtons
+              onPrint={handlePrintReport}
+              onExport={handleExportCSV}
+              disabled={reportBusy}
+            />
             <button
               type="button"
               onClick={fetchLogs}

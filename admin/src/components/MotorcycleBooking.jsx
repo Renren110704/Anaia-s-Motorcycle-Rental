@@ -46,6 +46,8 @@ import {
   MinusSquare,
   ListChecks,
 } from "lucide-react";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
@@ -1358,19 +1360,62 @@ const DetailDrawer = ({
                 label="Reservation"
                 value={`₱${booking.reservationFee || 200} — ${booking.reservationFeePaid ? "Paid" : "Unpaid"}`}
               />
-              {booking.reservationPaymentMethod && (
-                <Row
-                  icon={FaCreditCard}
-                  label="Payment Method (Res)"
-                  value={booking.reservationPaymentMethod}
-                />
+
+              {/* Reservation Payment: Reference ID + Payment Method + Amount */}
+              {booking.reservationFeePaid && (
+                <>
+                  <p className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase pt-1">
+                    Reservation Payment
+                  </p>
+                  <Row
+                    icon={FaReceipt}
+                    label="Reference ID"
+                    value={booking.paymentReferenceId || "—"}
+                    valueClass="font-mono tracking-tight"
+                  />
+                  <Row
+                    icon={FaCreditCard}
+                    label="Payment Method"
+                    value={booking.reservationPaymentMethod || "—"}
+                  />
+                  <Row
+                    icon={FaMoneyBillWave}
+                    label="Payment Amount"
+                    value={`₱${Number(booking.reservationFee || 200).toLocaleString()}`}
+                  />
+                </>
               )}
-              {booking.fullPaymentMethod && (
-                <Row
-                  icon={FaCreditCard}
-                  label="Payment Method (Full)"
-                  value={booking.fullPaymentMethod}
-                />
+
+              {/* Full Payment: Transaction ID + Payment Method + Amount */}
+              {booking.transactionId && (
+                <>
+                  <p className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase pt-1">
+                    Full Payment
+                  </p>
+                  <Row
+                    icon={FaReceipt}
+                    label="Transaction ID"
+                    value={booking.transactionId}
+                    valueClass="font-mono tracking-tight"
+                  />
+                  <Row
+                    icon={FaCreditCard}
+                    label="Payment Method"
+                    value={booking.fullPaymentMethod || "—"}
+                  />
+                  <Row
+                    icon={FaMoneyBillWave}
+                    label="Payment Amount"
+                    value={`₱${Number(
+                      booking.fullPaymentAmount ||
+                        Math.max(
+                          0,
+                          (booking.amount || 0) -
+                            (booking.reservationFee || 0),
+                        ),
+                    ).toLocaleString()}`}
+                  />
+                </>
               )}
               {booking.isDeleted && booking.deletedAt && (
                 <Row
@@ -1945,6 +1990,8 @@ const MotorcycleBooking = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("pending_reservation");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [colSort, setColSort] = useState({ key: null, dir: null });
   const [drawerBooking, setDrawerBooking] = useState(null);
@@ -2004,6 +2051,9 @@ const MotorcycleBooking = () => {
           paymentStatus: b.paymentStatus || "pending_verification",
           reservationPaymentMethod: b.reservationPaymentMethod || "",
           fullPaymentMethod: b.fullPaymentMethod || "",
+          fullPaymentConfirmedAt: b.fullPaymentConfirmedAt || null,
+          fullPaymentAmount: Number(b.fullPaymentAmount || 0),
+          transactionId: b.transactionId || "",
           securityDeposit: b.securityDeposit || null,
           paymentProofImage: b.paymentProofImage || "",
           paymentReferenceId: b.paymentReferenceId || "",
@@ -2104,6 +2154,17 @@ const MotorcycleBooking = () => {
           (b.email || "").toLowerCase().includes(q),
       );
     }
+    if (fromDate || toDate) {
+      const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+      const to = toDate ? new Date(`${toDate}T23:59:59.999`) : null;
+      list = list.filter((b) => {
+        const d = new Date(b.bookingDate || b.createdAt || b.pickupDate);
+        if (Number.isNaN(d.getTime())) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
+    }
     if (colSort.key && colSort.dir) {
       list.sort((a, b) => {
         let aVal = a[colSort.key],
@@ -2128,7 +2189,55 @@ const MotorcycleBooking = () => {
       });
     }
     return list;
-  }, [bookings, searchTerm, selectedStatus, colSort]);
+  }, [bookings, searchTerm, selectedStatus, fromDate, toDate, colSort]);
+
+  const bookingReportColumns = [
+    { key: "customer", label: "Customer", value: (b) => b.customer || b.customerName },
+    { key: "email", label: "Email" },
+    { key: "motorcycle", label: "Motorcycle", value: (b) => b.motorcycle || b.motorcycleName },
+    { key: "unitId", label: "Unit" },
+    { key: "bookingDate", label: "Booking Date", value: (b) => formatDate(b.bookingDate) },
+    { key: "pickupDate", label: "Pickup Date", value: (b) => formatDate(b.pickupDate) },
+    { key: "returnDate", label: "Return Date", value: (b) => formatDate(b.returnDate) },
+    { key: "total", label: "Total", value: (b) => `PHP ${Number(b.total || b.amount || 0).toLocaleString()}` },
+    { key: "paymentStatus", label: "Payment Status" },
+    { key: "paymentReferenceId", label: "Reference ID (Reservation)", value: (b) => b.paymentReferenceId || "—" },
+    { key: "reservationPaymentMethod", label: "Reservation Payment Method", value: (b) => b.reservationPaymentMethod || "—" },
+    { key: "reservationFee", label: "Reservation Amount", value: (b) => `PHP ${Number(b.reservationFee || 0).toLocaleString()}` },
+    { key: "transactionId", label: "Transaction ID (Full Payment)", value: (b) => b.transactionId || "—" },
+    { key: "fullPaymentMethod", label: "Full Payment Method", value: (b) => b.fullPaymentMethod || "—" },
+    { key: "fullPaymentAmount", label: "Full Payment Amount", value: (b) => (b.transactionId ? `PHP ${Number(b.fullPaymentAmount || 0).toLocaleString()}` : "—") },
+    { key: "status", label: "Status", value: (b) => (b.isDeleted ? "Rejected" : b.status) },
+  ];
+
+  const dateRangeLabel = (() => {
+    const fmt = (s) =>
+      new Date(`${s}T00:00:00`).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    if (fromDate && toDate) return `${fmt(fromDate)} – ${fmt(toDate)}`;
+    if (fromDate) return `From ${fmt(fromDate)}`;
+    if (toDate) return `Through ${fmt(toDate)}`;
+    return "";
+  })();
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Booking Dashboard Report",
+      subtitle: dateRangeLabel
+        ? `Status: ${selectedStatusLabel} · ${dateRangeLabel}`
+        : `Status: ${selectedStatusLabel}`,
+      columns: bookingReportColumns,
+      rows: filteredBookings,
+      emptyMessage: "No bookings match the current search, status, or date filter.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("booking-dashboard-report", bookingReportColumns, filteredBookings);
+  };
 
   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
   const paginated = filteredBookings.slice(
@@ -2262,6 +2371,11 @@ const MotorcycleBooking = () => {
                 reservationFeePaid:
                   updated.reservationFeePaid ?? b.reservationFeePaid,
                 fullPaymentMethod: updated.fullPaymentMethod || method,
+                fullPaymentConfirmedAt:
+                  updated.fullPaymentConfirmedAt || b.fullPaymentConfirmedAt,
+                transactionId: updated.transactionId || b.transactionId,
+                fullPaymentAmount:
+                  updated.fullPaymentAmount ?? b.fullPaymentAmount,
                 securityDeposit: updated.securityDeposit || b.securityDeposit,
               }
             : b,
@@ -2276,12 +2390,19 @@ const MotorcycleBooking = () => {
           reservationFeePaid:
             updated.reservationFeePaid ?? prev.reservationFeePaid,
           fullPaymentMethod: updated.fullPaymentMethod || method,
+          fullPaymentConfirmedAt:
+            updated.fullPaymentConfirmedAt || prev.fullPaymentConfirmedAt,
+          transactionId: updated.transactionId || prev.transactionId,
+          fullPaymentAmount:
+            updated.fullPaymentAmount ?? prev.fullPaymentAmount,
           securityDeposit: updated.securityDeposit || prev.securityDeposit,
         }));
       }
 
       await alertModal(
-        response?.data?.message || "Full payment confirmed successfully.",
+        updated.transactionId
+          ? `${response?.data?.message || "Full payment confirmed successfully."} Transaction ID: ${updated.transactionId}`
+          : response?.data?.message || "Full payment confirmed successfully.",
       );
     } catch (err) {
       await alertModal(
@@ -2606,13 +2727,16 @@ const MotorcycleBooking = () => {
     <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-            Booking Dashboard
-          </h1>
-          <p className="text-slate-700 text-sm mt-1">
-            Monitor payment flow, verify receipts, and manage booking lifecycle.
-          </p>
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              Booking Dashboard
+            </h1>
+            <p className="text-slate-700 text-sm mt-1">
+              Monitor payment flow, verify receipts, and manage booking lifecycle.
+            </p>
+          </div>
+          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
         </div>
 
         {/* Stat Cards */}
@@ -2660,6 +2784,62 @@ const MotorcycleBooking = () => {
               <ListChecks className="w-4 h-4" />
               {selectionMode ? "Cancel Select" : "Select"}
             </button>
+          </div>
+
+          {/* Date range filter */}
+          <div className="mt-3 pt-3 border-t border-slate-50 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <FaCalendarAlt className="text-slate-300 text-[10px]" />
+              <span className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase">
+                Date Range
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label
+                htmlFor="booking-from-date"
+                className="text-[11px] font-bold text-slate-500"
+              >
+                From
+              </label>
+              <input
+                id="booking-from-date"
+                type="date"
+                aria-label="From Date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label
+                htmlFor="booking-to-date"
+                className="text-[11px] font-bold text-slate-500"
+              >
+                To
+              </label>
+              <input
+                id="booking-to-date"
+                type="date"
+                aria-label="To Date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-[#171717] focus:outline-none focus:border-[#b50002]/30"
+              />
+            </div>
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
+                className="text-[11px] text-[#b50002] font-bold hover:underline"
+              >
+                Clear dates
+              </button>
+            )}
           </div>
 
           {selectionMode && (

@@ -210,9 +210,27 @@ const motorcycleBookingSchema = new Schema(
     },
     reservationPaymentMethod: { type: String, default: "" },
     fullPaymentMethod: { type: String, default: "" },
+    // The actual amount paid at the full-payment/pickup stage, captured at
+    // the moment confirmFullPayment succeeds (alongside transactionId) so
+    // it stays accurate for that transaction even if the booking's total
+    // amount changes later (e.g. via an extension).
+    fullPaymentAmount: { type: Number, default: 0 },
 
     paymentProofImage: { type: String, default: "" },
     paymentReferenceId: { type: String, default: "" },
+    // System-generated ID assigned automatically the moment a full payment
+    // is successfully confirmed (see confirmFullPayment in the booking
+    // controller). Unique across all bookings; sparse so bookings that
+    // haven't reached full payment yet (field left unset, not null) don't
+    // collide against the unique index. IMPORTANT: no `default` here on
+    // purpose — a default of null would still count as "present" for a
+    // sparse index and break uniqueness across untouched bookings.
+    transactionId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     paymentSentAt: { type: Date, default: null },
     paymentSentAmount: { type: Number, default: 0 },
     requiresProofReupload: { type: Boolean, default: false },

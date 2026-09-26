@@ -20,6 +20,7 @@ import {
   notifyProofReuploadRequested,
 } from "../services/notificationService.js";
 import { TRACCAR_BASE_URL, buildTraccarHeaders } from "../config/traccar.js";
+import { generateUniqueTransactionId } from "../utils/transactionId.js";
 
 // Fetch current Traccar stats for a device and save as booking baseline
 async function captureBookingBaseline(bookingId, motorcycleDbId) {
@@ -1636,6 +1637,10 @@ export const getMyMotorcycleBookings = async (req, res, next) => {
         paymentStatus: 1,
         paymentProofImage: 1,
         paymentReferenceId: 1,
+        transactionId: 1,
+        fullPaymentMethod: 1,
+        fullPaymentConfirmedAt: 1,
+        fullPaymentAmount: 1,
         paymentSentAt: 1,
         paymentSentAmount: 1,
         requiresProofReupload: 1,
@@ -3249,6 +3254,23 @@ export const confirmFullPayment = async (req, res, next) => {
     booking.status = "active";
     booking.fullPaymentConfirmedAt = new Date();
 
+    // Automatically generate and assign a unique Transaction ID the moment
+    // full payment is successfully confirmed. Guard against re-generating
+    // one if this booking somehow already has one (idempotency safeguard).
+    // The full-payment amount is captured at the same time, for the same
+    // reason: it should reflect what was actually paid in *this*
+    // transaction, not be recomputed later from fields that can drift
+    // (e.g. after an extension changes booking.amount).
+    if (!booking.transactionId) {
+      booking.transactionId = await generateUniqueTransactionId(
+        MotorcycleBooking,
+      );
+      booking.fullPaymentAmount = Math.max(
+        0,
+        (booking.amount || 0) - (booking.reservationFee || 0),
+      );
+    }
+
     // 👉 THIS IS THE MISSING FIX: Save the payment method from the request
     if (req.body.fullPaymentMethod) {
       booking.fullPaymentMethod = req.body.fullPaymentMethod;
@@ -3302,6 +3324,8 @@ export const confirmFullPayment = async (req, res, next) => {
         status: updated.status,
         paymentStatus: updated.paymentStatus,
         fullPaymentMethod: updated.fullPaymentMethod, // Log it too
+        transactionId: updated.transactionId,
+        fullPaymentAmount: updated.fullPaymentAmount,
         securityDepositCollected: updated.securityDeposit?.collected || false,
         securityDepositAmount: updated.securityDeposit?.amount || 1000,
         securityDepositMethod: updated.securityDeposit?.collectionMethod || "",
@@ -3319,6 +3343,8 @@ export const confirmFullPayment = async (req, res, next) => {
     res.json({
       success: true,
       message: "Full payment confirmed and booking activated",
+      transactionId: updated.transactionId,
+      fullPaymentAmount: updated.fullPaymentAmount,
       booking: updated,
     });
   } catch (err) {

@@ -31,6 +31,8 @@ import axios from "axios";
 import { createPortal } from "react-dom";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -1603,6 +1605,32 @@ const DiscountManagement = () => {
     return matchSearch && matchStatus;
   });
 
+  const promoReportColumns = [
+    { key: "name", label: "Promo Name" },
+    { key: "code", label: "Code" },
+    { key: "discountType", label: "Type" },
+    { key: "discountValue", label: "Value", value: (p) => (p.discountType === "percentage" ? `${p.discountValue}%` : `PHP ${Number(p.discountValue || 0).toLocaleString()}`) },
+    { key: "startDate", label: "Start Date" },
+    { key: "endDate", label: "End Date" },
+    { key: "usedCount", label: "Used" },
+    { key: "maxUses", label: "Max Uses", value: (p) => (p.maxUses === null || p.maxUses === undefined ? "Unlimited" : p.maxUses) },
+    { key: "status", label: "Status", value: (p) => getPromoStatus(p).label },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "Discounts & Promos Report",
+      subtitle: filterStatus === "all" ? "All promos" : `Status: ${filterStatus}`,
+      columns: promoReportColumns,
+      rows: filteredPromos,
+      emptyMessage: "No promos match the current search or status filter.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("discounts-promos-report", promoReportColumns, filteredPromos);
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f8fa]">
       {toast && (
@@ -1643,17 +1671,22 @@ const DiscountManagement = () => {
               Create and manage promotional offers for your fleet
             </p>
           </div>
-          <button
-            onClick={() => {
-              setEditingPromo(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#b50002] text-white text-sm font-bold rounded-xl shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex-shrink-0"
+          <div
+            className="flex items-center gap-2 flex-shrink-0"
             style={{ display: activeTab === "promos" ? "flex" : "none" }}
           >
-            <Plus className="w-4 h-4" />
-            New Promo
-          </button>
+            <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+            <button
+              onClick={() => {
+                setEditingPromo(null);
+                setShowForm(true);
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#b50002] text-white text-sm font-bold rounded-xl shadow-lg shadow-[#b50002]/30 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex-shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              New Promo
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

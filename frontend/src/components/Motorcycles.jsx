@@ -870,13 +870,26 @@ const Motorcycles = () => {
     if (motorcycle?.status && motorcycle.status !== "available") return true;
     return eff?.state === "booked";
   };
+
+  //uncomment this if you want to redirect to a separate "view availability" screen when the motorcycle is booked
+
+  // const handleBook = (motorcycle, id) => {
+  //   const disabled = isBookDisabled(motorcycle);
+  //   navigate(`/motorcycles/${id}`, {
+  //     state: {
+  //       motorcycle,
+  //       showCalendar: disabled, // Pass this flag to the detail page
+  //     },
+  //   });
+  // };
+
   const handleBook = (motorcycle, id) => {
-    const disabled = isBookDisabled(motorcycle);
+    // "Rent Now" always starts the normal booking flow for this vehicle.
+    // Date availability (bookings/maintenance, with a buffer) is enforced
+    // directly in the pickup/return calendars on the detail page, so we no
+    // longer redirect to a separate "view availability" screen.
     navigate(`/motorcycles/${id}`, {
-      state: {
-        motorcycle,
-        showCalendar: disabled, // Pass this flag to the detail page
-      },
+      state: { motorcycle },
     });
   };
 
@@ -1351,7 +1364,7 @@ const Motorcycles = () => {
                           className="mc-rent-btn"
                           onClick={() => handleBook(motorcycle, id)}
                         >
-                          {disabled ? "View Availability" : "Rent Now"}
+                          Rent Now
                           <FaArrowRight size={10} />
                         </button>
                       </div>

@@ -601,6 +601,12 @@ export const generateRentalAgreementPDF = (booking) => {
         value: bookingDetails.pickupLocation,
       });
     }
+    if (booking.transactionId) {
+      periodRows.push({
+        label: "Transaction ID",
+        value: booking.transactionId,
+      });
+    }
 
     const feeRows = [
       { label: "Description", amount: "Amount", isHeader: true },

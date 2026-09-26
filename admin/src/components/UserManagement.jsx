@@ -20,6 +20,8 @@ import {
 } from "react-icons/fa";
 import { AlertTriangle, CheckCircle2, Trash2, Users } from "lucide-react";
 import { LoyaltyTierBadge } from "../components/DiscountBadge";
+import ReportActionButtons from "./ReportActionButtons";
+import { printReport, downloadCSV } from "../utils/reportUtils";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
@@ -762,6 +764,29 @@ const UserManagement = () => {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  const userReportColumns = [
+    { key: "name", label: "Name", value: (u) => `${u.firstName || ""} ${u.lastName || ""}`.trim() },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Phone" },
+    { key: "isVerified", label: "Verified", value: (u) => (u.isVerified ? "Yes" : "No") },
+    { key: "loyaltyTier", label: "Loyalty Tier", value: (u) => u.loyaltyTier || "None" },
+    { key: "createdAt", label: "Joined", value: (u) => formatDate(u.createdAt) },
+  ];
+
+  const handlePrintReport = () => {
+    printReport({
+      title: "User Management Report",
+      subtitle: selectedStatus === "unverified" ? "Unverified users" : "All users",
+      columns: userReportColumns,
+      rows: filteredUsers,
+      emptyMessage: "No users match the current search or status filter.",
+    });
+  };
+
+  const handleExportCSV = () => {
+    downloadCSV("user-management-report", userReportColumns, filteredUsers);
+  };
+
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleDelete = async (userId) => {
     const user = users.find((u) => u.id === userId);
@@ -815,14 +840,17 @@ const UserManagement = () => {
     <main className="min-h-screen bg-[#f7f8fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-36">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
-            User Management
-          </h1>
-          <p className="text-slate-700 text-sm mt-1">
-            Manage your registered users, monitor verification status, and
-            handle account access.
-          </p>
+        <div className="mb-7 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#171717] tracking-tight">
+              User Management
+            </h1>
+            <p className="text-slate-700 text-sm mt-1">
+              Manage your registered users, monitor verification status, and
+              handle account access.
+            </p>
+          </div>
+          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
         </div>
 
         {/* Stat Cards */}

@@ -1039,6 +1039,10 @@ const normalizeBooking = (booking) => {
       "",
     paymentStatus: booking.paymentStatus || "pending_verification",
     paymentReferenceId: booking.paymentReferenceId || "",
+    fullPaymentMethod: booking.fullPaymentMethod || "",
+    fullPaymentConfirmedAt: booking.fullPaymentConfirmedAt || "",
+    fullPaymentAmount: Number(booking.fullPaymentAmount || 0),
+    transactionId: booking.transactionId || "",
     paymentSentAt: booking.paymentSentAt || "",
     paymentSentAmount: Number(booking.paymentSentAmount || DOWNPAYMENT),
     requiresProofReupload: !!booking.requiresProofReupload,
@@ -1439,6 +1443,42 @@ const BookingRow = ({
   const dueAtPickup = Math.max(0, grossTotal - downpayment);
   const needsReupload =
     booking.requiresProofReupload || booking.paymentStatus === "rejected";
+
+  // Small label/value row used inside the Reservation Payment and Full
+  // Payment info cards below. Text color is inherited from the card's
+  // wrapping element so each card can have its own accent color.
+  const PaymentInfoRow = ({ label, value, mono = false }) => (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 4,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          opacity: 0.75,
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          fontFamily: mono ? "monospace" : "'Space Grotesk', sans-serif",
+          letterSpacing: "-0.2px",
+          textAlign: "right",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
 
   // True original return date/time BEFORE any extensions were made. Used to
   // keep the promo code applied at checkout pinned to the amount it actually
@@ -3194,6 +3234,102 @@ const BookingRow = ({
                   )}
                 </div>
               </div>
+
+              {/* Reservation Payment info (Reference ID + Method + Amount) */}
+              {booking.reservationFeePaid && (
+                <div
+                  style={{
+                    background: "#eff6ff",
+                    border: "1.5px solid #bfdbfe",
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginTop: 12,
+                    color: "#1e3a8a",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <FaReceipt style={{ color: "#2563eb" }} />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Reservation Payment
+                    </span>
+                  </div>
+                  <PaymentInfoRow
+                    label="Reference ID"
+                    value={booking.paymentReferenceId || "—"}
+                    mono
+                  />
+                  <PaymentInfoRow
+                    label="Payment Method"
+                    value={booking.paymentMethod || "—"}
+                  />
+                  <PaymentInfoRow
+                    label="Payment Amount"
+                    value={formatPrice(downpayment)}
+                  />
+                </div>
+              )}
+
+              {/* Full Payment info (Transaction ID + Method + Amount) */}
+              {booking.transactionId && (
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1.5px solid #bbf7d0",
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginTop: 12,
+                    color: "#065f46",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <FaReceipt style={{ color: "#16a34a" }} />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Full Payment
+                    </span>
+                  </div>
+                  <PaymentInfoRow
+                    label="Transaction ID"
+                    value={booking.transactionId}
+                    mono
+                  />
+                  <PaymentInfoRow
+                    label="Payment Method"
+                    value={booking.fullPaymentMethod || "—"}
+                  />
+                  <PaymentInfoRow
+                    label="Payment Amount"
+                    value={formatPrice(
+                      booking.fullPaymentAmount || dueAtPickup,
+                    )}
+                  />
+                </div>
+              )}
 
               {/* Security Deposit Status */}
               {booking.securityDeposit?.collected && (

@@ -1200,7 +1200,7 @@ const Motorcycles = () => {
                     "Unnamed";
                   const imageSrc =
                     buildImageSrc(motorcycle.image) || fallbackImage;
-                  const disabled = isBookDisabled(motorcycle);
+                  // const disabled = isBookDisabled(motorcycle);
                   const originalPrice =
                     motorcycle.dailyRate ??
                     motorcycle.price ??

@@ -780,7 +780,7 @@ const HomeMotorcycles = () => {
                 "Unnamed";
               const imgSrc = buildImageSrc(m.image) || FALLBACK_IMG;
               const avail = getAvailabilityInfo(m);
-              const disabled = isBookDisabled(m);
+              // const disabled = isBookDisabled(m);
               const originalPrice = Math.round(m.dailyRate ?? m.price ?? 0);
               const bestDiscount = getBestDiscount(m, activePromos, 1);
               const discountedPrice = bestDiscount

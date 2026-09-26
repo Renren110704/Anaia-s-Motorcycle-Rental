@@ -865,11 +865,11 @@ const Motorcycles = () => {
   //   letterSpacing: "0.3px",
   // });
 
-  const isBookDisabled = (motorcycle) => {
-    const eff = computeEffectiveAvailability(motorcycle);
-    if (motorcycle?.status && motorcycle.status !== "available") return true;
-    return eff?.state === "booked";
-  };
+  // const isBookDisabled = (motorcycle) => {
+  //   const eff = computeEffectiveAvailability(motorcycle);
+  //   if (motorcycle?.status && motorcycle.status !== "available") return true;
+  //   return eff?.state === "booked";
+  // };
 
   //uncomment this if you want to redirect to a separate "view availability" screen when the motorcycle is booked
 

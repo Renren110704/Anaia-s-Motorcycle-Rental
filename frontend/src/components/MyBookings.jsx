@@ -5746,6 +5746,8 @@ const MyBookings = () => {
         b.destination,
         b.dates?.pickup,
         b.dates?.return,
+        b.paymentReferenceId,
+        b.transactionId,
       ]
         .filter(Boolean)
         .join(" ")
@@ -5926,7 +5928,7 @@ const MyBookings = () => {
                   type="text"
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  placeholder="Search by vehicle, location, or reference..."
+                  placeholder="Search by vehicle, location, reference ID, or transaction ID..."
                   style={{
                     width: "100%",
                     boxSizing: "border-box",

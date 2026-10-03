@@ -325,11 +325,11 @@ const HomeMotorcycles = () => {
     return { label: "", color: "available" };
   };
 
-  // const isBookDisabled = (motorcycle) => {
-  //   const eff = computeEffectiveAvailability(motorcycle);
-  //   if (motorcycle?.status && motorcycle.status !== "available") return true;
-  //   return eff?.state === "booked";
-  // };
+  const isBookDisabled = (motorcycle) => {
+    if (motorcycle?.status && motorcycle.status !== "available") return true;
+    const eff = computeEffectiveAvailability(motorcycle);
+    return eff?.state === "booked";
+  };
 
   //uncomment this if you want to redirect to a separate "view availability" screen when the motorcycle is booked
 
@@ -344,11 +344,8 @@ const HomeMotorcycles = () => {
   // };
 
   const handleBook = (motorcycle) => {
-    // Same reasoning as Motorcycles.jsx: always go straight into the
-    // normal booking flow; the calendar itself now blocks unavailable
-    // dates for this vehicle.
     navigate(`/motorcycles/${motorcycle._id || motorcycle.id}`, {
-      state: { motorcycle },
+      state: { motorcycle, showCalendar: isBookDisabled(motorcycle) },
     });
   };
 
@@ -780,7 +777,7 @@ const HomeMotorcycles = () => {
                 "Unnamed";
               const imgSrc = buildImageSrc(m.image) || FALLBACK_IMG;
               const avail = getAvailabilityInfo(m);
-              // const disabled = isBookDisabled(m);
+              const disabled = isBookDisabled(m);
               const originalPrice = Math.round(m.dailyRate ?? m.price ?? 0);
               const bestDiscount = getBestDiscount(m, activePromos, 1);
               const discountedPrice = bestDiscount
@@ -949,7 +946,8 @@ const HomeMotorcycles = () => {
                         handleBook(m);
                       }}
                     >
-                      Rent Now <ArrowRight size={13} />
+                      {disabled ? "View Availability" : "Rent Now"}{" "}
+                      <ArrowRight size={13} />
                     </button>
                   </div>
                 </div>

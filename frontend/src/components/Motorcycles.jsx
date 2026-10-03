@@ -865,11 +865,11 @@ const Motorcycles = () => {
   //   letterSpacing: "0.3px",
   // });
 
-  // const isBookDisabled = (motorcycle) => {
-  //   const eff = computeEffectiveAvailability(motorcycle);
-  //   if (motorcycle?.status && motorcycle.status !== "available") return true;
-  //   return eff?.state === "booked";
-  // };
+  const isBookDisabled = (motorcycle) => {
+    if (motorcycle?.status && motorcycle.status !== "available") return true;
+    const eff = computeEffectiveAvailability(motorcycle);
+    return eff?.state === "booked";
+  };
 
   //uncomment this if you want to redirect to a separate "view availability" screen when the motorcycle is booked
 
@@ -884,12 +884,8 @@ const Motorcycles = () => {
   // };
 
   const handleBook = (motorcycle, id) => {
-    // "Rent Now" always starts the normal booking flow for this vehicle.
-    // Date availability (bookings/maintenance, with a buffer) is enforced
-    // directly in the pickup/return calendars on the detail page, so we no
-    // longer redirect to a separate "view availability" screen.
     navigate(`/motorcycles/${id}`, {
-      state: { motorcycle },
+      state: { motorcycle, showCalendar: isBookDisabled(motorcycle) },
     });
   };
 
@@ -1200,7 +1196,7 @@ const Motorcycles = () => {
                     "Unnamed";
                   const imageSrc =
                     buildImageSrc(motorcycle.image) || fallbackImage;
-                  // const disabled = isBookDisabled(motorcycle);
+                  const disabled = isBookDisabled(motorcycle);
                   const originalPrice =
                     motorcycle.dailyRate ??
                     motorcycle.price ??
@@ -1364,7 +1360,7 @@ const Motorcycles = () => {
                           className="mc-rent-btn"
                           onClick={() => handleBook(motorcycle, id)}
                         >
-                          Rent Now
+                          {disabled ? "View Availability" : "Rent Now"}
                           <FaArrowRight size={10} />
                         </button>
                       </div>

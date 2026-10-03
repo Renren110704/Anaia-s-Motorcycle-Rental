@@ -28,7 +28,7 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({
@@ -360,9 +360,17 @@ const SystemLog = () => {
   }, [logs]);
 
   const systemLogReportColumns = [
-    { key: "createdAt", label: "Date/Time", value: (l) => formatDateTime(l.createdAt) },
+    {
+      key: "createdAt",
+      label: "Date/Time",
+      value: (l) => formatDateTime(l.createdAt),
+    },
     { key: "actorType", label: "Actor Type" },
-    { key: "actorName", label: "Actor", value: (l) => l.actorName || l.actorEmail || "Unknown" },
+    {
+      key: "actorName",
+      label: "Actor",
+      value: (l) => l.actorName || l.actorEmail || "Unknown",
+    },
     { key: "action", label: "Action" },
     { key: "summary", label: "Summary" },
     { key: "targetType", label: "Target Type" },
@@ -385,24 +393,6 @@ const SystemLog = () => {
     return res.data?.data || [];
   };
 
-  const handlePrintReport = async () => {
-    setReportBusy(true);
-    try {
-      const rows = await fetchAllFilteredLogs();
-      printReport({
-        title: "System Log Report",
-        subtitle: hasFilters ? "Filtered results" : "All logs",
-        columns: systemLogReportColumns,
-        rows,
-        emptyMessage: "No logs match the current filters.",
-      });
-    } catch (err) {
-      toast.error("Failed to prepare the report. Please try again.");
-    } finally {
-      setReportBusy(false);
-    }
-  };
-
   const handleExportCSV = async () => {
     setReportBusy(true);
     try {
@@ -416,6 +406,18 @@ const SystemLog = () => {
   };
 
   const hasFilters = search || actorType || action;
+
+  const printConfig = {
+    title: "System Log Report",
+    subtitle: hasFilters ? "Filtered results" : "All logs",
+    columns: systemLogReportColumns,
+    rows: fetchAllFilteredLogs, // async: fetches every matching log, then date-filters
+    getDate: (l) => l.createdAt,
+    dateLabel: "Date/time logged",
+    emptyMessage: "No logs match the current filters or date range.",
+    onError: () =>
+      toast.error("Failed to prepare the report. Please try again."),
+  };
 
   const clearFilters = () => {
     setSearch("");
@@ -501,7 +503,7 @@ const SystemLog = () => {
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <ReportActionButtons
-              onPrint={handlePrintReport}
+              report={printConfig}
               onExport={handleExportCSV}
               disabled={reportBusy}
             />

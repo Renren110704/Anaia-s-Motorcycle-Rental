@@ -1,12 +1,7 @@
 // Shared helpers for the "Print Report" and "Export CSV" actions used across
-// the admin pages (ManageMotorcycle, ReturnInspection, ReviewManagement,
-// SystemLog, MotorcycleBooking, DiscountManagement, MaintenancePage,
-// AdminContact, UserManagement).
+// the admin pages.
 //
 // columns shape: [{ key: "make", label: "Vehicle", value?: (row) => any }]
-// - `key` reads row[key] directly.
-// - optional `value(row)` lets a column derive/format its own text
-//   (e.g. combining make + model, or formatting a date/currency).
 
 const cellText = (col, row) => {
   const raw = typeof col.value === "function" ? col.value(row) : row[col.key];
@@ -14,8 +9,7 @@ const cellText = (col, row) => {
   return String(raw);
 };
 
-// Escape a value for CSV: wrap in quotes and double up any internal quotes,
-// so commas, quotes, and newlines inside data never break the file.
+// ── CSV (unchanged behaviour) ────────────────────────────────────────────────
 const csvCell = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
 
 export const buildCSV = (columns, rows) => {
@@ -26,19 +20,9 @@ export const buildCSV = (columns, rows) => {
   return rows.length ? [header, body].join("\n") : header;
 };
 
-/**
- * Downloads the given rows as a CSV file.
- * @param {string} filename  Base filename (".csv" appended if missing).
- * @param {Array}  columns   [{ key, label, value? }]
- * @param {Array}  rows      Array of plain objects (the currently
- *                           filtered/visible dataset for that page).
- */
 export const downloadCSV = (filename, columns, rows) => {
   const csv = buildCSV(columns, rows || []);
-  // UTF-8 BOM so Excel auto-detects encoding correctly.
-  const blob = new Blob(["\uFEFF" + csv], {
-    type: "text/csv;charset=utf-8;",
-  });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -51,95 +35,242 @@ export const downloadCSV = (filename, columns, rows) => {
   URL.revokeObjectURL(url);
 };
 
+// ── Date helpers ─────────────────────────────────────────────────────────────
+export const escapeHTML = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+const parseDate = (v) => {
+  if (v === undefined || v === null || v === "") return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  const s = String(v);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s)
+    ? new Date(`${s}T00:00:00`)
+    : new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const endOfDay = (d) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+/** Any date-ish value -> "YYYY-MM-DD" (local), or "" if invalid. */
+export const toISODate = (v) => {
+  const d = parseDate(v);
+  if (!d) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+/** Any date-ish value -> "May 5, 2026". */
+export const formatReportDate = (v, fallback = "—") => {
+  const d = parseDate(v);
+  return d
+    ? d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : fallback;
+};
+
 /**
- * Opens a clean, print-formatted report of the given rows in a new window
- * and triggers the browser's print dialog. Only the report itself is in
- * that window, so navigation, sidebars, filters, and action buttons never
- * appear in the printed output.
- * @param {Object} opts
- * @param {string} opts.title     Report title (also used as the doc title).
- * @param {string} [opts.subtitle] Small badge, e.g. active filter summary.
- * @param {Array}  opts.columns   [{ key, label, value? }]
- * @param {Array}  opts.rows      Rows to print.
- * @param {string} [opts.emptyMessage]
+ * Filters rows to an inclusive Date From / Date To range.
+ *
+ * getDate(row) may return:
+ *   - a single date            -> kept if it falls inside the range
+ *   - [start, end]             -> kept if the period OVERLAPS the range
+ *                                 (a missing start/end means open-ended)
+ * Rows with no usable date are dropped when a range is set, unless
+ * opts.undated === "include". With no from AND no to, all rows are returned.
  */
+export const filterByDateRange = (rows, getDate, from, to, opts = {}) => {
+  const f = parseDate(from);
+  const t = parseDate(to);
+  if (!f && !t) return rows;
+  const lo = f ? startOfDay(f) : null;
+  const hi = t ? endOfDay(t) : null;
+  const keepUndated = opts.undated === "include";
+
+  return rows.filter((row) => {
+    const v = getDate(row);
+    if (Array.isArray(v)) {
+      const s = parseDate(v[0]);
+      const e = parseDate(v[1]);
+      if (!s && !e) return keepUndated;
+      if (hi && s && startOfDay(s) > hi) return false;
+      if (lo && e && endOfDay(e) < lo) return false;
+      return true;
+    }
+    const d = parseDate(v);
+    if (!d) return keepUndated;
+    if (lo && d < lo) return false;
+    if (hi && d > hi) return false;
+    return true;
+  });
+};
+
+/** Earliest / latest date found in rows, as "YYYY-MM-DD" ("" if none). */
+export const getDateBounds = (rows, getDate) => {
+  let min = null;
+  let max = null;
+  rows.forEach((row) => {
+    const v = getDate ? getDate(row) : null;
+    (Array.isArray(v) ? v : [v]).forEach((x) => {
+      const d = parseDate(x);
+      if (!d) return;
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
+    });
+  });
+  return { min: min ? toISODate(min) : "", max: max ? toISODate(max) : "" };
+};
+
+// ── Print document (shared by every printed admin report) ───────────────────
+// Strictly black on white: no colours, gradients, shadows or badges.
+const PRINT_CSS = (landscape, fontPt) => `
+  @page {
+    size: A4 ${landscape ? "landscape" : "portrait"};
+    margin: 14mm 12mm 16mm 12mm;
+    @bottom-center { content: "Page " counter(page) " of " counter(pages); font: 9pt Arial, Helvetica, sans-serif; color: #000; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; color: #000; background: transparent; box-shadow: none; text-shadow: none; }
+  html, body { background: #fff; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: ${fontPt}pt; line-height: 1.35; padding: 12mm; }
+  .rpt-head { margin-bottom: 8mm; }
+  .rpt-org { text-align: center; font-size: 10pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .rpt-title { text-align: center; font-size: 17pt; font-weight: 700; margin-top: 2mm; text-transform: uppercase; letter-spacing: 0.04em; }
+  .rpt-rule { border: 0; border-top: 2px solid #000; margin: 4mm 0 3mm; }
+  table.rpt-meta { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+  table.rpt-meta th, table.rpt-meta td { border: 1px solid #000; padding: 4px 8px; font-size: 10pt; text-align: left; vertical-align: top; }
+  table.rpt-meta th { width: 18%; font-weight: 700; white-space: nowrap; }
+  h2.rpt-section { font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 6mm 0 2mm; padding-bottom: 1mm; border-bottom: 1px solid #000; break-after: avoid; }
+  table.rpt-table { width: 100%; border-collapse: collapse; }
+  table.rpt-table th, table.rpt-table td { border: 1px solid #000; padding: 4px 5px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  table.rpt-table th { font-weight: 700; }
+  table.rpt-table td.num, table.rpt-table th.num { width: 4%; text-align: center; white-space: nowrap; }
+  table.rpt-table td.amt, table.rpt-table th.amt { text-align: right; white-space: nowrap; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  .rpt-empty { border: 1px solid #000; padding: 10mm 0; text-align: center; font-style: italic; }
+  .rpt-end { margin-top: 6mm; text-align: center; font-size: 9pt; letter-spacing: 0.08em; }
+  @media print { body { padding: 0; } }
+`;
+
+/**
+ * Builds the standard formal report page and opens the print dialog.
+ * Returns false if the pop-up was blocked.
+ */
+export const printDocument = ({
+  title,
+  subtitle = "",
+  dateFrom = "",
+  dateTo = "",
+  dateBasis = "",
+  bodyHTML,
+  recordCount = null,
+  landscape = false,
+  fontPt = 10,
+}) => {
+  const from = formatReportDate(dateFrom, "All dates");
+  const to = formatReportDate(dateTo, "All dates");
+  const generated = new Date().toLocaleString("en-PH", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+  const docTitle = `${title} (${from} to ${to})`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>${escapeHTML(docTitle)}</title>
+<style>${PRINT_CSS(landscape, fontPt)}</style>
+</head>
+<body>
+  <header class="rpt-head">
+    <div class="rpt-org">Anaia Motorcycle Rental</div>
+    <div class="rpt-title">${escapeHTML(title)}</div>
+    <hr class="rpt-rule"/>
+    <table class="rpt-meta">
+      <tr>
+        <th>Date From</th><td>${escapeHTML(from)}</td>
+        <th>Date To</th><td>${escapeHTML(to)}</td>
+      </tr>
+      ${dateBasis ? `<tr><th>Date Basis</th><td colspan="3">${escapeHTML(dateBasis)}</td></tr>` : ""}
+      ${subtitle ? `<tr><th>Filters</th><td colspan="3">${escapeHTML(subtitle)}</td></tr>` : ""}
+      <tr>
+        <th>Date Generated</th><td${recordCount === null ? ' colspan="3"' : ""}>${escapeHTML(generated)}</td>
+        ${recordCount === null ? "" : `<th>Total Records</th><td>${recordCount}</td>`}
+      </tr>
+    </table>
+  </header>
+  ${bodyHTML}
+  <div class="rpt-end">*** End of Report ***</div>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank", "width=1100,height=800");
+  if (!w) {
+    // eslint-disable-next-line no-alert
+    alert(
+      "Pop-up blocked. Please allow pop-ups for this site to print reports.",
+    );
+    return false;
+  }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
+  return true;
+};
+
+/** Prints a table report (used by every admin list page). */
 export const printReport = ({
   title,
   subtitle = "",
   columns,
   rows = [],
   emptyMessage = "No records to display.",
+  dateFrom = "",
+  dateTo = "",
+  dateBasis = "",
 }) => {
-  const escapeHTML = (s) =>
-    String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  const n = columns.length;
+  const landscape = n > 6;
+  const fontPt = n > 12 ? 7 : n > 9 ? 8 : n > 6 ? 9 : 10;
 
-  const tableHTML = rows.length
-    ? `<table>
-        <thead><tr>${columns.map((c) => `<th>${escapeHTML(c.label)}</th>`).join("")}</tr></thead>
-        <tbody>
-          ${rows
-            .map(
-              (row) =>
-                `<tr>${columns
-                  .map((c) => `<td>${escapeHTML(cellText(c, row)) || "&mdash;"}</td>`)
-                  .join("")}</tr>`,
-            )
-            .join("")}
-        </tbody>
+  const bodyHTML = rows.length
+    ? `<table class="rpt-table">
+        <thead><tr><th class="num">No.</th>${columns
+          .map((c) => `<th>${escapeHTML(c.label)}</th>`)
+          .join("")}</tr></thead>
+        <tbody>${rows
+          .map(
+            (row, i) =>
+              `<tr><td class="num">${i + 1}</td>${columns
+                .map(
+                  (c) =>
+                    `<td>${escapeHTML(cellText(c, row)) || "&mdash;"}</td>`,
+                )
+                .join("")}</tr>`,
+          )
+          .join("")}</tbody>
       </table>`
-    : `<p class="empty">${escapeHTML(emptyMessage)}</p>`;
+    : `<div class="rpt-empty">${escapeHTML(emptyMessage)}</div>`;
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>${escapeHTML(title)}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; color: #171717; padding: 32px; font-size: 12px; }
-  .report-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #b50002; }
-  .report-header h1 { font-size: 19px; font-weight: 800; }
-  .report-header p { font-size: 11px; color: #888; margin-top: 4px; }
-  .badge { display: inline-block; background: #fef2f2; color: #b50002; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; max-width: 320px; text-align: right; }
-  table { width: 100%; border-collapse: collapse; }
-  thead tr { background: #f8fafc; }
-  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #f1f5f9; font-size: 11px; vertical-align: top; }
-  th { font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
-  tbody tr:nth-child(even) { background: #fafafa; }
-  .empty { padding: 24px 0; text-align: center; color: #94a3b8; font-style: italic; }
-  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
-  @media print {
-    body { padding: 16px; }
-    thead { display: table-header-group; }
-    tr { page-break-inside: avoid; }
-  }
-</style>
-</head>
-<body>
-  <div class="report-header">
-    <div>
-      <h1>${escapeHTML(title)}</h1>
-      <p>Generated ${new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}</p>
-    </div>
-    ${subtitle ? `<span class="badge">${escapeHTML(subtitle)}</span>` : ""}
-  </div>
-  ${tableHTML}
-  <div class="footer">Anaia Motorcycle Rental &nbsp;&middot;&nbsp; ${rows.length} record${rows.length === 1 ? "" : "s"} &nbsp;&middot;&nbsp; Confidential</div>
-</body>
-</html>`;
-
-  const w = window.open("", "_blank", "width=1100,height=800");
-  if (!w) {
-    // Popup blocked — surface this instead of failing silently.
-    // eslint-disable-next-line no-alert
-    alert("Pop-up blocked. Please allow pop-ups for this site to print reports.");
-    return;
-  }
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
+  return printDocument({
+    title,
+    subtitle,
+    dateFrom,
+    dateTo,
+    dateBasis,
+    bodyHTML,
+    recordCount: rows.length,
+    landscape,
+    fontPt,
+  });
 };

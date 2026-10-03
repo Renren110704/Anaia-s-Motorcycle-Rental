@@ -351,6 +351,41 @@ const addDaysHelper = (date, n) => {
 // both the pickup and return calendars.
 const UNAVAILABILITY_BUFFER_DAYS = 2;
 
+// ── Blocked-range helpers (rentals + bookings + maintenance, ±buffer) ──
+const MS_PER_DAY_CAL = 24 * 60 * 60 * 1000;
+// Timezone/DST-safe whole-day number from a Date or a "YYYY-MM-DD" string.
+const dayNum = (d) => {
+  const x = d instanceof Date ? d : new Date(`${d}T00:00:00`);
+  return Math.round(
+    Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()) / MS_PER_DAY_CAL,
+  );
+};
+// Returns merged [startDay, endDay] pairs. Overlapping or back-to-back
+// buffered ranges collapse into one continuous blocked range.
+const buildBlockedRanges = (bookingRanges = [], maintenanceRanges = []) => {
+  const raw = [
+    ...bookingRanges.map((b) => [dayNum(b.pickupDate), dayNum(b.returnDate)]),
+    ...maintenanceRanges.map((m) => [dayNum(m.startDate), dayNum(m.endDate)]),
+  ]
+    .filter(([s, e]) => !Number.isNaN(s) && !Number.isNaN(e))
+    .map(([s, e]) => [
+      Math.min(s, e) - UNAVAILABILITY_BUFFER_DAYS,
+      Math.max(s, e) + UNAVAILABILITY_BUFFER_DAYS,
+    ])
+    .sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  raw.forEach(([s, e]) => {
+    const last = merged[merged.length - 1];
+    if (last && s <= last[1] + 1) last[1] = Math.max(last[1], e);
+    else merged.push([s, e]);
+  });
+  return merged;
+};
+const isDayBlocked = (merged, day) =>
+  merged.some(([s, e]) => day >= s && day <= e);
+const isRangeBlocked = (merged, startDay, endDay) =>
+  merged.some(([s, e]) => startDay <= e && endDay >= s);
+
 /* ── Shared styles ─────────────────────────────────────────────── */
 const S = {
   card: {
@@ -997,7 +1032,15 @@ const InlineDatePicker = ({
   );
 };
 
-const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
+const InlineFullCalendar = ({
+  bookingRanges,
+  maintenanceRanges,
+  // Optional: only passed when used as the date-selection step.
+  selectable = false,
+  selectedPickup = "",
+  selectedReturn = "",
+  onSelectDate,
+}) => {
   const [viewMonth, setViewMonth] = useState(new Date());
   const monthGrid = getMonthGrid(viewMonth);
   const monthLabel = viewMonth.toLocaleDateString("en-US", {
@@ -1005,6 +1048,18 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
     year: "numeric",
   });
   const todayKey = toDateKey(new Date());
+  const blocked = buildBlockedRanges(bookingRanges, maintenanceRanges);
+
+  // Pickup must be within 7 days from today. Return dates are NOT capped by this.
+  const maxPickupISO = addDaysToISODate(todayISO(), 7);
+  const maxPickupLabel = new Date(
+    `${maxPickupISO}T00:00:00`,
+  ).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const choosingReturn = !!selectedPickup && !selectedReturn;
 
   return (
     <div style={{ padding: "10px 0" }}>
@@ -1042,6 +1097,33 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
           <FaChevronRight size={12} />
         </button>
       </div>
+
+      {selectable && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            marginBottom: 14,
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "rgba(181,0,2,0.06)",
+            border: "1.5px solid rgba(181,0,2,0.15)",
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: "#b50002",
+            fontFamily: "'Space Grotesk',sans-serif",
+            fontWeight: 600,
+          }}
+        >
+          <FaCalendarAlt size={12} style={{ marginTop: 2, flexShrink: 0 }} />
+          <span>
+            Pickup must be within 7 days from today (on or before{" "}
+            {maxPickupLabel}). Your return date can be any available date after
+            pickup.
+          </span>
+        </div>
+      )}
 
       {/* Day Headers */}
       <div
@@ -1087,17 +1169,42 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
           const isMaintenance = maintenanceRanges.some(
             (m) => dk >= toDateKey(m.startDate) && dk <= toDateKey(m.endDate),
           );
-          // FIX: using addDaysHelper instead of addDays
-          const isBuffer = maintenanceRanges.some(
-            (m) => dk === toDateKey(addDaysHelper(m.startDate, -1)),
-          );
+          // Buffer = inside the merged blocked range but not a rental/maintenance day itself.
+          const isBuffer =
+            !isBooked && !isMaintenance && isDayBlocked(blocked, dayNum(date));
           const isToday = dk === todayKey;
+          const isPast = dk < todayKey;
+          const isPickup = dk === selectedPickup;
+          const isReturn = dk === selectedReturn;
+          const inSelectedRange =
+            selectedPickup &&
+            selectedReturn &&
+            dk > selectedPickup &&
+            dk < selectedReturn;
+          // The 7-day limit only applies when choosing a PICKUP date.
+          // Once a pickup is chosen, any later date can be the return date.
+          const beyondPickupWindow =
+            !(choosingReturn && dk > selectedPickup) && dk > maxPickupISO;
+          const clickable =
+            selectable &&
+            !isPast &&
+            !isBooked &&
+            !isMaintenance &&
+            !isBuffer &&
+            !beyondPickupWindow;
 
           let bg = "transparent";
           let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
           let border = "1.5px solid transparent";
 
-          if (isMaintenance) {
+          if (isPickup || isReturn) {
+            bg = "#b50002";
+            color = "#fff";
+            border = "1.5px solid #b50002";
+          } else if (inSelectedRange) {
+            bg = "rgba(181,0,2,0.12)";
+            color = "#b50002";
+          } else if (isMaintenance) {
             bg = "rgba(124,58,237,0.08)";
             color = "#7c3aed";
             border = "1.5px solid rgba(124,58,237,0.2)";
@@ -1116,6 +1223,9 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
           return (
             <div
               key={idx}
+              role={selectable ? "button" : undefined}
+              aria-disabled={selectable ? !clickable : undefined}
+              onClick={() => clickable && onSelectDate && onSelectDate(dk)}
               style={{
                 height: 40,
                 display: "flex",
@@ -1126,9 +1236,21 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
                 border: border,
                 borderRadius: 10,
                 fontSize: 13,
-                fontWeight: isBooked || isMaintenance || isToday ? 800 : 600,
+                fontWeight:
+                  isBooked || isMaintenance || isToday || isPickup || isReturn
+                    ? 800
+                    : 600,
                 fontFamily: "'Space Grotesk',sans-serif",
-                opacity: inMonth ? 1 : 0.3,
+                opacity: inMonth
+                  ? selectable && (isPast || beyondPickupWindow)
+                    ? 0.35
+                    : 1
+                  : 0.3,
+                cursor: !selectable
+                  ? "default"
+                  : clickable
+                    ? "pointer"
+                    : "not-allowed",
               }}
             >
               {date.getDate()}
@@ -1152,6 +1274,7 @@ const InlineFullCalendar = ({ bookingRanges, maintenanceRanges }) => {
           { dot: "rgba(181,0,2,0.5)", label: "Booked" },
           { dot: "#7c3aed", label: "Maintenance" },
           { dot: "#f59e0b", label: "Buffer Day" },
+          ...(selectable ? [{ dot: "#b50002", label: "Selected" }] : []),
         ].map(({ dot, label }) => (
           <div
             key={label}
@@ -3269,6 +3392,11 @@ const MotorcycleDetail = () => {
     () => location.state?.showCalendar || false,
   );
 
+  // Date-selection step state for the availability calendar
+  const [calSel, setCalSel] = useState({ pickup: "", ret: "" });
+  const [calError, setCalError] = useState("");
+  const [calReady, setCalReady] = useState(false);
+
   // Calendar data state
   const [calBookings, setCalBookings] = useState([]);
   // const [calMotorcycles, setCalMotorcycles] = useState([]);
@@ -3493,6 +3621,69 @@ const MotorcycleDetail = () => {
     return String(id) === String(currentMotoId);
   });
 
+  // Merged ±2-day blocked ranges for THIS vehicle only
+  const blockedRanges = buildBlockedRanges(
+    bookingRanges,
+    currentMaintenanceRanges,
+  );
+
+  const handleCalendarDateSelect = (iso) => {
+    setCalError("");
+    const { pickup, ret } = calSel;
+    // First click, a click after a full selection, or a date on/before the
+    // pickup → start a new selection with this date as the pickup.
+    if (!pickup || ret || iso <= pickup) {
+      setCalSel({ pickup: iso, ret: "" });
+      return;
+    }
+    // Otherwise this is the return date: the WHOLE range must be free.
+    if (isRangeBlocked(blockedRanges, dayNum(pickup), dayNum(iso))) {
+      setCalError(
+        "That range overlaps a booked, maintenance, or buffer period. Please choose different dates.",
+      );
+      return;
+    }
+    setCalSel({ pickup, ret: iso });
+  };
+
+  const handleCalendarContinue = () => {
+    const { pickup, ret } = calSel;
+    if (!pickup || !ret) {
+      setCalError("Please select a pickup date and a return date.");
+      return;
+    }
+    if (pickup < todayISO()) {
+      setCalError("Pickup date cannot be in the past.");
+      return;
+    }
+    if (pickup > addDaysToISODate(todayISO(), 7)) {
+      setCalError("Pickup must be within 7 days from today.");
+      return;
+    }
+    if (ret <= pickup) {
+      setCalError("Return date must be after the pickup date.");
+      return;
+    }
+    if (isRangeBlocked(blockedRanges, dayNum(pickup), dayNum(ret))) {
+      setCalError(
+        "That range overlaps a booked, maintenance, or buffer period. Please choose different dates.",
+      );
+      return;
+    }
+    // Valid → pre-fill the existing booking form (Step 1) and open it.
+    const freshSlots = getAvailablePickupSlots(pickup);
+    setFormData((p) => ({
+      ...p,
+      pickupDate: pickup,
+      pickupTime: freshSlots.length > 0 ? freshSlots[0].value : "08:00",
+      returnDate: ret,
+    }));
+    setCalError("");
+    setShowAvailabilityCalendar(false);
+    setBookingStep(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   useEffect(() => {
     api
       .get("/api/settings/payment-methods", { params: { activeOnly: true } })
@@ -3583,7 +3774,10 @@ const MotorcycleDetail = () => {
             .filter(Boolean);
           setMaintenanceRanges([...autoMaint, ...stored]);
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (!controller.signal.aborted) setCalReady(true);
+      }
     })();
     return () => controller.abort();
   }, []);
@@ -5294,15 +5488,87 @@ const MotorcycleDetail = () => {
                       fontFamily: "'Space Grotesk',sans-serif",
                     }}
                   >
-                    This vehicle is currently rented or unavailable.
+                    Select your pickup date, then your return date.
                   </p>
                 </div>
               </div>
               <div className="md-form-body">
-                <InlineFullCalendar
-                  bookingRanges={bookingRanges}
-                  maintenanceRanges={currentMaintenanceRanges}
-                />
+                {!calReady ? (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(0,0,0,0.5)",
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    Loading availability…
+                  </p>
+                ) : (
+                  <InlineFullCalendar
+                    bookingRanges={bookingRanges}
+                    maintenanceRanges={currentMaintenanceRanges}
+                    selectable
+                    selectedPickup={calSel.pickup}
+                    selectedReturn={calSel.ret}
+                    onSelectDate={handleCalendarDateSelect}
+                  />
+                )}
+
+                <div
+                  style={{
+                    marginTop: 14,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    fontFamily: "'Space Grotesk',sans-serif",
+                    color: "#0E0E0E",
+                  }}
+                >
+                  Pickup:{" "}
+                  {calSel.pickup
+                    ? new Date(`${calSel.pickup}T00:00:00`).toLocaleDateString(
+                        "en-PH",
+                        { month: "short", day: "numeric", year: "numeric" },
+                      )
+                    : "—"}
+                  {"  ·  "}Return:{" "}
+                  {calSel.ret
+                    ? new Date(`${calSel.ret}T00:00:00`).toLocaleDateString(
+                        "en-PH",
+                        { month: "short", day: "numeric", year: "numeric" },
+                      )
+                    : "—"}
+                </div>
+
+                {calError && (
+                  <p
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: "#b50002",
+                      fontFamily: "'Space Grotesk',sans-serif",
+                    }}
+                  >
+                    {calError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCalendarContinue}
+                  disabled={!calReady || !calSel.pickup || !calSel.ret}
+                  style={{
+                    ...S.btnPrimary,
+                    marginTop: 16,
+                    opacity:
+                      !calReady || !calSel.pickup || !calSel.ret ? 0.5 : 1,
+                    cursor:
+                      !calReady || !calSel.pickup || !calSel.ret
+                        ? "not-allowed"
+                        : "pointer",
+                  }}
+                >
+                  Continue <FaArrowRight size={11} />
+                </button>
               </div>
             </div>
           ) : (

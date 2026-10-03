@@ -22,7 +22,7 @@ import {
 import { AlertTriangle, CheckCircle2, Mail, MessageSquare } from "lucide-react";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -550,23 +550,38 @@ const AdminContact = () => {
     { key: "name", label: "Name" },
     { key: "email", label: "Email" },
     { key: "message", label: "Message" },
-    { key: "status", label: "Status", value: (m) => (m.adminReplyMessage ? "Replied" : "Pending") },
+    {
+      key: "status",
+      label: "Status",
+      value: (m) => (m.adminReplyMessage ? "Replied" : "Pending"),
+    },
     { key: "adminReplyMessage", label: "Admin Reply" },
-    { key: "createdAt", label: "Received", value: (m) => formatDateTime(m.createdAt) },
+    {
+      key: "createdAt",
+      label: "Received",
+      value: (m) => formatDateTime(m.createdAt),
+    },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Contact Messages Report",
-      subtitle: filterStatus === "all" ? "All messages" : `Status: ${filterStatus}`,
-      columns: contactReportColumns,
-      rows: filteredMessages,
-      emptyMessage: "No messages match the current search or status filter.",
-    });
+  const printConfig = {
+    title: "Contact Messages Report",
+    subtitle:
+      filterStatus === "all"
+        ? "Status: All messages"
+        : `Status: ${filterStatus}`,
+    columns: contactReportColumns,
+    rows: filteredMessages,
+    getDate: (m) => m.createdAt,
+    dateLabel: "Date received",
+    emptyMessage: "No messages match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
-    downloadCSV("contact-messages-report", contactReportColumns, filteredMessages);
+    downloadCSV(
+      "contact-messages-report",
+      contactReportColumns,
+      filteredMessages,
+    );
   };
 
   const handleReplySent = (msgId, replyText) => {
@@ -642,7 +657,10 @@ const AdminContact = () => {
               View customer inquiries and send email replies directly from here.
             </p>
           </div>
-          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+          <ReportActionButtons
+            report={printConfig}
+            onExport={handleExportCSV}
+          />
         </div>
 
         {/* Stat Cards */}

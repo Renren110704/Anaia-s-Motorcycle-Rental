@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaPrint, FaTimes } from "react-icons/fa";
 import { Calendar, BarChart3, ShieldCheck, Coins, Bike } from "lucide-react";
+import {
+  printDocument,
+  escapeHTML,
+  formatReportDate,
+} from "../utils/reportUtils";
 
 const SECTIONS = [
   {
@@ -33,7 +38,8 @@ const SECTIONS = [
   },
 ];
 
-const formatMoney = (n) => `₱${Number(n || 0).toLocaleString()}`;
+// "PHP" prefix (not ₱) to match the other printed reports and the CSV export.
+const formatMoney = (n) => `PHP ${Number(n || 0).toLocaleString()}`;
 
 /**
  * PrintReportModal
@@ -42,6 +48,7 @@ const formatMoney = (n) => `₱${Number(n || 0).toLocaleString()}`;
  *   open                boolean
  *   onClose             () => void
  *   selectedPeriodLabel string
+ *   dateFrom / dateTo   "YYYY-MM-DD"  concrete range shown in the printed header
  *   metrics             object  (same shape as AdminAnalytics metrics)
  *   fleetStats          object  { total, available, rented, pending, maintenance }
  *   earningsAndExpenses object  (same shape as AdminAnalytics earningsAndExpenses)
@@ -50,6 +57,8 @@ const PrintReportModal = ({
   open,
   onClose,
   selectedPeriodLabel = "All Time",
+  dateFrom = "",
+  dateTo = "",
   metrics = {},
   fleetStats = {},
   earningsAndExpenses = {},
@@ -88,117 +97,76 @@ const PrintReportModal = ({
 
   const handlePrint = () => {
     const show = (key) => enabled.has(key);
+    const row = (label, value) =>
+      `<tr><td>${escapeHTML(label)}</td><td class="amt">${escapeHTML(value)}</td></tr>`;
+    const table = (heading, rows) =>
+      `<h2 class="rpt-section">${escapeHTML(heading)}</h2>
+       <table class="rpt-table">
+         <thead><tr><th>Item</th><th class="amt">Value</th></tr></thead>
+         <tbody>${rows.join("")}</tbody>
+       </table>`;
 
-    const summaryHTML = show("summary")
-      ? `<div class="section">
-          <h2>Summary Metrics</h2>
-          <div class="grid">
-            <div class="card"><strong>Total Bookings</strong><span>${metrics.totalBookings ?? "—"}</span></div>
-            <div class="card"><strong>Revenue</strong><span>${formatMoney(metrics.totalRevenue)}</span></div>
-            <div class="card"><strong>Due At Pickup</strong><span>${formatMoney(metrics.totalDueAtPickup)}</span></div>
-            <div class="card"><strong>Active Rentals</strong><span>${metrics.activeRentals ?? "—"}</span></div>
-            <div class="card"><strong>Completed</strong><span>${metrics.completed ?? "—"}</span></div>
-            <div class="card"><strong>Pending Reservation</strong><span>${metrics.pendingReservations ?? "—"}</span></div>
-          </div>
-        </div>`
-      : "";
+    const sections = [];
+    if (show("summary"))
+      sections.push(
+        table("Summary Metrics", [
+          row("Total Bookings", metrics.totalBookings ?? "—"),
+          row("Revenue", formatMoney(metrics.totalRevenue)),
+          row("Due At Pickup", formatMoney(metrics.totalDueAtPickup)),
+          row("Active Rentals", metrics.activeRentals ?? "—"),
+          row("Completed", metrics.completed ?? "—"),
+          row("Pending Reservation", metrics.pendingReservations ?? "—"),
+        ]),
+      );
+    if (show("integrity"))
+      sections.push(
+        table("Receipt Integrity", [
+          row("Suspected Fake", metrics.suspectedFake ?? "—"),
+          row("Re-upload Requests", metrics.reuploadRequested ?? "—"),
+        ]),
+      );
+    if (show("revenue"))
+      sections.push(
+        table("Revenue Breakdown", [
+          row("Unit Rental", formatMoney(earningsAndExpenses.unitRental)),
+          row(
+            "Reservation Fees",
+            formatMoney(earningsAndExpenses.reservationFees),
+          ),
+          row("Extensions", formatMoney(earningsAndExpenses.extensions)),
+          row("Penalties", formatMoney(earningsAndExpenses.penalties)),
+          row("Helmet Fees", formatMoney(earningsAndExpenses.helmetFees)),
+          row("Distance Fees", formatMoney(earningsAndExpenses.distanceFees)),
+          ...(earningsAndExpenses.expenses > 0
+            ? [
+                row(
+                  "Expenses (Repairs)",
+                  formatMoney(earningsAndExpenses.expenses),
+                ),
+              ]
+            : []),
+        ]),
+      );
+    if (show("fleet"))
+      sections.push(
+        table("Fleet Summary", [
+          row("Total", fleetStats.total ?? "—"),
+          row("Available", fleetStats.available ?? "—"),
+          row("Rented", fleetStats.rented ?? "—"),
+          row("Pending", fleetStats.pending ?? "—"),
+          row("Maintenance", fleetStats.maintenance ?? "—"),
+        ]),
+      );
 
-    const integrityHTML = show("integrity")
-      ? `<div class="section">
-          <h2>Receipt Integrity</h2>
-          <div class="grid">
-            <div class="card warn"><strong>Suspected Fake</strong><span>${metrics.suspectedFake ?? "—"}</span></div>
-            <div class="card warn"><strong>Re-upload Requests</strong><span>${metrics.reuploadRequested ?? "—"}</span></div>
-          </div>
-        </div>`
-      : "";
-
-    const revenueHTML = show("revenue")
-      ? `<div class="section">
-          <h2>Revenue Breakdown</h2>
-          <table>
-            <thead><tr><th>Category</th><th>Amount</th></tr></thead>
-            <tbody>
-              <tr><td>Unit Rental</td><td>${formatMoney(earningsAndExpenses.unitRental)}</td></tr>
-              <tr><td>Reservation Fees</td><td>${formatMoney(earningsAndExpenses.reservationFees)}</td></tr>
-              <tr><td>Extensions</td><td>${formatMoney(earningsAndExpenses.extensions)}</td></tr>
-              <tr><td>Penalties</td><td>${formatMoney(earningsAndExpenses.penalties)}</td></tr>
-              <tr><td>Helmet Fees</td><td>${formatMoney(earningsAndExpenses.helmetFees)}</td></tr>
-              <tr><td>Distance Fees</td><td>${formatMoney(earningsAndExpenses.distanceFees)}</td></tr>
-              ${earningsAndExpenses.expenses > 0 ? `<tr class="exp"><td>Expenses (Repairs)</td><td>${formatMoney(earningsAndExpenses.expenses)}</td></tr>` : ""}
-            </tbody>
-          </table>
-        </div>`
-      : "";
-
-    const fleetHTML = show("fleet")
-      ? `<div class="section">
-          <h2>Fleet Summary</h2>
-          <div class="grid">
-            <div class="card"><strong>Total</strong><span>${fleetStats.total ?? "—"}</span></div>
-            <div class="card"><strong>Available</strong><span>${fleetStats.available ?? "—"}</span></div>
-            <div class="card"><strong>Rented</strong><span>${fleetStats.rented ?? "—"}</span></div>
-            <div class="card"><strong>Pending</strong><span>${fleetStats.pending ?? "—"}</span></div>
-            <div class="card"><strong>Maintenance</strong><span>${fleetStats.maintenance ?? "—"}</span></div>
-          </div>
-        </div>`
-      : "";
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Analytics Report — ${selectedPeriodLabel}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #171717; padding: 32px; font-size: 13px; }
-    .report-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid #b50002; }
-    .report-header h1 { font-size: 20px; font-weight: 800; color: #171717; }
-    .report-header p  { font-size: 12px; color: #888; margin-top: 4px; }
-    .badge { display: inline-block; background: #fef2f2; color: #b50002; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; }
-    .section { margin-bottom: 24px; }
-    .section h2 { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #b50002; margin-bottom: 12px; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; }
-    .card.warn { border-color: #fecaca; background: #fef2f2; }
-    .card strong { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 4px; }
-    .card span { font-size: 18px; font-weight: 800; color: #171717; }
-    .card.warn span { color: #b50002; }
-    table { width: 100%; border-collapse: collapse; }
-    table thead tr { background: #f8fafc; }
-    table th, table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
-    table th { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
-    table tr.exp td { color: #b50002; font-weight: 700; }
-    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
-    @media print { body { padding: 16px; } }
-  </style>
-</head>
-<body>
-  <div class="report-header">
-    <div>
-      <h1>Analytics Report</h1>
-      <p>Generated ${new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}</p>
-    </div>
-    <span class="badge">${selectedPeriodLabel}</span>
-  </div>
-  ${summaryHTML}
-  ${integrityHTML}
-  ${revenueHTML}
-  ${fleetHTML}
-  <div class="footer">Powered by Anaia's Motorcycle Rental Analytics &nbsp;·&nbsp; Confidential</div>
-</body>
-</html>`;
-
-    const w = window.open("", "_blank", "width=1100,height=800");
-    if (!w) {
-      alert("Pop-up blocked. Please allow pop-ups for this site.");
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 400);
-    onClose();
+    const printed = printDocument({
+      title: "Analytics Report",
+      subtitle: `Period: ${selectedPeriodLabel}`,
+      dateFrom,
+      dateTo,
+      dateBasis: "Booking date",
+      bodyHTML: sections.join(""),
+    });
+    if (printed !== false) onClose();
   };
 
   if (!open) return null;
@@ -253,14 +221,29 @@ const PrintReportModal = ({
         {/* Body */}
         <div className="px-5 py-4">
           {/* Period chip */}
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-4">
-            <Calendar className="w-3.5 h-3.5 text-[#b50002] flex-shrink-0" />
-            <span className="text-[12px] text-slate-500 font-semibold">
-              Period:{" "}
-              <span className="text-[#171717] font-black">
-                {selectedPeriodLabel}
-              </span>
-            </span>
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-4">
+            <Calendar className="w-3.5 h-3.5 text-[#b50002] flex-shrink-0 mt-0.5" />
+            <div className="text-[12px] text-slate-500 font-semibold leading-relaxed">
+              <div>
+                Period:{" "}
+                <span className="text-[#171717] font-black">
+                  {selectedPeriodLabel}
+                </span>
+              </div>
+              <div>
+                Date From:{" "}
+                <span className="text-[#171717] font-black">
+                  {formatReportDate(dateFrom, "All dates")}
+                </span>
+                {"  ·  "}Date To:{" "}
+                <span className="text-[#171717] font-black">
+                  {formatReportDate(dateTo, "All dates")}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Change the range with "Filter Period" on this page.
+              </div>
+            </div>
           </div>
 
           {/* Section toggles */}

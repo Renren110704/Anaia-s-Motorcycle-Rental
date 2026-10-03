@@ -51,7 +51,7 @@ import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV, formatReportDate } from "../utils/reportUtils";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
@@ -99,6 +99,7 @@ const buildSafeMotorcycle = (raw = {}, idx = 0) => {
     isDeleted: raw.isDeleted || false,
     traccarDeviceId: raw.traccarDeviceId || "",
     deletedAt: raw.deletedAt || null,
+    createdAt: raw.createdAt || null,
     _rawImage: raw.image ?? raw._rawImage ?? "",
     image: raw.image
       ? makeImageUrl(raw.image)
@@ -2117,28 +2118,52 @@ const ManageMotorcycle = () => {
 
   const motorcycleReportColumns = [
     { key: "unitId", label: "Unit ID" },
-    { key: "make", label: "Vehicle", value: (m) => `${m.make || ""} ${m.model || ""}`.trim() },
+    {
+      key: "make",
+      label: "Vehicle",
+      value: (m) => `${m.make || ""} ${m.model || ""}`.trim(),
+    },
     { key: "category", label: "Category" },
     { key: "year", label: "Year" },
     { key: "engineSize", label: "Engine" },
     { key: "fuelType", label: "Fuel Type" },
     { key: "transmission", label: "Transmission" },
-    { key: "dailyRate", label: "Rate/Day", value: (m) => `PHP ${Number(m.dailyRate || 0).toLocaleString()}` },
-    { key: "status", label: "Status", value: (m) => (m.isDeleted ? "Deleted" : m.status) },
+    {
+      key: "dailyRate",
+      label: "Rate/Day",
+      value: (m) => `PHP ${Number(m.dailyRate || 0).toLocaleString()}`,
+    },
+    {
+      key: "status",
+      label: "Status",
+      value: (m) => (m.isDeleted ? "Deleted" : m.status),
+    },
+    {
+      key: "createdAt",
+      label: "Date Added",
+      value: (m) => formatReportDate(m.createdAt, ""),
+    },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Vehicle Management Report",
-      subtitle: selectedStatus === "deleted" ? "Deleted units" : `Status: ${selectedStatus}`,
-      columns: motorcycleReportColumns,
-      rows: filteredMotorcycles,
-      emptyMessage: "No motorcycles match the current filters.",
-    });
+  const printConfig = {
+    title: "Vehicle Management Report",
+    subtitle:
+      selectedStatus === "deleted"
+        ? "Status: Deleted units"
+        : `Status: ${selectedStatus}`,
+    columns: motorcycleReportColumns,
+    rows: filteredMotorcycles,
+    getDate: (m) => m.createdAt,
+    dateLabel: "Date added",
+    emptyMessage: "No motorcycles match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
-    downloadCSV("vehicle-management-report", motorcycleReportColumns, filteredMotorcycles);
+    downloadCSV(
+      "vehicle-management-report",
+      motorcycleReportColumns,
+      filteredMotorcycles,
+    );
   };
 
   const clearFilters = () => {
@@ -2321,7 +2346,10 @@ const ManageMotorcycle = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+            <ReportActionButtons
+              report={printConfig}
+              onExport={handleExportCSV}
+            />
             <button
               onClick={() => setShowAddModal(true)}
               className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b50002] text-white text-sm font-bold shadow-md shadow-[#b50002]/30 hover:brightness-110 transition-all"

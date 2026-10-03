@@ -31,7 +31,7 @@ import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -1105,26 +1105,42 @@ const ReviewManagement = () => {
   const reviewReportColumns = [
     { key: "renterName", label: "Renter" },
     { key: "renterEmail", label: "Email" },
-    { key: "motorcycle", label: "Motorcycle", value: (r) => `${r.motorcycleId?.make || ""} ${r.motorcycleId?.model || ""}`.trim() },
+    {
+      key: "motorcycle",
+      label: "Motorcycle",
+      value: (r) =>
+        `${r.motorcycleId?.make || ""} ${r.motorcycleId?.model || ""}`.trim(),
+    },
     { key: "rating", label: "Rating" },
     { key: "feedbackDescription", label: "Feedback" },
     { key: "status", label: "Status" },
-    { key: "isFeatured", label: "Featured", value: (r) => (r.isFeatured ? "Yes" : "No") },
+    {
+      key: "isFeatured",
+      label: "Featured",
+      value: (r) => (r.isFeatured ? "Yes" : "No"),
+    },
     { key: "createdAt", label: "Date", value: (r) => formatDate(r.createdAt) },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Review Management Report",
-      subtitle: activeStatus === "all" ? "All reviews" : `Status: ${activeStatus}`,
-      columns: reviewReportColumns,
-      rows: filteredReviews,
-      emptyMessage: "No reviews match the current search or status filter.",
-    });
+  const printConfig = {
+    title: "Review Management Report",
+    subtitle:
+      activeStatus === "all"
+        ? "Status: All reviews"
+        : `Status: ${activeStatus}`,
+    columns: reviewReportColumns,
+    rows: filteredReviews,
+    getDate: (r) => r.createdAt,
+    dateLabel: "Review date",
+    emptyMessage: "No reviews match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
-    downloadCSV("review-management-report", reviewReportColumns, filteredReviews);
+    downloadCSV(
+      "review-management-report",
+      reviewReportColumns,
+      filteredReviews,
+    );
   };
 
   const drawerReview = useMemo(
@@ -1342,11 +1358,14 @@ const ReviewManagement = () => {
               Review Management
             </h1>
             <p className="text-slate-700 text-sm mt-1">
-              Moderate renter feedback and choose which approved reviews appear in
-              testimonials. (New reviews are automatically approved).
+              Moderate renter feedback and choose which approved reviews appear
+              in testimonials. (New reviews are automatically approved).
             </p>
           </div>
-          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+          <ReportActionButtons
+            report={printConfig}
+            onExport={handleExportCSV}
+          />
         </div>
 
         {/* Stat cards */}

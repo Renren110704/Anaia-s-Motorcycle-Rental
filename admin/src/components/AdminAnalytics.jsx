@@ -481,6 +481,36 @@ const AdminAnalytics = () => {
     return `${monthName} ${selectedYear}`;
   }, [selectedYear, selectedMonth, fromDate, toDate]);
 
+  // Concrete Date From / Date To for the printed report header.
+  const reportDateRange = useMemo(() => {
+    const pad = (n) => String(n).padStart(2, "0");
+    const iso = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    let from = fromDate;
+    let to = toDate;
+    if (!from && !to && selectedYear !== "all") {
+      const y = Number(selectedYear);
+      if (selectedMonth !== "all") {
+        const m = Number(selectedMonth);
+        from = iso(new Date(y, m - 1, 1));
+        to = iso(new Date(y, m, 0));
+      } else {
+        from = `${y}-01-01`;
+        to = `${y}-12-31`;
+      }
+    }
+    if (!from || !to) {
+      const times = filteredBookings
+        .map((b) => new Date(b?.bookingDate || b?.createdAt || b?.pickupDate))
+        .filter((d) => !Number.isNaN(d.getTime()));
+      if (times.length) {
+        if (!from) from = iso(new Date(Math.min(...times)));
+        if (!to) to = iso(new Date(Math.max(...times)));
+      }
+    }
+    return { from: from || "", to: to || "" };
+  }, [fromDate, toDate, selectedYear, selectedMonth, filteredBookings]);
+
   const metrics = useMemo(() => {
     const totalBookings = filteredBookings.length;
     const activeRentals = filteredBookings.filter(
@@ -1372,6 +1402,8 @@ const AdminAnalytics = () => {
         metrics={metrics}
         fleetStats={fleetStats}
         earningsAndExpenses={earningsAndExpenses}
+        dateFrom={reportDateRange.from}
+        dateTo={reportDateRange.to}
       />
     </main>
   );

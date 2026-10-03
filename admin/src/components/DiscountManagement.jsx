@@ -32,7 +32,7 @@ import { createPortal } from "react-dom";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -1609,22 +1609,36 @@ const DiscountManagement = () => {
     { key: "name", label: "Promo Name" },
     { key: "code", label: "Code" },
     { key: "discountType", label: "Type" },
-    { key: "discountValue", label: "Value", value: (p) => (p.discountType === "percentage" ? `${p.discountValue}%` : `PHP ${Number(p.discountValue || 0).toLocaleString()}`) },
+    {
+      key: "discountValue",
+      label: "Value",
+      value: (p) =>
+        p.discountType === "percentage"
+          ? `${p.discountValue}%`
+          : `PHP ${Number(p.discountValue || 0).toLocaleString()}`,
+    },
     { key: "startDate", label: "Start Date" },
     { key: "endDate", label: "End Date" },
     { key: "usedCount", label: "Used" },
-    { key: "maxUses", label: "Max Uses", value: (p) => (p.maxUses === null || p.maxUses === undefined ? "Unlimited" : p.maxUses) },
+    {
+      key: "maxUses",
+      label: "Max Uses",
+      value: (p) =>
+        p.maxUses === null || p.maxUses === undefined ? "Unlimited" : p.maxUses,
+    },
     { key: "status", label: "Status", value: (p) => getPromoStatus(p).label },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Discounts & Promos Report",
-      subtitle: filterStatus === "all" ? "All promos" : `Status: ${filterStatus}`,
-      columns: promoReportColumns,
-      rows: filteredPromos,
-      emptyMessage: "No promos match the current search or status filter.",
-    });
+  const printConfig = {
+    title: "Discounts & Promos Report",
+    subtitle:
+      filterStatus === "all" ? "Status: All promos" : `Status: ${filterStatus}`,
+    columns: promoReportColumns,
+    rows: filteredPromos,
+    getDate: (p) => [p.startDate, p.endDate], // promos valid at any point in the range
+    undated: "include", // a promo with no dates is always valid
+    dateLabel: "Promo validity period (overlaps the range)",
+    emptyMessage: "No promos match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
@@ -1675,7 +1689,10 @@ const DiscountManagement = () => {
             className="flex items-center gap-2 flex-shrink-0"
             style={{ display: activeTab === "promos" ? "flex" : "none" }}
           >
-            <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+            <ReportActionButtons
+              report={printConfig}
+              onExport={handleExportCSV}
+            />
             <button
               onClick={() => {
                 setEditingPromo(null);

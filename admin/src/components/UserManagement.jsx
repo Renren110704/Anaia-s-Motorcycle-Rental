@@ -21,7 +21,7 @@ import {
 import { AlertTriangle, CheckCircle2, Trash2, Users } from "lucide-react";
 import { LoyaltyTierBadge } from "../components/DiscountBadge";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const baseURL = API_BASE_URL;
 const api = axios.create({ baseURL, headers: { Accept: "application/json" } });
@@ -765,22 +765,41 @@ const UserManagement = () => {
   );
 
   const userReportColumns = [
-    { key: "name", label: "Name", value: (u) => `${u.firstName || ""} ${u.lastName || ""}`.trim() },
+    {
+      key: "name",
+      label: "Name",
+      value: (u) => `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+    },
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone" },
-    { key: "isVerified", label: "Verified", value: (u) => (u.isVerified ? "Yes" : "No") },
-    { key: "loyaltyTier", label: "Loyalty Tier", value: (u) => u.loyaltyTier || "None" },
-    { key: "createdAt", label: "Joined", value: (u) => formatDate(u.createdAt) },
+    {
+      key: "isVerified",
+      label: "Verified",
+      value: (u) => (u.isVerified ? "Yes" : "No"),
+    },
+    {
+      key: "loyaltyTier",
+      label: "Loyalty Tier",
+      value: (u) => u.loyaltyTier || "None",
+    },
+    {
+      key: "createdAt",
+      label: "Joined",
+      value: (u) => formatDate(u.createdAt),
+    },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "User Management Report",
-      subtitle: selectedStatus === "unverified" ? "Unverified users" : "All users",
-      columns: userReportColumns,
-      rows: filteredUsers,
-      emptyMessage: "No users match the current search or status filter.",
-    });
+  const printConfig = {
+    title: "User Management Report",
+    subtitle:
+      selectedStatus === "unverified"
+        ? "Status: Unverified users"
+        : "Status: All users",
+    columns: userReportColumns,
+    rows: filteredUsers,
+    getDate: (u) => u.createdAt,
+    dateLabel: "Date joined",
+    emptyMessage: "No users match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
@@ -850,7 +869,10 @@ const UserManagement = () => {
               handle account access.
             </p>
           </div>
-          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+          <ReportActionButtons
+            report={printConfig}
+            onExport={handleExportCSV}
+          />
         </div>
 
         {/* Stat Cards */}

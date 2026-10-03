@@ -23,7 +23,7 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -470,24 +470,44 @@ const ReturnInspection = () => {
     { key: "email", label: "Email" },
     { key: "motorcycleName", label: "Motorcycle" },
     { key: "unitId", label: "Unit" },
-    { key: "returnDate", label: "Return Date", value: (b) => formatDate(b.returnDate) },
-    { key: "inspectionDate", label: "Inspection Date", value: (b) => formatDate(b.returnInspection?.inspectionDate) },
-    { key: "clearanceStatus", label: "Clearance", value: (b) => (b.returnInspection?.clearanceStatus || "pending_inspection").replace(/_/g, " ") },
+    {
+      key: "returnDate",
+      label: "Return Date",
+      value: (b) => formatDate(b.returnDate),
+    },
+    {
+      key: "inspectionDate",
+      label: "Inspection Date",
+      value: (b) => formatDate(b.returnInspection?.inspectionDate),
+    },
+    {
+      key: "clearanceStatus",
+      label: "Clearance",
+      value: (b) =>
+        (b.returnInspection?.clearanceStatus || "pending_inspection").replace(
+          /_/g,
+          " ",
+        ),
+    },
     { key: "status", label: "Booking Status" },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Return Inspection Report",
-      subtitle: `Status: ${selectedStatus}`,
-      columns: inspectionReportColumns,
-      rows: filteredBookings,
-      emptyMessage: "No bookings match the current search or status filter.",
-    });
+  const printConfig = {
+    title: "Return Inspection Report",
+    subtitle: `Status: ${selectedStatus}`,
+    columns: inspectionReportColumns,
+    rows: filteredBookings,
+    getDate: (b) => b.returnDate,
+    dateLabel: "Return date",
+    emptyMessage: "No bookings match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
-    downloadCSV("return-inspection-report", inspectionReportColumns, filteredBookings);
+    downloadCSV(
+      "return-inspection-report",
+      inspectionReportColumns,
+      filteredBookings,
+    );
   };
 
   // Sync form when booking changes
@@ -830,7 +850,10 @@ const ReturnInspection = () => {
               Move active rentals into inspection and record clearance outcomes.
             </p>
           </div>
-          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+          <ReportActionButtons
+            report={printConfig}
+            onExport={handleExportCSV}
+          />
         </div>
 
         {/* Stat Cards */}

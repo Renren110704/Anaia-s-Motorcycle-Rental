@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import ReactDOM from "react-dom/client";
 import {
   FaCog,
@@ -18,17 +24,13 @@ import {
   FaTools,
   FaCheckCircle,
 } from "react-icons/fa";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardList,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList } from "lucide-react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import API_BASE_URL from "../apiBase";
 import { ADMIN_TOKEN_STORAGE_KEY } from "../constants/adminAuth";
 import ReportActionButtons from "./ReportActionButtons";
-import { printReport, downloadCSV } from "../utils/reportUtils";
+import { downloadCSV } from "../utils/reportUtils";
 
 const BASE = API_BASE_URL;
 const api = axios.create({
@@ -331,7 +333,13 @@ const InlineDatePicker = ({
               type="button"
               aria-label="Previous month"
               onClick={() => setViewMonth((v) => calAddMonths(v, -1))}
-              style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
+              style={{
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               <FaChevronLeft size={10} color="#0E0E0E" />
             </button>
@@ -342,7 +350,13 @@ const InlineDatePicker = ({
               type="button"
               aria-label="Next month"
               onClick={() => setViewMonth((v) => calAddMonths(v, 1))}
-              style={{ padding: "5px 8px", borderRadius: 8, background: "#F5F5F3", border: "none", cursor: "pointer" }}
+              style={{
+                padding: "5px 8px",
+                borderRadius: 8,
+                background: "#F5F5F3",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               <FaChevronRight size={10} color="#0E0E0E" />
             </button>
@@ -384,7 +398,11 @@ const InlineDatePicker = ({
               const inMonth = date.getMonth() === viewMonth.getMonth();
               const dk = toDateKey(date);
               const isSelected = value === dk;
-              const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+              const d = new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+              );
               const tooEarly = minD && d < minD;
               const tooLate = maxD && d > maxD;
               const isBooked = isBookedDay(date);
@@ -392,7 +410,11 @@ const InlineDatePicker = ({
               const isToday = dk === todayISO();
 
               const isRangeStart = highlightRangeStart === dk;
-              const isInRange = highlightRangeStart && value && dk > highlightRangeStart && dk < value;
+              const isInRange =
+                highlightRangeStart &&
+                value &&
+                dk > highlightRangeStart &&
+                dk < value;
 
               let bg = "transparent";
               let color = inMonth ? "#0E0E0E" : "rgba(0,0,0,0.2)";
@@ -471,40 +493,39 @@ const InlineDatePicker = ({
               gap: "6px 12px",
             }}
           >
-            {[
-              { dot: "rgba(181,0,2,0.4)", label: "Booked" },
-            ].map(({ dot, label }) => (
-              <div
-                key={label}
-                style={{ display: "flex", alignItems: "center", gap: 5 }}
-              >
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: dot,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "rgba(0,0,0,0.4)",
-                    fontWeight: 600,
-                  }}
+            {[{ dot: "rgba(181,0,2,0.4)", label: "Booked" }].map(
+              ({ dot, label }) => (
+                <div
+                  key={label}
+                  style={{ display: "flex", alignItems: "center", gap: 5 }}
                 >
-                  {label}
-                </span>
-              </div>
-            ))}
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: "rgba(0,0,0,0.4)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              ),
+            )}
           </div>
         </div>
       )}
     </div>
   );
 };
-
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
@@ -729,12 +750,17 @@ const scheduleModal = (motorcycle, bookings) =>
     const bookingRanges = (bookings || [])
       .filter((b) => {
         const id =
-          b.motorcycle?._id || b.motorcycle?.id || b.motorcycle || b.motorcycleId;
+          b.motorcycle?._id ||
+          b.motorcycle?.id ||
+          b.motorcycle ||
+          b.motorcycleId;
         return String(id) === String(currentMotoId);
       })
       .map((b) => {
         const status = String(b?.status || "").toLowerCase();
-        if (["completed", "inspection", "canceled", "cancelled"].includes(status))
+        if (
+          ["completed", "inspection", "canceled", "cancelled"].includes(status)
+        )
           return null;
         const pd = new Date(b.pickupDate);
         const rd = new Date(b.returnDate);
@@ -1298,30 +1324,51 @@ const MaintenancePage = () => {
   const maintenanceFormatDate = (s) => {
     if (!s) return "";
     const d = new Date(s);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-PH", { dateStyle: "medium" });
+    return isNaN(d.getTime())
+      ? ""
+      : d.toLocaleDateString("en-PH", { dateStyle: "medium" });
   };
 
   const maintenanceReportColumns = [
     { key: "unitId", label: "Unit ID" },
-    { key: "make", label: "Vehicle", value: (m) => `${m.make || ""} ${m.model || ""}`.trim() },
+    {
+      key: "make",
+      label: "Vehicle",
+      value: (m) => `${m.make || ""} ${m.model || ""}`.trim(),
+    },
     { key: "category", label: "Category" },
     { key: "status", label: "Status" },
-    { key: "maintenanceScheduleStartAt", label: "Scheduled Start", value: (m) => maintenanceFormatDate(m.maintenanceScheduleStartAt) },
-    { key: "maintenanceScheduleEndAt", label: "Scheduled End", value: (m) => maintenanceFormatDate(m.maintenanceScheduleEndAt) },
+    {
+      key: "maintenanceScheduleStartAt",
+      label: "Scheduled Start",
+      value: (m) => maintenanceFormatDate(m.maintenanceScheduleStartAt),
+    },
+    {
+      key: "maintenanceScheduleEndAt",
+      label: "Scheduled End",
+      value: (m) => maintenanceFormatDate(m.maintenanceScheduleEndAt),
+    },
   ];
 
-  const handlePrintReport = () => {
-    printReport({
-      title: "Maintenance Management Report",
-      subtitle: selectedStatus === "all" ? "All units" : `Status: ${selectedStatus}`,
-      columns: maintenanceReportColumns,
-      rows: filteredMotorcycles,
-      emptyMessage: "No units match the current filters.",
-    });
+  const printConfig = {
+    title: "Maintenance Management Report",
+    subtitle:
+      selectedStatus === "all"
+        ? "Status: All units"
+        : `Status: ${selectedStatus}`,
+    columns: maintenanceReportColumns,
+    rows: filteredMotorcycles,
+    getDate: (m) => [m.maintenanceScheduleStartAt, m.maintenanceScheduleEndAt],
+    dateLabel: "Maintenance schedule (overlaps the range)",
+    emptyMessage: "No scheduled units match the current filters or date range.",
   };
 
   const handleExportCSV = () => {
-    downloadCSV("maintenance-management-report", maintenanceReportColumns, filteredMotorcycles);
+    downloadCSV(
+      "maintenance-management-report",
+      maintenanceReportColumns,
+      filteredMotorcycles,
+    );
   };
 
   const hasActiveFilters =
@@ -1434,7 +1481,7 @@ const MaintenancePage = () => {
         status: newStatus,
       });
       await api.put(`/api/motorcycles/${motorcycle._id}`, fd);
-      
+
       toast.success(
         isToday
           ? `${motorcycle.make} ${motorcycle.model} maintenance rescheduled and set to In Maintenance`
@@ -1480,7 +1527,10 @@ const MaintenancePage = () => {
               Set units to maintenance mode or return them to the active fleet.
             </p>
           </div>
-          <ReportActionButtons onPrint={handlePrintReport} onExport={handleExportCSV} />
+          <ReportActionButtons
+            report={printConfig}
+            onExport={handleExportCSV}
+          />
         </div>
 
         {/* Stat Cards */}

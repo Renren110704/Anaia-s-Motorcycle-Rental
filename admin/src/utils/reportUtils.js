@@ -130,6 +130,14 @@ export const getDateBounds = (rows, getDate) => {
   return { min: min ? toISODate(min) : "", max: max ? toISODate(max) : "" };
 };
 
+// ── Company details shown in the printed letterhead ─────────────────────────
+export const REPORT_COMPANY = {
+  name: "Anaia Motorcycle Rental",
+  address: ["Soldiers Hills IV, Block 9 Lot 1 PH2 Lily", "Bacoor, 4102 Cavite"],
+  email: "jpineda132020@gmail.com",
+  phone: "0917 623 1426",
+};
+
 // ── Report branding: "Printed By" name + changeable logo ────────────────────
 // Saved in this browser (localStorage) and applied to every printed report.
 export const DEFAULT_PRINTED_BY = "Martin Lorenz Dula";
@@ -248,15 +256,20 @@ const PRINT_CSS = (landscape, fontPt) => `
   * { box-sizing: border-box; margin: 0; padding: 0; color: #000; background: transparent; box-shadow: none; text-shadow: none; }
   html, body { background: #fff; }
   body { font-family: Arial, Helvetica, sans-serif; font-size: ${fontPt}pt; line-height: 1.35; padding: 12mm; }
-  .rpt-head { margin-bottom: 8mm; }
-  .rpt-brand { display: flex; align-items: center; gap: 5mm; }
-  .rpt-brand-side { flex: 0 0 30mm; height: 20mm; display: flex; align-items: center; justify-content: flex-start; }
-  .rpt-brand-text { flex: 1 1 auto; min-width: 0; }
-  img.rpt-logo { display: block; max-width: 30mm; max-height: 20mm; width: auto; height: auto; object-fit: contain; }
+  .rpt-head { margin-bottom: 6mm; }
+  /* Letterhead: logo on the left, company details on the right. */
+  .rpt-brand { display: flex; align-items: center; justify-content: space-between; gap: 8mm; }
+  .rpt-logo-box { flex: 0 0 auto; }
+  img.rpt-logo { display: block; max-width: 42mm; max-height: 20mm; width: auto; height: auto; object-fit: contain; }
+  /* The built-in logo file has wide transparent padding around the artwork,
+     so the box crops to the artwork itself (about 40mm x 18mm). */
+  .rpt-logo-box.rpt-logo-default { width: 40mm; height: 18mm; overflow: hidden; }
+  .rpt-logo-default img.rpt-logo { width: 98mm; height: 24.5mm; max-width: none; max-height: none; margin: -1.1mm 0 0 -28.7mm; }
+  .rpt-info { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 10pt; line-height: 1.3; }
   table.rpt-meta td.rpt-by { font-weight: 700; }
-  .rpt-org { text-align: center; font-size: 10pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
-  .rpt-title { text-align: center; font-size: 17pt; font-weight: 700; margin-top: 2mm; text-transform: uppercase; letter-spacing: 0.04em; }
-  .rpt-rule { border: 0; border-top: 2px solid #000; margin: 4mm 0 3mm; }
+  .rpt-org { font-size: 13pt; font-weight: 700; margin-bottom: 1mm; }
+  .rpt-title { text-align: center; font-size: 17pt; font-weight: 700; margin-bottom: 3mm; text-transform: uppercase; letter-spacing: 0.04em; }
+  .rpt-rule { border: 0; border-top: 2px solid #000; margin: 3mm 0 3mm; }
   table.rpt-meta { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
   table.rpt-meta th, table.rpt-meta td { border: 1px solid #000; padding: 4px 8px; font-size: 10pt; text-align: left; vertical-align: top; }
   table.rpt-meta th { width: 18%; font-weight: 700; white-space: nowrap; }
@@ -270,7 +283,7 @@ const PRINT_CSS = (landscape, fontPt) => `
   tfoot { display: table-footer-group; }
   tr { break-inside: avoid; page-break-inside: avoid; }
   .rpt-empty { border: 1px solid #000; padding: 10mm 0; text-align: center; font-style: italic; }
-  .rpt-end { margin-top: 6mm; text-align: center; font-size: 9pt; letter-spacing: 0.08em; }
+  .rpt-end { margin-top: 4mm; text-align: center; font-size: 9pt; letter-spacing: 0.08em; }
   @media print { body { padding: 0; } }
 `;
 
@@ -294,6 +307,7 @@ export const printDocument = ({
   const branding = getReportSettings();
   const byName = String(printedBy || "").trim() || branding.printedBy;
   const logoSrc = logo || branding.logo;
+  const isDefaultLogo = !logo && !branding.hasCustomLogo;
   const from = formatReportDate(dateFrom, "All dates");
   const to = formatReportDate(dateTo, "All dates");
   const generated = new Date().toLocaleString("en-PH", {
@@ -312,18 +326,22 @@ export const printDocument = ({
 <body>
   <header class="rpt-head">
     <div class="rpt-brand">
-      <div class="rpt-brand-side">${
+      <div class="rpt-logo-box${isDefaultLogo ? " rpt-logo-default" : ""}">${
         logoSrc
           ? `<img class="rpt-logo" src="${escapeHTML(logoSrc)}" alt="Logo"/>`
           : ""
       }</div>
-      <div class="rpt-brand-text">
-        <div class="rpt-org">Anaia Motorcycle Rental</div>
-        <div class="rpt-title">${escapeHTML(title)}</div>
+      <div class="rpt-info">
+        <div class="rpt-org">${escapeHTML(REPORT_COMPANY.name)}</div>
+        ${REPORT_COMPANY.address
+          .map((line) => `<div>${escapeHTML(line)}</div>`)
+          .join("")}
+        <div>${escapeHTML(REPORT_COMPANY.email)}</div>
+        <div>${escapeHTML(REPORT_COMPANY.phone)}</div>
       </div>
-      <div class="rpt-brand-side"></div>
     </div>
     <hr class="rpt-rule"/>
+    <div class="rpt-title">${escapeHTML(title)}</div>
     <table class="rpt-meta">
       <tr>
         <th>Date From</th><td>${escapeHTML(from)}</td>

@@ -3,6 +3,8 @@
 //
 // columns shape: [{ key: "make", label: "Vehicle", value?: (row) => any }]
 
+import defaultReportLogo from "../assets/logo.png";
+
 const cellText = (col, row) => {
   const raw = typeof col.value === "function" ? col.value(row) : row[col.key];
   if (raw === undefined || raw === null || raw === "") return "";
@@ -128,8 +130,115 @@ export const getDateBounds = (rows, getDate) => {
   return { min: min ? toISODate(min) : "", max: max ? toISODate(max) : "" };
 };
 
+// ── Report branding: "Printed By" name + changeable logo ────────────────────
+// Saved in this browser (localStorage) and applied to every printed report.
+export const DEFAULT_PRINTED_BY = "Martin Lorenz Dula";
+
+const PRINTED_BY_KEY = "anaia_report_printed_by";
+const LOGO_KEY = "anaia_report_logo";
+const LOGO_DATA_URL = /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const LOGO_MAX_BYTES = 5 * 1024 * 1024; // source file limit
+const LOGO_MAX_PX = 480; // longest side after resizing
+
+const readStore = (key) => {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (err) {
+    return "";
+  }
+};
+
+const writeStore = (key, value) => {
+  try {
+    if (value) window.localStorage.setItem(key, value);
+    else window.localStorage.removeItem(key);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+/** Absolute URL of the built-in logo (the print window has no base path). */
+export const getDefaultReportLogo = () => {
+  try {
+    return new URL(defaultReportLogo, window.location.href).href;
+  } catch (err) {
+    return defaultReportLogo;
+  }
+};
+
+/** Current branding. Falls back to the default name / default logo. */
+export const getReportSettings = () => {
+  const printedBy = readStore(PRINTED_BY_KEY).trim() || DEFAULT_PRINTED_BY;
+  const stored = readStore(LOGO_KEY);
+  const hasCustomLogo = LOGO_DATA_URL.test(stored);
+  return {
+    printedBy,
+    logo: hasCustomLogo ? stored : getDefaultReportLogo(),
+    hasCustomLogo,
+  };
+};
+
+/** Saves the "Printed By" name. A blank name restores the default. */
+export const saveReportPrintedBy = (name) =>
+  writeStore(PRINTED_BY_KEY, String(name ?? "").trim());
+
+/** Saves a custom logo (data URL from prepareReportLogo). False if it failed. */
+export const saveReportLogo = (dataUrl) =>
+  LOGO_DATA_URL.test(dataUrl || "") ? writeStore(LOGO_KEY, dataUrl) : false;
+
+/** Removes the custom logo so reports use the default one again. */
+export const clearReportLogo = () => writeStore(LOGO_KEY, "");
+
+/**
+ * Validates an uploaded image and resizes it to a small PNG data URL that is
+ * safe to keep in localStorage and embed in the printed page.
+ */
+export const prepareReportLogo = (file) =>
+  new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error("No file selected."));
+      return;
+    }
+    if (!LOGO_TYPES.includes(file.type)) {
+      reject(new Error("Please choose a PNG, JPG or WebP image."));
+      return;
+    }
+    if (file.size > LOGO_MAX_BYTES) {
+      reject(new Error("That image is too large. Maximum size is 5 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("That file is not a valid image."));
+      img.onload = () => {
+        try {
+          const scale = Math.min(
+            1,
+            LOGO_MAX_PX / Math.max(img.width, img.height, 1),
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          canvas
+            .getContext("2d")
+            .drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (err) {
+          reject(new Error("Could not process that image."));
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
 // ── Print document (shared by every printed admin report) ───────────────────
-// Strictly black on white: no colours, gradients, shadows or badges.
+// Black on white: no colours, gradients, shadows or badges. The only
+// exception is the logo, which prints as uploaded.
 const PRINT_CSS = (landscape, fontPt) => `
   @page {
     size: A4 ${landscape ? "landscape" : "portrait"};
@@ -140,6 +249,11 @@ const PRINT_CSS = (landscape, fontPt) => `
   html, body { background: #fff; }
   body { font-family: Arial, Helvetica, sans-serif; font-size: ${fontPt}pt; line-height: 1.35; padding: 12mm; }
   .rpt-head { margin-bottom: 8mm; }
+  .rpt-brand { display: flex; align-items: center; gap: 5mm; }
+  .rpt-brand-side { flex: 0 0 30mm; height: 20mm; display: flex; align-items: center; justify-content: flex-start; }
+  .rpt-brand-text { flex: 1 1 auto; min-width: 0; }
+  img.rpt-logo { display: block; max-width: 30mm; max-height: 20mm; width: auto; height: auto; object-fit: contain; }
+  table.rpt-meta td.rpt-by { font-weight: 700; }
   .rpt-org { text-align: center; font-size: 10pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
   .rpt-title { text-align: center; font-size: 17pt; font-weight: 700; margin-top: 2mm; text-transform: uppercase; letter-spacing: 0.04em; }
   .rpt-rule { border: 0; border-top: 2px solid #000; margin: 4mm 0 3mm; }
@@ -174,7 +288,12 @@ export const printDocument = ({
   recordCount = null,
   landscape = false,
   fontPt = 10,
+  printedBy = "", // optional override; defaults to the saved name
+  logo = "", // optional override; defaults to the saved / default logo
 }) => {
+  const branding = getReportSettings();
+  const byName = String(printedBy || "").trim() || branding.printedBy;
+  const logoSrc = logo || branding.logo;
   const from = formatReportDate(dateFrom, "All dates");
   const to = formatReportDate(dateTo, "All dates");
   const generated = new Date().toLocaleString("en-PH", {
@@ -192,8 +311,18 @@ export const printDocument = ({
 </head>
 <body>
   <header class="rpt-head">
-    <div class="rpt-org">Anaia Motorcycle Rental</div>
-    <div class="rpt-title">${escapeHTML(title)}</div>
+    <div class="rpt-brand">
+      <div class="rpt-brand-side">${
+        logoSrc
+          ? `<img class="rpt-logo" src="${escapeHTML(logoSrc)}" alt="Logo"/>`
+          : ""
+      }</div>
+      <div class="rpt-brand-text">
+        <div class="rpt-org">Anaia Motorcycle Rental</div>
+        <div class="rpt-title">${escapeHTML(title)}</div>
+      </div>
+      <div class="rpt-brand-side"></div>
+    </div>
     <hr class="rpt-rule"/>
     <table class="rpt-meta">
       <tr>
@@ -206,6 +335,7 @@ export const printDocument = ({
         <th>Date Generated</th><td${recordCount === null ? ' colspan="3"' : ""}>${escapeHTML(generated)}</td>
         ${recordCount === null ? "" : `<th>Total Records</th><td>${recordCount}</td>`}
       </tr>
+      <tr><th>Printed By</th><td colspan="3" class="rpt-by">${escapeHTML(byName)}</td></tr>
     </table>
   </header>
   ${bodyHTML}
@@ -224,7 +354,28 @@ export const printDocument = ({
   w.document.write(html);
   w.document.close();
   w.focus();
-  setTimeout(() => w.print(), 400);
+
+  // Wait for the logo to load so it is never missing from the printout.
+  let fired = false;
+  const firePrint = () => {
+    if (fired) return;
+    fired = true;
+    setTimeout(() => {
+      if (!w.closed) w.print();
+    }, 300);
+  };
+  const logoEl = w.document.querySelector("img.rpt-logo");
+  if (logoEl && !logoEl.complete) {
+    logoEl.addEventListener("load", firePrint);
+    logoEl.addEventListener("error", () => {
+      // A broken logo must not leave a broken-image icon on the report.
+      logoEl.style.display = "none";
+      firePrint();
+    });
+    setTimeout(firePrint, 3000);
+  } else {
+    firePrint();
+  }
   return true;
 };
 

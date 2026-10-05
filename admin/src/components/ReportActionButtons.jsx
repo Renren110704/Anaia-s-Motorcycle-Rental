@@ -6,6 +6,7 @@ import {
   getDateBounds,
   printReport,
 } from "../utils/reportUtils";
+import ReportBrandingFields from "./ReportBrandingFields";
 
 /**
  * ReportActionButtons — "Print Report" + "Export CSV".
@@ -153,7 +154,7 @@ const ReportActionButtons = ({
                 </button>
               </div>
 
-              <div className="px-5 py-4 space-y-3">
+              <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center gap-1.5">
                   <FaCalendarAlt className="text-slate-300 text-[10px]" />
                   <span className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase">
@@ -200,6 +201,10 @@ const ReportActionButtons = ({
                   to include everything; the report will then show the earliest
                   or latest date found.
                 </p>
+
+                {/* Printed By + logo (shown in the printed header) */}
+                <ReportBrandingFields disabled={busy} className="pt-1" />
+
                 {error && (
                   <p className="text-[11px] font-semibold text-[#b50002]">
                     {error}
